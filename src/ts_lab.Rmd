@@ -1,0 +1,85 @@
+---
+title: 'Forecasting Lab: Production Figures'
+output:
+  html_document:
+    df_print: paged
+---
+
+Tässä dokumentissa tutkitaan aikasarjaennustamista tuotannon kuukausittaisilla luvuilla. Erityisesti halutaan tietää seuraavat:
+
+1. Kuinka hyvin ennustemallit ovat historiallisesti toimineet? Onko jompi kumpi malleista parempi?
+1.1. Kuinka hyvä keskiarvoennuste on?
+1.2. Kuinka hyvin vaihtelu mahtuu ennustettuihin rajoihin? Onko yksittäisiä selitettäviä poikkeamia?
+1.3. Miten parametrien valinta vaikuttaa mallien suoriutumiseen (esim. ikkunan koko)?
+2. Voidaanko tehdä kuukausiennuste tulevaisuuteen?
+3. Onko olemassa uusia ja parempia helposti sovellettavia malleja?
+4. Saisiko malleihin lisää parametreja?
+4.1. Työpäivien määrä kuukaudessa
+4.2. Historiallinen vuosivaihtelu
+4.3. Priori yleisestä trendistä
+4.4. Väestörakenne
+4.4.1 Auttaako sairaanhoitopiirien tasolle meneminen?
+    
+## Create original dataset that should remain immutable throughout labbing
+```{r message=FALSE}
+library(forecast)
+
+# Set working directory and load data
+setwd("/home/esa/tsproj")
+monthly_sales <- read.table("kuukausimyynti.txt", header = T, sep = "\t")
+
+# Separate yyyy/mmm column into months and years
+monthly_sales$year <- substr(monthly_sales$kuukausi, 1, 4)
+monthly_sales$month <- factor(substr(monthly_sales$kuukausi, 6, 8), levels=c("tam", "hel", "maa", "huh", "tou", "kes", "hei", "elo", "syy", "lok", "mar", "jou"))
+
+# Create a numeric column for months
+monthly_sales$month_num <- as.numeric(monthly_sales$month)
+
+# Omit empty values
+d <- na.omit(monthly_sales)
+```
+
+## Create time series objects
+```{r}
+ts.red <- ts(d$Punasoluvalmisteet, 
+             start=as.numeric(c(d$year[1], d$month_num[1])), 
+             end=as.numeric(c(tail(d$year, 1), tail(d$month_num, 1))), 
+             frequency=12)  # This tells the series that it is monthly data
+ts.pla <- ts(d$Trombosyyttivalmisteet,
+             start=as.numeric(c(d$year[1], d$month_num[1])), 
+             end=as.numeric(c(tail(d$year, 1), tail(d$month_num, 1))), 
+             frequency=12)
+ts.ffp <- ts(d$FFP,
+             start=as.numeric(c(d$year[1], d$month_num[1])), 
+             end=as.numeric(c(tail(d$year, 1), tail(d$month_num, 1))), 
+             frequency=12)
+
+# Create also a time series matrix for wicked snappy plotting yo
+tsm <- cbind(ts.red, ts.pla, ts.ffp)  # Try plot(tsm) !
+plot(tsm)
+```
+
+## Forecasts of Jarno Tuimala
+```{r}
+# Seasonal Decomposition by LOESS
+# The t.window of stl() should be an odd number, but Tuimala has decided against it. Will investigate.
+stl.red <- forecast(stl(ts.red, s.window="periodic", t.window=6), h=12)
+stl.pla <- forecast(stl(ts.pla, s.window="periodic", t.window=6), h=12)
+stl.ffp <- forecast(stl(ts.ffp, s.window="periodic", t.window=6), h=12)
+
+# Exponential smoothing state space model
+# ets() is an automated model selection function, so these are not the same model! Uses AICc, AIC and BIC.
+ets.red <- forecast(ets(ts.red), h=12)
+ets.pla <- forecast(ets(ts.pla), h=12)
+ets.ffp <- forecast(ets(ts.ffp), h=12)
+
+# Plot
+par(mfcol=c(3, 2))
+plot(stl.red)
+plot(stl.pla)
+plot(stl.ffp)
+plot(ets.red)
+plot(ets.pla)
+plot(ets.ffp)
+```
+
