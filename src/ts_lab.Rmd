@@ -19,7 +19,7 @@ Tässä dokumentissa tutkitaan aikasarjaennustamista tuotannon kuukausittaisilla
 4.3. Priori yleisestä trendistä
 4.4. Väestörakenne
 4.4.1 Auttaako sairaanhoitopiirien tasolle meneminen?
-    
+
 ## Create original dataset that should remain immutable throughout labbing
 ```{r message=FALSE}
 library(forecast)
@@ -81,5 +81,63 @@ plot(stl.ffp)
 plot(ets.red)
 plot(ets.pla)
 plot(ets.ffp)
+```
+
+## Accuracy of Tuimala's forecasts year by year
+```{r}
+stl.red.forecasts <- c()
+stl.pla.forecasts <- c()
+stl.ffp.forecasts <- c()
+ets.red.forecasts <- c()
+ets.pla.forecasts <- c()
+ets.ffp.forecasts <- c()
+for(n in seq(36, 180, by=12)){
+  red.period <- head(ts.red, n)
+  pla.period <- head(ts.pla, n)
+  ffp.period <- head(ts.ffp, n)
+  
+  stl.red.forecasts <- c(stl.red.forecasts, data.frame(forecast(stl(red.period, s.window="periodic", t.window=6), h=12))$Point.Forecast)
+  stl.pla.forecasts <- c(stl.pla.forecasts, data.frame(forecast(stl(pla.period, s.window="periodic", t.window=6), h=12))$Point.Forecast)
+  stl.ffp.forecasts <- c(stl.ffp.forecasts, data.frame(forecast(stl(ffp.period, s.window="periodic", t.window=6), h=12))$Point.Forecast)
+  ets.red.forecasts <- c(ets.red.forecasts, data.frame(forecast(ets(red.period), h=12))$Point.Forecast)
+  ets.pla.forecasts <- c(ets.pla.forecasts, data.frame(forecast(ets(pla.period), h=12))$Point.Forecast)
+  ets.ffp.forecasts <- c(ets.ffp.forecasts, data.frame(forecast(ets(ffp.period), h=12))$Point.Forecast)
+  
+  
+}
+```
+### Quick check
+```{r}
+# Arduous plotting
+
+red_slice <- tail(ts.red, 156)
+pla_slice <- tail(ts.pla, 156)
+ffp_slice <- tail(ts.ffp, 156)
+
+par(mfcol=c(3, 2))
+
+stl.red.p <- plot(red_slice, col="red")
+par(new=TRUE)
+stl.red.p <- plot(ts(stl.red.forecasts, frequency=12))
+
+stl.pla.p <- plot(pla_slice, col="red")
+par(new=TRUE)
+stl.pla.p <- plot(ts(stl.pla.forecasts, start=head(pla_slice, 1), frequency=12))
+
+stl.ffp.p <- plot(ffp_slice, col="red")
+par(new=TRUE)
+stl.ffp.p <- plot(ts(stl.ffp.forecasts, start=head(ffp_slice, 1), frequency=12))
+
+ets.red.p <- plot(red_slice, col="red")
+par(new=TRUE)
+ets.red.p <- plot(ts(ets.red.forecasts, start=head(red_slice, 1), frequency=12))
+
+ets.pla.p <- plot(pla_slice, col="red")
+par(new=TRUE)
+ets.pla.p <- plot(ts(ets.pla.forecasts, start=head(pla_slice, 1), frequency=12))
+
+ets.ffp.p <- plot(ffp_slice, col="red")
+par(new=TRUE)
+ets.ffp.p <- plot(ts(ets.ffp.forecasts, start=head(ffp_slice, 1), frequency=12))
 ```
 
