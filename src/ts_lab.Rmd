@@ -141,3 +141,64 @@ par(new=TRUE)
 ets.ffp.p <- plot(ts(ets.ffp.forecasts, start=head(ffp_slice, 1), frequency=12))
 ```
 
+## Investigating the seasonality and trend of the series
+```{r}
+library(TSA)
+
+pgram <- periodogram(ts.red)
+
+dd = data.frame(freq=pgram$freq, spec=pgram$spec)
+order = dd[order(-dd$spec),]
+top2 = head(order, 10)
+ 
+# display the 2 highest "power" frequencies
+top2
+```
+
+## Using a decomposition
+```{r}
+decomposed <- stl(ts.red, s.window="periodic")
+plot(decomposed)
+```
+
+```{r}
+seasonal   <- decomposed$time.series[,1]
+trend	   <- decomposed$time.series[,2]
+remainder  <- decomposed$time.series[,3]
+
+par(mfcol = c(3, 1))
+plot(trend+remainder,
+     main="Red cell production over Time, Seasonally Adjusted",
+     ylab="Red cell production (units)")
+plot(seasonal+remainder,
+     main="Red cell production over Time, Trend Adjusted",
+     ylab="Red cell production (units")
+plot(trend+seasonal,
+     main="Red cell production over Time, Noise removed",
+     ylab="Red cell production (units")
+```
+## Test noise to see if decomposition is successful
+```{r}
+checkresiduals(remainder)
+```
+Something suspicious about this decomp. Let's observe the seasons more closely.
+
+## Seasonal plot
+```{r}
+library(ggplot2)
+ggseasonplot(ts.red, polar = TRUE)
+ggseasonplot(ts.pla, polar = TRUE)
+ggseasonplot(ts.ffp, polar = TRUE)
+
+```
+```{r}
+ggsubseriesplot(ts.red)
+```
+## Do blood product types correlate with each other?
+```{r}
+GGally::ggpairs(as.data.frame(cbind(ts.red, ts.pla, ts.ffp)))
+```
+```{r}
+ggAcf(ts.ffp)
+```
+
