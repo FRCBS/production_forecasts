@@ -21,6 +21,8 @@ meneminen?
 
 ``` r
 library(forecast)
+library(ggplot2)
+library(gridExtra)
 
 # Set working directory and load data
 setwd("/home/esa/production_forecasts")
@@ -53,12 +55,20 @@ ts.ffp <- ts(d$FFP,
              end=as.numeric(c(tail(d$year, 1), tail(d$month_num, 1))), 
              frequency=12)
 
-# Create also a time series matrix for wicked snappy plotting yo
-tsm <- cbind(ts.red, ts.pla, ts.ffp)  # Try plot(tsm) !
-plot(tsm)
+# Create plots for a quick overview
+tsm <- cbind(ts.red, ts.pla, ts.ffp)
+p1 <- autoplot(ts.red)
+p2 <- autoplot(ts.pla)
+p3 <- autoplot(ts.ffp)
+p4 <- autoplot(tsm)
+grid.arrange(grobs=list(p1, p2, p3, p4), 
+             widths=c(4, 2, 2), 
+             layout_matrix = rbind(c(4, 1, 2), 
+                                   c(4, 3, NA)))
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
+![](ts_lab_files/figure-gfm/unnamed-chunk-2-1.png)<!-- --> Tähän perään
+tulee dekompositioita ja “transformaatioita” myöhemmin.
 
 ## Forecasts of Jarno Tuimala
 
@@ -87,92 +97,81 @@ plot(ets.ffp)
 
 ![](ts_lab_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
 
-## Accuracy of Tuimala’s forecasts year by year
+## Check the errors of yearly and monthly predictions.
 
 ``` r
-stl.red.forecasts <- c()
-stl.pla.forecasts <- c()
-stl.ffp.forecasts <- c()
-ets.red.forecasts <- c()
-ets.pla.forecasts <- c()
-ets.ffp.forecasts <- c()
-avg.red.forecasts <- c()
-avg.pla.forecasts <- c()
-avg.ffp.forecasts <- c()
-for(n in seq(36, 180, by=12)){
-  red.period <- head(ts.red, n)
-  pla.period <- head(ts.pla, n)
-  ffp.period <- head(ts.ffp, n)
+yearly <- ggplot() 
+forecast_errors <- c()
+# Loop 
+for(i in seq(from=2008, to=2018, by=1)){
+  fit <- stl(window(ts.red, start=2004, end=c(i-1, 12)), s.window="periodic", t.window=6)  # Fit based on history so far
+  fcast <- forecast(fit, h=12)  # Forecast the next year
+  segment <- window(ts.red, start=i, end=c(i, 12))  # Extract that year from the history for plotting purposes
   
-  # STL + ETS
-  stl.red.forecasts <- c(stl.red.forecasts, data.frame(forecast(stl(red.period, s.window="periodic", t.window=6), h=12))$Point.Forecast)
-  stl.pla.forecasts <- c(stl.pla.forecasts, data.frame(forecast(stl(pla.period, s.window="periodic", t.window=6), h=12))$Point.Forecast)
-  stl.ffp.forecasts <- c(stl.ffp.forecasts, data.frame(forecast(stl(ffp.period, s.window="periodic", t.window=6), h=12))$Point.Forecast)
+  # Build the plot piece by piece
+  yearly <- yearly + autolayer(fcast) + autolayer(segment, colour=FALSE)
   
-  # ETS
-  ets.red.forecasts <- c(ets.red.forecasts, data.frame(forecast(ets(red.period), h=12))$Point.Forecast)
-  ets.pla.forecasts <- c(ets.pla.forecasts, data.frame(forecast(ets(pla.period), h=12))$Point.Forecast)
-  ets.ffp.forecasts <- c(ets.ffp.forecasts, data.frame(forecast(ets(ffp.period), h=12))$Point.Forecast)
-  
-  # Naive
-  avg.red.forecasts <- c(avg.red.forecasts, data.frame(naive(red.period, h=12))$Point.Forecast)
-  avg.pla.forecasts <- c(avg.pla.forecasts, data.frame(naive(pla.period, h=12))$Point.Forecast)
-  avg.ffp.forecasts <- c(avg.ffp.forecasts, data.frame(naive(ffp.period, h=12))$Point.Forecast)
-  
-  
-  
+  # Calculate forecast errors
+  forecast_errors <- c(forecast_errors, abs(data.frame(fcast)$Point.Forecast - segment))
 }
+
+yearly + ggtitle("STL+ETS forecast of red cell sales year by year") +
+  scale_x_discrete(limits=c(2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018)) + xlab("Time") +
+  ylab("Unit sales")
 ```
 
-### Quick check
+![](ts_lab_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
 
 ``` r
-# Arduous plotting
-
-red_slice <- tail(ts.red, 156)
-pla_slice <- tail(ts.pla, 156)
-ffp_slice <- tail(ts.ffp, 156)
-
-par(mfcol=c(3, 3))
-
-stl.red.p <- plot(red_slice, col="red")
-par(new=TRUE)
-stl.red.p <- plot(ts(stl.red.forecasts, frequency=12))
-
-stl.pla.p <- plot(pla_slice, col="red")
-par(new=TRUE)
-stl.pla.p <- plot(ts(stl.pla.forecasts, start=head(pla_slice, 1), frequency=12))
-
-stl.ffp.p <- plot(ffp_slice, col="red")
-par(new=TRUE)
-stl.ffp.p <- plot(ts(stl.ffp.forecasts, start=head(ffp_slice, 1), frequency=12))
-
-ets.red.p <- plot(red_slice, col="red")
-par(new=TRUE)
-ets.red.p <- plot(ts(ets.red.forecasts, start=head(red_slice, 1), frequency=12))
-
-ets.pla.p <- plot(pla_slice, col="red")
-par(new=TRUE)
-ets.pla.p <- plot(ts(ets.pla.forecasts, start=head(pla_slice, 1), frequency=12))
-
-ets.ffp.p <- plot(ffp_slice, col="red")
-par(new=TRUE)
-ets.ffp.p <- plot(ts(ets.ffp.forecasts, start=head(ffp_slice, 1), frequency=12))
-
-avg.red.p <- plot(red_slice, col="red")
-par(new=TRUE)
-avg.red.p <- plot(ts(avg.red.forecasts, start=head(red_slice, 1), frequency=12))
-
-avg.pla.p <- plot(pla_slice, col="red")
-par(new=TRUE)
-avg.pla.p <- plot(ts(avg.pla.forecasts, start=head(pla_slice, 1), frequency=12))
-
-avg.ffp.p <- plot(ffp_slice, col="red")
-par(new=TRUE)
-avg.ffp.p <- plot(ts(avg.ffp.forecasts, start=head(ffp_slice, 1), frequency=12))
+autoplot(ts(forecast_errors, start=2008, end=2018, frequency=12)) + ggtitle("STL+ETS historical forecast errors") + ylab("Unit sales")
 ```
 
 ![](ts_lab_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
+
+``` r
+yearly_ets <- ggplot() 
+ets_forecast_errors <- c()
+# Loop 
+for(i in seq(from=2008, to=2018, by=1)){
+  fit <- ets(window(ts.red, start=2004, end=c(i-1, 12)))  # Fit based on history so far
+  fcast <- forecast(fit, h=12)  # Forecast the next year
+  segment <- window(ts.red, start=i, end=c(i, 12))  # Extract that year from the history for plotting purposes
+  
+  # Build the plot piece by piece
+  yearly_ets <- yearly_ets + autolayer(fcast) + autolayer(segment, colour=FALSE)
+  
+  # Calculate forecast errors
+  ets_forecast_errors <- c(ets_forecast_errors, abs(data.frame(fcast)$Point.Forecast - segment))
+}
+
+yearly_ets + ggtitle("ETS forecast of red cell sales year by year") +
+  scale_x_discrete(limits=c(2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018)) + xlab("Time") +
+  ylab("Unit sales")
+```
+
+![](ts_lab_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+
+``` r
+autoplot(ts(ets_forecast_errors, start=2008, end=2018, frequency=12)) + ggtitle("ETS historical forecast errors") + ylab("Unit sales")
+```
+
+![](ts_lab_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+
+Find out which performed better on average:
+
+``` r
+median(forecast_errors)
+```
+
+    ## [1] 679.1006
+
+``` r
+median(ets_forecast_errors)
+```
+
+    ## [1] 723.6955
+
+It is noteworthy that after 2011 the models have been identical\!
 
 ## Investigating the seasonality and trend of the series
 
@@ -200,7 +199,7 @@ library(TSA)
 pgram <- periodogram(ts.red)
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+![](ts_lab_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
 
 ``` r
 dd = data.frame(freq=pgram$freq, spec=pgram$spec)
@@ -230,7 +229,7 @@ decomposed <- stl(ts.red, s.window="periodic")
 plot(decomposed)
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+![](ts_lab_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
 
 ``` r
 seasonal   <- decomposed$time.series[,1]
@@ -249,7 +248,7 @@ plot(trend+seasonal,
      ylab="Red cell production (units")
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-8-1.png)<!-- --> \#\# Test
+![](ts_lab_files/figure-gfm/unnamed-chunk-11-1.png)<!-- --> \#\# Test
 noise to see if decomposition is
     successful
 
@@ -260,7 +259,7 @@ checkresiduals(remainder)
     ## Warning in modeldf.default(object): Could not find appropriate degrees of
     ## freedom for this model.
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-9-1.png)<!-- --> Something
+![](ts_lab_files/figure-gfm/unnamed-chunk-12-1.png)<!-- --> Something
 suspicious about this decomp. Let’s observe the seasons more closely.
 
 ## Seasonal plot
@@ -270,25 +269,25 @@ library(ggplot2)
 ggseasonplot(ts.red, year.labels = TRUE, year.labels.left = TRUE)
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+![](ts_lab_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
 
 ``` r
 ggseasonplot(ts.pla, year.labels = TRUE, year.labels.left = TRUE)
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-10-2.png)<!-- -->
+![](ts_lab_files/figure-gfm/unnamed-chunk-13-2.png)<!-- -->
 
 ``` r
 ggseasonplot(ts.ffp, year.labels = TRUE, year.labels.left = TRUE)
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-10-3.png)<!-- -->
+![](ts_lab_files/figure-gfm/unnamed-chunk-13-3.png)<!-- -->
 
 ``` r
 ggsubseriesplot(ts.red)
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-11-1.png)<!-- --> \#\# Do
+![](ts_lab_files/figure-gfm/unnamed-chunk-14-1.png)<!-- --> \#\# Do
 blood product types correlate with each other?
 
 ``` r
@@ -299,10 +298,19 @@ GGally::ggpairs(as.data.frame(cbind(ts.red, ts.pla, ts.ffp)))
     ##   method from   
     ##   +.gg   ggplot2
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+![](ts_lab_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
 
 ``` r
 ggAcf(ts.red)
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+![](ts_lab_files/figure-gfm/unnamed-chunk-16-1.png)<!-- --> \#\# Playing
+around with a NN
+
+``` r
+library(ggplot2)
+fit <- nnetar(ts.red, lambda=0)
+autoplot(forecast(fit, PI=TRUE, h=12))
+```
+
+![](ts_lab_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
