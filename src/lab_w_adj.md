@@ -56,9 +56,9 @@ ts.ffp <- ts(d$FFP,
              frequency=12)
 
 # Trying month adjustment
-# ts.red <- ts.red/monthdays(ts.red)
-# ts.pla <- ts.pla/monthdays(ts.pla)
-# ts.ffp <- ts.ffp/monthdays(ts.ffp)
+ts.red <- ts.red/monthdays(ts.red)
+ts.pla <- ts.pla/monthdays(ts.pla)
+ts.ffp <- ts.ffp/monthdays(ts.ffp)
 
 # Create plots for a quick overview
 tsm <- cbind(ts.red, ts.pla, ts.ffp)
@@ -72,7 +72,7 @@ grid.arrange(grobs=list(p1, p2, p3, p4),
                                    c(4, 3, NA)))
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
+![](lab_w_adj_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
 
 Initial remarks: Blood product types don’t seem to correlate in sales.
 Why are platelets and plasma triangular while red cells have a smoother
@@ -88,7 +88,7 @@ GGally::ggpairs(as.data.frame(cbind(ts.red, ts.pla, ts.ffp)))
     ##   method from   
     ##   +.gg   ggplot2
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
+![](lab_w_adj_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
 
 The correlation is not non-existent though, as all of the products have
 a downward trend beginning from 2011. Let’s inspect their seasonality
@@ -98,7 +98,7 @@ more closely and see if we could extract it from the series.
 ggseasonplot(ts.red, year.labels = TRUE, year.labels.left = TRUE)
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+![](lab_w_adj_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
 
 There seems to be a set of prominent features present in the red cell
 sales series. January starts off high and demand decreases sharply in
@@ -112,7 +112,7 @@ holiday seasons. Let’s check the monthly subseries:
 ggsubseriesplot(ts.red)
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
+![](lab_w_adj_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
 
 Next up, platelets
 
@@ -120,7 +120,7 @@ Next up, platelets
 ggseasonplot(ts.pla, year.labels = TRUE, year.labels.left = TRUE)
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+![](lab_w_adj_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
 
 The pattern found in red cell sales is not as prominent in platelets,
 but some zig-zagging is still present.
@@ -129,7 +129,7 @@ but some zig-zagging is still present.
 ggseasonplot(ts.ffp, year.labels = TRUE, year.labels.left = TRUE)
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+![](lab_w_adj_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
 
 Frozen fresh plasma is even more messy, but some believable zig-zagging
 could be pointed out.
@@ -147,7 +147,7 @@ remainder <- decomposed$time.series[,3]         # Remainder component
 autoplot(decomposed)  # Plot
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+![](lab_w_adj_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
 
 STL seems to think that the trend is significant, but that the remainder
 is 3 to 4 times greater in magnitude compared to the seasonal component
@@ -159,7 +159,7 @@ autocorrelation of the remainder:
 ggAcf(remainder)
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+![](lab_w_adj_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
 
 There is significant autocorrelation at multiple lags, which tells us
 that there is a considerable amount of information thrown out during the
@@ -187,7 +187,7 @@ grid.arrange(grobs=list(autoplot(pla_decomposed),
                                  c(3, 4)))
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+![](lab_w_adj_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
 
 Same decomposition problems persist with platelets and plasma\!
 
@@ -223,7 +223,7 @@ grid.arrange(grobs=list(autoplot(stl.red),
                                  c(3, 6)))
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+![](lab_w_adj_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
 
 ETS models are based on weighted averages of past observations, with
 *exponentially* decaying weights as the observations move further back
@@ -270,13 +270,13 @@ yearly + ggtitle("STL+ETS forecast of red cell sales year by year") +
   ylab("Unit sales")
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+![](lab_w_adj_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
 
 ``` r
 autoplot(ts(forecast_errors, start=2008, end=2018, frequency=12)) + ggtitle("STL+ETS historical forecast errors for red cells") + ylab("Unit sales")
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+![](lab_w_adj_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
 
 ``` r
 yearly_ets <- ggplot() 
@@ -304,13 +304,13 @@ yearly_ets + ggtitle("ETS forecast of red cell sales year by year") +
   ylab("Unit sales")
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
+![](lab_w_adj_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
 
 ``` r
 autoplot(ts(ets_forecast_errors, start=2008, end=2018, frequency=12)) + ggtitle("ETS historical forecast errors for red cells") + ylab("Unit sales")
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+![](lab_w_adj_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
 
 Now for the platelets and plasma:
 
@@ -455,15 +455,15 @@ grid.arrange(grobs=list(plap,
                                  c(7, 8)))
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+![](lab_w_adj_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 
 Sandbox for closer inspection:
 
 ``` r
-ffpp
+plap
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
+![](lab_w_adj_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
 
 Find out which performed better on average:
 
@@ -485,13 +485,13 @@ results <- as.table(results)
 results
 ```
 
-    ##                    RMSE        MAPE
-    ## STL+ETS red 1037.442035    4.382631
-    ## ETS red     1076.385147    4.572516
-    ## STL+ETS pla  195.913024    5.130505
-    ## ETS pla      207.220458    5.403643
-    ## STL+ETS ffp  498.557165   10.965570
-    ## ETS ffp      524.873132   11.796454
+    ##                  RMSE      MAPE
+    ## STL+ETS red 32.679537  4.200062
+    ## ETS red     35.821089  4.664313
+    ## STL+ETS pla  6.411698  5.121857
+    ## ETS pla      6.534333  5.179408
+    ## STL+ETS ffp 16.266112 10.958912
+    ## ETS ffp     16.847664 11.331089
 
 ## Playing around with a NN
 
@@ -501,4 +501,4 @@ fit <- nnetar(ts.red, lambda=0)
 autoplot(forecast(fit, PI=TRUE, h=12))
 ```
 
-![](ts_lab_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
+![](lab_w_adj_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
