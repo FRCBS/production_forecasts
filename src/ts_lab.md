@@ -162,9 +162,10 @@ ggAcf(remainder)
 ![](ts_lab_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
 
 There is significant autocorrelation at multiple lags, which tells us
-that there is a considerable amount of information thrown out during the
-decomposition. This is not a particularly good decomposition. Let’s
-check decompositions for platelets and plasma also.
+that either there is a considerable amount of information thrown out
+during the decomposition or that the series is close to a random walk.
+This is not a particularly good decomposition. Let’s check
+decompositions for platelets and plasma also.
 
 ``` r
 # Platelets
@@ -460,7 +461,7 @@ grid.arrange(grobs=list(plap,
 Sandbox for closer inspection:
 
 ``` r
-ffpp
+plap
 ```
 
 ![](ts_lab_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->

@@ -23,6 +23,7 @@ Tässä dokumentissa tutkitaan aikasarjaennustamista tuotannon kuukausittaisilla
 library(forecast)
 library(ggplot2)
 library(gridExtra)
+library(knitr)
 
 # Set working directory and load data
 setwd("/home/esa/production_forecasts")
@@ -71,6 +72,9 @@ grid.arrange(grobs=list(p1, p2, p3, p4),
                                    c(4, 3, NA)))
 ```
 
+```{r}
+plot(ts.pla)
+```
 
 Initial remarks: Blood product types don't seem to correlate in sales. Why are platelets and plasma triangular while red cells have a smoother downwards trend curve? It's also obvious that red cells get sold in much larger quantities than platelets or plasma.
 
@@ -121,7 +125,7 @@ STL seems to think that the trend is significant, but that the remainder is 3 to
 ggAcf(remainder)
 ```
 
-There is significant autocorrelation at multiple lags, which tells us that there is a considerable amount of information thrown out during the decomposition. This is not a particularly good decomposition. Let's check decompositions for platelets and plasma also.
+There is significant autocorrelation at multiple lags, which tells us that either there is a considerable amount of information thrown out during the decomposition or that the series is close to a random walk. This is not a particularly good decomposition. Let's check decompositions for platelets and plasma also.
 
 ```{r}
 # Platelets
@@ -402,7 +406,7 @@ rownames(results) <- c("STL+ETS red",
                        "ETS pla",
                        "STL+ETS ffp",
                        "ETS ffp")
-results <- as.table(results)
+results <- kable(results, "markdown")
 results
 ```
 

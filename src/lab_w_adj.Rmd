@@ -121,7 +121,7 @@ STL seems to think that the trend is significant, but that the remainder is 3 to
 ggAcf(remainder)
 ```
 
-There is significant autocorrelation at multiple lags, which tells us that there is a considerable amount of information thrown out during the decomposition. This is not a particularly good decomposition. Let's check decompositions for platelets and plasma also.
+There is significant autocorrelation at multiple lags, which tells us that either there is a considerable amount of information thrown out during the decomposition or that the series is close to a random walk. This is not a particularly good decomposition. Let's check decompositions for platelets and plasma also.
 
 ```{r}
 # Platelets
