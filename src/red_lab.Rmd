@@ -1,7 +1,12 @@
 ---
-title: 'Forecasting Lab: Production Figures'
+title: 'Forecasting Lab: Production Figures (red cells)'
 output: github_document
 ---
+
+```{r setup}
+# Set working directory
+knitr::opts_knit$set(root.dir = "/home/esa/production_forecasts")
+```
 
 Tässä dokumentissa tutkitaan aikasarjaennustamista tuotannon kuukausittaisilla luvuilla. Erityisesti halutaan tietää seuraavat:
 
@@ -25,9 +30,8 @@ library(ggplot2)
 library(gridExtra)
 library(knitr)
 
-# Set working directory and load data
-setwd("/home/esa/production_forecasts")
-monthly_sales <- read.table("/home/esa/production_forecasts/data/kuukausimyynti.txt", header = T, sep = "\t")
+# Load data
+monthly_sales <- read.table("./data/kuukausimyynti.txt", header = T, sep = "\t")
 
 # Separate yyyy/mmm column into months and years
 monthly_sales$year <- substr(monthly_sales$kuukausi, 1, 4)
@@ -40,6 +44,7 @@ monthly_sales$month_num <- as.numeric(monthly_sales$month)
 d <- na.omit(monthly_sales)
 ```
 
+
 ## Create the time series object
 ```{r}
 ts.red <- ts(d$Punasoluvalmisteet, 
@@ -47,8 +52,8 @@ ts.red <- ts(d$Punasoluvalmisteet,
              end=as.numeric(c(tail(d$year, 1), tail(d$month_num, 1))), 
              frequency=12)  # This tells the series that it is monthly data
 
-# Month adjustment
-ts.red <- ts.red/monthdays(ts.red)
+# Business day adjustment
+ts.red <- ts.red/bizdays(ts.red, FinCenter = "Zurich")  # Zurich is closest to Finnish business calendar, implementing of which would be a chore
 
 # Create plots for a quick overview
 p1 <- autoplot(ts.red)
@@ -85,12 +90,25 @@ Jarno built his forecasts using **STL+ETS** and **ETS** models, including also a
 ```{r}
 # Seasonal and Trend decomposition by LOESS + ETS
 # The t.window of stl() should be an odd number, but Tuimala has decided against it. Will investigate.
-stl.red <- forecast(stl(ts.red, s.window="periodic", t.window=6), h=12)
+
+# IF MODEL EXISTS ALREADY, LOAD
+if (file.exists("./data/models/biz_jarno_stl_red.rds")) {
+  stl.red <- readRDS("./data/models/biz_jarno_stl_red.rds")
+} else {  # IF IT DOESN'T, CREATE AND SAVE
+  stl.red <- forecast(stl(ts.red, s.window="periodic", t.window=6), h=12)
+  saveRDS(stl.red, "./data/models/biz_jarno_stl_red.rds")
+}
+
 
 
 # Exponential smoothing state space model
 # ets() is an automated model selection function, so these are not the same model! Uses AICc, AIC and BIC.
-ets.red <- forecast(ets(ts.red), h=12)
+if (file.exists("./data/models/biz_jarno_ets_red.rds")) {
+  ets.red <- readRDS("./data/models/biz_jarno_ets_red.rds")
+} else {
+  ets.red <- forecast(ets(ts.red), h=12)
+  saveRDS(ets.red, "./data/models/biz_jarno_ets_red.rds")
+}
 
 
 # Plot
@@ -354,6 +372,7 @@ monthly_NN + ggtitle("NN forecast of red cell sales month by month") +
 
 Find out which performed better on average:
 ```{r}
+library(knitr)
 results <- matrix(c(mean(stl_RMSE), mean(stl_MAPE), 
                     mean(ets_RMSE), mean(ets_MAPE),
                     mean(NN_RMSE), mean(NN_MAPE),

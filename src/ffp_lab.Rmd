@@ -48,7 +48,7 @@ ts.ffp <- ts(d$FFP,
              frequency=12)  # This tells the series that it is monthly data
 
 # Month adjustment
-ts.ffp <- ts.ffp/monthdays(ts.ffp)
+ts.ffp <- ts.ffp/bizdays(ts.ffp, FinCenter = "Zurich")
 
 # Create plots for a quick overview
 p1 <- autoplot(ts.ffp)

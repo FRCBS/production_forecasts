@@ -48,7 +48,7 @@ ts.pla <- ts(d$Trombosyyttivalmisteet,
              frequency=12)  # This tells the series that it is monthly data
 
 # Month adjustment
-ts.pla <- ts.pla/monthdays(ts.pla)
+ts.pla <- ts.pla/bizdays(ts.pla, FinCenter = "Zurich")
 
 # Create plots for a quick overview
 p1 <- autoplot(ts.pla)
