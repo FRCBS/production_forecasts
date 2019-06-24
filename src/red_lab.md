@@ -84,7 +84,7 @@ for(i in seq(from=48, to=180, by=1)){
 naive_plot + ggtitle("Naive forecast of red cell sales month by month") +
   scale_x_discrete(limits=c(2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018)) + xlab("Time") +
   ylab("Unit sales") + autolayer(window(ts.red, start=2008), colour=FALSE) +
-  geom_text(aes(2018, 26000, label=paste("RMSE: ", as.name(naive_RMSE)))) + geom_text(aes(2018, 26700, label=paste("MAPE: ", as.name(naive_MAPE))))
+  geom_text(aes(2018, 26000, label=paste("RMSE: ", as.name(mean(naive_RMSE))))) + geom_text(aes(2018, 26700, label=paste("MAPE: ", as.name(mean(naive_MAPE)))))
 ```
 
 ![](red_lab_files/figure-gfm/unnamed-chunk-4-1.png)<!-- --> \#\# First
@@ -128,13 +128,13 @@ for(i in seq(from=48, to=180, by=1)){
 naive_adj_plot + ggtitle("Naive forecast of adjusted red cell sales month by month") +
   scale_x_discrete(limits=c(2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018)) + xlab("Time") +
   ylab("Unit sales per day") + autolayer(window(ts.red, start=2008), colour=FALSE) +
-  geom_text(aes(2018, 1300, label=paste("RMSE: ", as.name(naive_adj_RMSE)))) + geom_text(aes(2018, 1370, label=paste("MAPE: ", as.name(naive_adj_MAPE))))
+  geom_text(aes(2018, 1300, label=paste("RMSE: ", as.name(mean(naive_adj_RMSE))))) + geom_text(aes(2018, 1370, label=paste("MAPE: ", as.name(mean(naive_adj_MAPE)))))
 ```
 
 ![](red_lab_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
 
 Adjusting for business days per month improved the naive forecast by a
-whopping 1.8 percentage points.
+whopping 1.59 percentage points.
 
 ``` r
 ggseasonplot(ts.red, year.labels = TRUE, year.labels.left = TRUE)
@@ -142,34 +142,16 @@ ggseasonplot(ts.red, year.labels = TRUE, year.labels.left = TRUE)
 
 ![](red_lab_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
 
-Seems to me that July and December are low points in sales very
-consistently, while lots of sales happen in October and November.
-
-Trying out more advanced methods of decomposing
-
-``` r
-autoplot(stlf(ts.red))
-```
-
-![](red_lab_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
-
-EXPLANATION OF RESULTS
-
-Let’s do this again, but with filtering and see if it could improve the
-results
-
-``` r
-# FILTERING PLUS DECOMP
-```
-
-EXAMINE RESULTS
+Seems to me that July is a low point in sales very consistently, while
+lots of sales happen in April, May and September.
 
 ## Forecasts of Jarno Tuimala now with better decomp and filtering
 
 Jarno built his forecasts using **STL+ETS** and **ETS** models,
 including also a naive 6 month repetition forecast. I will not be
 considering the naive “forecast” here, as I’m fairly certain we want to
-do proper modelling.
+do proper modelling. Here we will run Jarno’s models on business day
+adjusted data, which will improve their performance somewhat.
 
 ``` r
 # Seasonal and Trend decomposition by LOESS + ETS
@@ -202,7 +184,303 @@ grid.arrange(grobs=list(autoplot(stl.red),
                                  c(2)))
 ```
 
+![](red_lab_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+
+Let’s see how the STL performs on business day adjusted
+data
+
+``` r
+decomposed <- stl(ts.red, s.window="periodic")  # Seasonal and Trend decomposition using LOESS
+seasonal <- decomposed$time.series[,1]          # Season component
+trend <- decomposed$time.series[,2]             # Trend component
+remainder <- decomposed$time.series[,3]         # Remainder component
+
+autoplot(decomposed)  # Plot
+```
+
+![](red_lab_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+
+The seasonal component looks consistent, but seems to still be smaller
+than random noise. Let’s check the autocorrelation of the remainder to
+see how well the decomposition works.
+
+``` r
+ggAcf(remainder)
+```
+
 ![](red_lab_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+
+There are significant lags at 2 and 7 lags, but otherwise the ACF looks
+*much* cleaner than before. The business day adjustment seems to be
+effective. Let’s see what kind of forecasts these give.
+
+``` r
+stl_adj_plot <- ggplot() 
+stl_adj_forecast_errors <- c()
+stl_adj_RMSE <- c()
+stl_adj_MAPE <- c()
+# Loop 
+for(i in seq(from=48, to=180, by=1)){
+  fit <- stl(head(ts.red, i), s.window="periodic", t.window=6)  # Fit based on history so far
+  fcast <- forecast(fit, h=1)  # Forecast the next month
+  segment <- ts.red[i+1]  # Extract that year from the history for plotting purposes
+  
+  # Build the plot piece by piece
+  stl_adj_plot <- stl_adj_plot + autolayer(fcast) # + autolayer(segment, colour=FALSE)
+  
+  # Calculate raw forecast errors
+  stl_adj_forecast_errors <- c(stl_adj_forecast_errors, abs(data.frame(fcast)$Point.Forecast - segment))
+  
+  stl_adj_RMSE <- c(stl_adj_RMSE, data.frame(accuracy(fcast, segment))$RMSE)
+  stl_adj_MAPE <- c(stl_adj_MAPE, data.frame(accuracy(fcast, segment))$MAPE)
+}
+
+stl_adj_plot + ggtitle("STL+ETS forecast of adjusted red cell sales month by month") +
+  scale_x_discrete(limits=c(2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018)) + xlab("Time") +
+  ylab("Unit sales") + autolayer(window(ts.red, start=2008), colour=FALSE) +
+  geom_text(aes(2018, 1300, label=paste("RMSE: ", as.name(mean(stl_adj_RMSE))))) + geom_text(aes(2018, 1370, label=paste("MAPE: ", as.name(mean(stl_adj_MAPE)))))
+```
+
+![](red_lab_files/figure-gfm/unnamed-chunk-12-1.png)<!-- --> The naive
+errors are halved.
+
+``` r
+ets_adj_plot <- ggplot() 
+ets_adj_forecast_errors <- c()
+ets_adj_RMSE <- c()
+ets_adj_MAPE <- c()
+# Loop 
+for(i in seq(from=48, to=180, by=1)){
+  fit <- ets(head(ts.red, i))  # Fit based on history so far
+  fcast <- forecast(fit, h=1)  # Forecast the next month
+  segment <- ts.red[i+1]  # Extract that month from the history for error calculation
+  
+  # Build the plot piece by piece
+  ets_adj_plot <- ets_adj_plot + autolayer(fcast)
+  
+  # Calculate forecast errors
+  ets_adj_forecast_errors <- c(ets_adj_forecast_errors, abs(data.frame(fcast)$Point.Forecast - segment))
+  
+  ets_adj_RMSE <- c(ets_adj_RMSE, data.frame(accuracy(fcast, segment))$RMSE)
+  ets_adj_MAPE <- c(ets_adj_MAPE, data.frame(accuracy(fcast, segment))$MAPE)
+}
+
+ets_adj_plot + ggtitle("ETS forecast of adjusted red cell sales month by month") +
+  scale_x_discrete(limits=c(2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018)) + xlab("Time") +
+  ylab("Unit sales") + autolayer(window(ts.red, start=2008), colour=FALSE) +
+  geom_text(aes(2018, 1300, label=paste("RMSE: ", as.name(mean(ets_adj_RMSE))))) + geom_text(aes(2018, 1370, label=paste("MAPE: ", as.name(mean(ets_adj_MAPE)))))
+```
+
+![](red_lab_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+
+## Trying out more advanced methods of decomposing
+
+``` r
+multi_decomp <- mstl(ts.red)
+multi_trend <- multi_decomp[,2]
+multi_season <- multi_decomp[,3]
+multi_remainder <- multi_decomp[,4]
+autoplot(multi_decomp) + ggtitle("Multiple seasonality decomposition")
+```
+
+![](red_lab_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
+
+``` r
+# Plot with simple seasonal decomposition to see if there are tangible differences
+grid.arrange(grobs=list(autoplot(seasonal) + ggtitle("STL"),
+                        autoplot(multi_season) + ggtitle("MSTL")),
+             layout_matrix=rbind(c(1),
+                                 c(2)))
+```
+
+![](red_lab_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+
+The MSTL has a slight decrease in the magnitude of the seasonality.
+
+``` r
+# Let's compare their autocorrelation plots
+grid.arrange(grobs=list(ggAcf(remainder) + ggtitle("STL remainder"),
+                        ggAcf(multi_remainder) + ggtitle("MSTL remainder")),
+             layout_matrix=rbind(c(1),
+                                 c(2)))
+```
+
+![](red_lab_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+
+Somewhat surprisingly it seems that the simpler STL decomposition is
+more accurate. Let’s confirm by CV.
+
+``` r
+stl_multi_plot <- ggplot() 
+stl_multi_forecast_errors <- c()
+stl_multi_RMSE <- c()
+stl_multi_MAPE <- c()
+# Loop 
+for(i in seq(from=48, to=180, by=1)){
+  fit <- stlf(head(ts.red, i), s.window="periodic", t.window=6)  # Fit based on history so far
+  fcast <- forecast(fit, h=1)  # Forecast the next month
+  segment <- ts.red[i+1]  # Extract that year from the history for plotting purposes
+  
+  # Build the plot piece by piece
+  stl_multi_plot <- stl_multi_plot + autolayer(fcast) # + autolayer(segment, colour=FALSE)
+  
+  # Calculate raw forecast errors
+  stl_multi_forecast_errors <- c(stl_multi_forecast_errors, abs(data.frame(fcast)$Point.Forecast - segment))
+  
+  stl_multi_RMSE <- c(stl_multi_RMSE, data.frame(accuracy(fcast, segment))$RMSE)
+  stl_multi_MAPE <- c(stl_multi_MAPE, data.frame(accuracy(fcast, segment))$MAPE)
+}
+
+stl_multi_plot + ggtitle("STLF forecast of adjusted red cell sales month by month") +
+  scale_x_discrete(limits=c(2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018)) + xlab("Time") +
+  ylab("Unit sales") + autolayer(window(ts.red, start=2008), colour=FALSE) +
+  geom_text(aes(2018, 1300, label=paste("RMSE: ", as.name(mean(stl_multi_RMSE))))) + geom_text(aes(2018, 1370, label=paste("MAPE: ", as.name(mean(stl_multi_MAPE)))))
+```
+
+![](red_lab_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
+
+The results are exactly the same to the 5th decimal point\! It appears
+that Multiple Seasonal Decomposition has no advantage over simple STL.
+
+Let’s do this again, but with filtering and see if it could improve the
+results
+
+``` r
+# Filter
+smooth25.red <- ts(itsmr::smooth.fft(ts.red, .25), start=as.numeric(c(d$year[1], d$month_num[1])), 
+                   end=as.numeric(c(tail(d$year, 1), tail(d$month_num, 1))), frequency = 12)
+smooth10.red <- ts(itsmr::smooth.fft(ts.red, .1), start=as.numeric(c(d$year[1], d$month_num[1])), 
+             end=as.numeric(c(tail(d$year, 1), tail(d$month_num, 1))), frequency = 12)
+
+cnct.smooth25 <- ts(itsmr::smooth.fft(head(ts.red, 24), .25), start=as.numeric(c(d$year[1], d$month_num[1])), frequency = 12)
+autoplot(smooth25.red, colour = "red") + autolayer(smooth10.red, colour = FALSE) + ggtitle(".10 and .25 smoothed ts.red") + autolayer(cnct.smooth25, colour = TRUE)
+```
+
+![](red_lab_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
+
+The filtering changes as we move down the time stream. We’ll try to
+incorporate this into the CV.
+
+We’ll need to cut off the end of the series as the smoothing produces an
+awkwardly aggressive slope at the end. Or do we? Will investigate.
+
+``` r
+smooth25.red <- head(smooth25.red, 180)
+smooth10.red <- head(smooth10.red, 180)
+autoplot(smooth25.red, colour = "red") + autolayer(smooth10.red, colour = FALSE)
+```
+
+![](red_lab_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
+
+## Forecasts of Jarno Tuimala now with filtering
+
+``` r
+# Seasonal and Trend decomposition by LOESS + ETS
+# The t.window of stl() should be an odd number, but Tuimala has decided against it. Will investigate.
+
+# IF MODEL EXISTS ALREADY, LOAD
+if (file.exists("./data/models/biz_smooth25_jarno_stl_red.rds")) {
+  smooth25.stl.red <- readRDS("./data/models/biz_smooth25_jarno_stl_red.rds")
+} else {  # IF IT DOESN'T, CREATE AND SAVE
+  smooth25.stl.red <- forecast(stl(smooth25.red, s.window="periodic", t.window=6), h=12)
+  saveRDS(smooth25.stl.red, "./data/models/biz_smooth25_jarno_stl_red.rds")
+}
+
+if (file.exists("./data/models/biz_smooth10_jarno_stl_red.rds")) {
+  smooth10.stl.red <- readRDS("./data/models/biz_smooth10_jarno_stl_red.rds")
+} else {  # IF IT DOESN'T, CREATE AND SAVE
+  smooth10.stl.red <- forecast(stl(smooth10.red, s.window="periodic", t.window=6), h=12)
+  saveRDS(smooth10.stl.red, "./data/models/biz_smooth10_jarno_stl_red.rds")
+}
+
+# Exponential smoothing state space model
+# ets() is an automated model selection function, so these are not the same model! Uses AICc, AIC and BIC.
+if (file.exists("./data/models/biz_smooth25_jarno_ets_red.rds")) {
+  smooth25.ets.red <- readRDS("./data/models/biz_smooth25_jarno_ets_red.rds")
+} else {
+  smooth25.ets.red <- forecast(ets(smooth25.red), h=12)
+  saveRDS(smooth25.ets.red, "./data/models/biz_smooth25_jarno_ets_red.rds")
+}
+
+if (file.exists("./data/models/biz_smooth10_jarno_ets_red.rds")) {
+  smooth10.ets.red <- readRDS("./data/models/biz_smooth10_jarno_ets_red.rds")
+} else {
+  smooth10.ets.red <- forecast(ets(smooth10.red), h=12)
+  saveRDS(smooth10.ets.red, "./data/models/biz_smooth10_jarno_ets_red.rds")
+}
+
+# Plot
+grid.arrange(grobs=list(autoplot(smooth25.stl.red),
+                        autoplot(smooth25.ets.red),
+                        autoplot(smooth10.stl.red),
+                        autoplot(smooth10.ets.red)),
+             layout_matrix=rbind(c(1, 2),
+                                 c(3, 4)))
+```
+
+![](red_lab_files/figure-gfm/unnamed-chunk-20-1.png)<!-- --> These give
+somewhat nonsensical forecasts. The smoothing isn’t robust for
+“pathological” observations at the end I suppose?
+
+Let’s see how these perform in CV
+
+``` r
+stl_smooth_plot <- ggplot() 
+stl_smooth_forecast_errors <- c()
+stl_smooth_RMSE <- c()
+stl_smooth_MAPE <- c()
+# Loop 
+for(i in seq(from=48, to=180, by=1)){
+  fit <- stl(head(smooth25.red, i), s.window="periodic", t.window=6)  # Fit based on history so far
+  fcast <- forecast(fit, h=1)  # Forecast the next month
+  segment <- ts.red[i+1]  # Extract that year from the history for errror
+  
+  # Build the plot piece by piece
+  stl_smooth_plot <- stl_smooth_plot + autolayer(fcast) # + autolayer(segment, colour=FALSE)
+  
+  # Calculate raw forecast errors
+  stl_smooth_forecast_errors <- c(stl_smooth_forecast_errors, abs(data.frame(fcast)$Point.Forecast - segment))
+  
+  stl_smooth_RMSE <- c(stl_smooth_RMSE, data.frame(accuracy(fcast, segment))$RMSE)
+  stl_smooth_MAPE <- c(stl_smooth_MAPE, data.frame(accuracy(fcast, segment))$MAPE)
+}
+
+stl_smooth_plot + ggtitle("STL forecast of adjusted smoothed (.25) red cell sales month by month") +
+  scale_x_discrete(limits=c(2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018)) + xlab("Time") +
+  ylab("Unit sales") + autolayer(window(ts.red, start=2008), colour=FALSE) +
+  geom_text(aes(2018, 1300, label=paste("RMSE: ", as.name(mean(stl_smooth_RMSE))))) + geom_text(aes(2018, 1370, label=paste("MAPE: ", as.name(mean(stl_smooth_MAPE)))))
+```
+
+![](red_lab_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
+
+``` r
+stl_smooth10_plot <- ggplot() 
+stl_smooth10_forecast_errors <- c()
+stl_smooth10_RMSE <- c()
+stl_smooth10_MAPE <- c()
+# Loop 
+for(i in seq(from=48, to=180, by=1)){
+  fit <- stl(head(smooth10.red, i), s.window="periodic", t.window=6)  # Fit based on history so far
+  fcast <- forecast(fit, h=1)  # Forecast the next month
+  segment <- ts.red[i+1]  # Extract that year from the history for errror
+  
+  # Build the plot piece by piece
+  stl_smooth10_plot <- stl_smooth10_plot + autolayer(fcast) # + autolayer(segment, colour=FALSE)
+  
+  # Calculate raw forecast errors
+  stl_smooth10_forecast_errors <- c(stl_smooth10_forecast_errors, abs(data.frame(fcast)$Point.Forecast - segment))
+  
+  stl_smooth10_RMSE <- c(stl_smooth10_RMSE, data.frame(accuracy(fcast, segment))$RMSE)
+  stl_smooth10_MAPE <- c(stl_smooth10_MAPE, data.frame(accuracy(fcast, segment))$MAPE)
+}
+
+stl_smooth10_plot + ggtitle("STL forecast of adjusted smoothed (.10) red cell sales month by month") +
+  scale_x_discrete(limits=c(2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018)) + xlab("Time") +
+  ylab("Unit sales") + autolayer(window(ts.red, start=2008), colour=FALSE) +
+  geom_text(aes(2018, 1300, label=paste("RMSE: ", as.name(mean(stl_smooth10_RMSE))))) + geom_text(aes(2018, 1370, label=paste("MAPE: ", as.name(mean(stl_smooth10_MAPE)))))
+```
+
+![](red_lab_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
 
 ETS models are based on weighted averages of past observations, with
 *exponentially* decaying weights as the observations move further back
@@ -243,16 +521,17 @@ for(i in seq(from=48, to=180, by=1)){
 
 monthly + ggtitle("STL+ETS forecast of red cell sales month by month") +
   scale_x_discrete(limits=c(2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018)) + xlab("Time") +
-  ylab("Unit sales") + autolayer(window(ts.red, start=2008), colour=FALSE)
+  ylab("Unit sales") + autolayer(window(ts.red, start=2008), colour=FALSE)  +
+  geom_text(aes(2018, 1300, label=paste("RMSE: ", as.name(mean(stl_RMSE))))) + geom_text(aes(2018, 1370, label=paste("MAPE: ", as.name(mean(stl_MAPE)))))
 ```
 
-![](red_lab_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+![](red_lab_files/figure-gfm/unnamed-chunk-23-1.png)<!-- -->
 
 ``` r
 autoplot(ts(forecast_errors, start=2008, end=2018, frequency=12)) + ggtitle("STL+ETS historical forecast errors for red cells") + ylab("Unit sales")
 ```
 
-![](red_lab_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+![](red_lab_files/figure-gfm/unnamed-chunk-24-1.png)<!-- -->
 
 ``` r
 monthly_ets <- ggplot() 
@@ -277,16 +556,17 @@ for(i in seq(from=48, to=180, by=1)){
 
 monthly_ets + ggtitle("ETS forecast of red cell sales year by year") +
   scale_x_discrete(limits=c(2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018)) + xlab("Time") +
-  ylab("Unit sales") + autolayer(window(ts.red, start=2008), colour=FALSE)
+  ylab("Unit sales") + autolayer(window(ts.red, start=2008), colour=FALSE)  +
+  geom_text(aes(2018, 1300, label=paste("RMSE: ", as.name(mean(ets_RMSE))))) + geom_text(aes(2018, 1370, label=paste("MAPE: ", as.name(mean(ets_MAPE)))))
 ```
 
-![](red_lab_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
+![](red_lab_files/figure-gfm/unnamed-chunk-25-1.png)<!-- -->
 
 ``` r
 autoplot(ts(ets_forecast_errors, start=2008, end=2018, frequency=12)) + ggtitle("ETS historical forecast errors for red cells") + ylab("Unit sales")
 ```
 
-![](red_lab_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+![](red_lab_files/figure-gfm/unnamed-chunk-26-1.png)<!-- -->
 
 ## How far back do the models actually look?
 
@@ -294,10 +574,10 @@ autoplot(ts(ets_forecast_errors, start=2008, end=2018, frequency=12)) + ggtitle(
 ##################################
 # 5 YEARS
 ##################################
-monthly_1yr <- ggplot() 
-forecast_errors_1yr <- c()
-stl_RMSE_1yr <- c()
-stl_MAPE_1yr <- c()
+monthly_5yr <- ggplot() 
+forecast_errors_5yr <- c()
+stl_RMSE_5yr <- c()
+stl_MAPE_5yr <- c()
 # Loop 
 for(i in seq(from=48, to=180, by=1)){
   fit <- stl(tail(head(ts.red, i), 60), s.window="periodic", t.window=6)  # Fit based on 5yr history
@@ -305,21 +585,22 @@ for(i in seq(from=48, to=180, by=1)){
   segment <- ts.red[i+1]  # Extract that month from the history for error calculation
   
   # Build the plot piece by piece
-  monthly_1yr <- monthly_1yr + autolayer(fcast)
+  monthly_5yr <- monthly_5yr + autolayer(fcast)
   
   # Calculate raw forecast errors
-  forecast_errors_1yr <- c(forecast_errors_1yr, abs(data.frame(fcast)$Point.Forecast - segment))
+  forecast_errors_5yr <- c(forecast_errors_5yr, abs(data.frame(fcast)$Point.Forecast - segment))
   
-  stl_RMSE_1yr <- c(stl_RMSE_1yr, data.frame(accuracy(fcast, segment))$RMSE)
-  stl_MAPE_1yr <- c(stl_MAPE_1yr, data.frame(accuracy(fcast, segment))$MAPE)
+  stl_RMSE_5yr <- c(stl_RMSE_5yr, data.frame(accuracy(fcast, segment))$RMSE)
+  stl_MAPE_5yr <- c(stl_MAPE_5yr, data.frame(accuracy(fcast, segment))$MAPE)
 }
 
-monthly_1yr + ggtitle("STL+ETS forecast of red cell sales month by month, 5 years of data") +
+monthly_5yr + ggtitle("STL+ETS forecast of red cell sales month by month, 5 years of data") +
   scale_x_discrete(limits=c(2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018)) + xlab("Time") +
-  ylab("Unit sales") + autolayer(window(ts.red, start=2008), colour=FALSE)
+  ylab("Unit sales") + autolayer(window(ts.red, start=2008), colour=FALSE) +
+  geom_text(aes(2018, 1300, label=paste("RMSE: ", as.name(mean(stl_RMSE_5yr))))) + geom_text(aes(2018, 1370, label=paste("MAPE: ", as.name(mean(stl_MAPE_5yr)))))
 ```
 
-![](red_lab_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+![](red_lab_files/figure-gfm/unnamed-chunk-27-1.png)<!-- -->
 
 ``` r
 ##################################
@@ -347,20 +628,21 @@ for(i in seq(from=48, to=180, by=1)){
 
 monthly_3yr + ggtitle("STL+ETS forecast of red cell sales month by month, 3 years of data") +
   scale_x_discrete(limits=c(2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018)) + xlab("Time") +
-  ylab("Unit sales") + autolayer(window(ts.red, start=2008), colour=FALSE)
+  ylab("Unit sales") + autolayer(window(ts.red, start=2008), colour=FALSE)  +
+  geom_text(aes(2018, 1300, label=paste("RMSE: ", as.name(mean(stl_RMSE_3yr))))) + geom_text(aes(2018, 1370, label=paste("MAPE: ", as.name(mean(stl_MAPE_3yr)))))
 ```
 
-![](red_lab_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
+![](red_lab_files/figure-gfm/unnamed-chunk-28-1.png)<!-- -->
 
 ``` r
 ##################################
 # 5 YEARS
 ##################################
 
-monthly_ets_1yr <- ggplot() 
-ets_forecast_errors_1yr <- c()
-ets_RMSE_1yr <- c()
-ets_MAPE_1yr <- c()
+monthly_ets_5yr <- ggplot() 
+ets_forecast_errors_5yr <- c()
+ets_RMSE_5yr <- c()
+ets_MAPE_5yr <- c()
 # Loop 
 for(i in seq(from=48, to=180, by=1)){
   fit <- ets(tail(head(ts.red, i), 60))  # Fit based on 5yr history
@@ -368,21 +650,22 @@ for(i in seq(from=48, to=180, by=1)){
   segment <- ts.red[i+1]  # Extract that month from the history for error calculation
   
   # Build the plot piece by piece
-  monthly_ets_1yr <- monthly_ets_1yr + autolayer(fcast)
+  monthly_ets_5yr <- monthly_ets_5yr + autolayer(fcast)
   
   # Calculate forecast errors
-  ets_forecast_errors_1yr <- c(ets_forecast_errors_1yr, abs(data.frame(fcast)$Point.Forecast - segment))
+  ets_forecast_errors_5yr <- c(ets_forecast_errors_5yr, abs(data.frame(fcast)$Point.Forecast - segment))
   
-  ets_RMSE_1yr <- c(ets_RMSE_1yr, data.frame(accuracy(fcast, segment))$RMSE)
-  ets_MAPE_1yr <- c(ets_MAPE_1yr, data.frame(accuracy(fcast, segment))$MAPE)
+  ets_RMSE_5yr <- c(ets_RMSE_5yr, data.frame(accuracy(fcast, segment))$RMSE)
+  ets_MAPE_5yr <- c(ets_MAPE_5yr, data.frame(accuracy(fcast, segment))$MAPE)
 }
 
-monthly_ets_1yr + ggtitle("ETS forecast of red cell sales month by month, 5 years of data") +
+monthly_ets_5yr + ggtitle("ETS forecast of red cell sales month by month, 5 years of data") +
   scale_x_discrete(limits=c(2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018)) + xlab("Time") +
-  ylab("Unit sales") + autolayer(window(ts.red, start=2008), colour=FALSE)
+  ylab("Unit sales") + autolayer(window(ts.red, start=2008), colour=FALSE)  +
+  geom_text(aes(2018, 1300, label=paste("RMSE: ", as.name(mean(ets_RMSE_5yr))))) + geom_text(aes(2018, 1370, label=paste("MAPE: ", as.name(mean(ets_MAPE_5yr)))))
 ```
 
-![](red_lab_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
+![](red_lab_files/figure-gfm/unnamed-chunk-29-1.png)<!-- -->
 
 ``` r
 ##################################
@@ -411,10 +694,11 @@ for(i in seq(from=48, to=180, by=1)){
 
 monthly_ets_3yr + ggtitle("ETS forecast of red cell sales month by month, 3 years of data") +
   scale_x_discrete(limits=c(2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018)) + xlab("Time") +
-  ylab("Unit sales") + autolayer(window(ts.red, start=2008), colour=FALSE)
+  ylab("Unit sales") + autolayer(window(ts.red, start=2008), colour=FALSE)  +
+  geom_text(aes(2018, 1300, label=paste("RMSE: ", as.name(mean(ets_RMSE_3yr))))) + geom_text(aes(2018, 1370, label=paste("MAPE: ", as.name(mean(ets_MAPE_3yr)))))
 ```
 
-![](red_lab_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
+![](red_lab_files/figure-gfm/unnamed-chunk-30-1.png)<!-- -->
 
 ## Forecasting from 2012 onwards
 
@@ -441,10 +725,11 @@ for(i in seq(from=96, to=180, by=1)){
 
 monthly_2012 + ggtitle("STL+ETS forecast of red cell sales month by month from 2012") +
   scale_x_discrete(limits=c(2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018)) + xlab("Time") +
-  ylab("Unit sales") + autolayer(window(ts.red, start=2011), colour=FALSE)
+  ylab("Unit sales") + autolayer(window(ts.red, start=2011), colour=FALSE)  +
+  geom_text(aes(2018, 1300, label=paste("RMSE: ", as.name(mean(stl_RMSE_2012))))) + geom_text(aes(2018, 1370, label=paste("MAPE: ", as.name(mean(stl_MAPE_2012)))))
 ```
 
-![](red_lab_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
+![](red_lab_files/figure-gfm/unnamed-chunk-31-1.png)<!-- -->
 
 ## Test out multiple regression
 
@@ -477,10 +762,11 @@ for(i in seq(from=48, to=180, by=1)){
 
 monthly_NN + ggtitle("NN forecast of red cell sales month by month") +
   scale_x_discrete(limits=c(2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018)) + xlab("Time") +
-  ylab("Unit sales") + autolayer(window(ts.red, start=2008), colour=FALSE)
+  ylab("Unit sales") + autolayer(window(ts.red, start=2008), colour=FALSE)  +
+  geom_text(aes(2018, 1300, label=paste("RMSE: ", as.name(mean(NN_RMSE))))) + geom_text(aes(2018, 1370, label=paste("MAPE: ", as.name(mean(NN_MAPE)))))
 ```
 
-![](red_lab_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
+![](red_lab_files/figure-gfm/unnamed-chunk-33-1.png)<!-- -->
 
 ``` r
 #fit <- nnetar(ts.red, lambda=0)
@@ -490,14 +776,14 @@ monthly_NN + ggtitle("NN forecast of red cell sales month by month") +
 Find out which performed better on average:
 
 ``` r
-library(knitr)
 results <- matrix(c(mean(stl_RMSE), mean(stl_MAPE), 
                     mean(ets_RMSE), mean(ets_MAPE),
                     mean(NN_RMSE), mean(NN_MAPE),
+                    mean(stl_multi_RMSE), mean(stl_multi_MAPE),
                     mean(stl_RMSE_3yr), mean(stl_MAPE_3yr),
                     mean(ets_RMSE_3yr), mean(ets_MAPE_3yr),
-                    mean(stl_RMSE_1yr), mean(stl_MAPE_1yr),
-                    mean(ets_RMSE_1yr), mean(ets_MAPE_1yr),
+                    mean(stl_RMSE_5yr), mean(stl_MAPE_5yr),
+                    mean(ets_RMSE_5yr), mean(ets_MAPE_5yr),
                     mean(stl_RMSE_2012), mean(stl_MAPE_2012)), 
                   ncol=2, 
                   byrow=TRUE)
@@ -506,6 +792,7 @@ colnames(results) <- c("RMSE", "MAPE")
 rownames(results) <- c("STL+ETS whole", 
                        "ETS whole",
                        "NN whole",
+                       "STLF whole",
                        "STL+ETS 3yr",
                        "ETS 3yr",
                        "STL+ETS 1yr",
@@ -520,7 +807,8 @@ results
 | :------------ | -------: | -------: |
 | STL+ETS whole | 34.74112 | 3.270382 |
 | ETS whole     | 34.65382 | 3.227973 |
-| NN whole      | 39.67374 | 3.739301 |
+| NN whole      | 39.42908 | 3.713717 |
+| STLF whole    | 34.74112 | 3.270382 |
 | STL+ETS 3yr   | 28.41612 | 2.888570 |
 | ETS 3yr       | 35.32236 | 3.603965 |
 | STL+ETS 1yr   | 29.59490 | 2.924929 |
