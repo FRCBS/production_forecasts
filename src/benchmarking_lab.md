@@ -1,0 +1,230 @@
+Benchmarking Lab
+================
+
+``` r
+# Set working directory
+knitr::opts_knit$set(root.dir = "/home/esa/production_forecasts")
+```
+
+## Create original dataset that should remain immutable throughout labbing
+
+``` r
+library(forecast)
+library(ggplot2)
+library(gridExtra)
+library(knitr)
+source("src/evalhelp.R")
+
+# Load data
+monthly_sales <- read.table("./data/kuukausimyynti.txt", header = T, sep = "\t")
+
+# Separate yyyy/mmm column into months and years
+monthly_sales$year <- substr(monthly_sales$kuukausi, 1, 4)
+monthly_sales$month <- factor(substr(monthly_sales$kuukausi, 6, 8), levels = c("tam", "hel", "maa", "huh", "tou", "kes", "hei", "elo", "syy", "lok", "mar", "jou"))
+
+# Create a numeric column for months
+monthly_sales$month_num <- as.numeric(monthly_sales$month)
+
+# Omit empty values
+d <- na.omit(monthly_sales)
+```
+
+## Create the time series object
+
+``` r
+ts.red <- ts(d$Punasoluvalmisteet, 
+             start = as.numeric(c(d$year[1], d$month_num[1])), 
+             end = as.numeric(c(tail(d$year, 1), tail(d$month_num, 1))), 
+             frequency = 12)  # This tells the series that it is monthly data
+
+# Business day adjustment
+ts.red.adj <- ts.red/bizdays(ts.red, FinCenter = "Zurich")  # Zurich is closest to Finnish business calendar, implementing of which would be a chore
+```
+
+## Get baseline benchmarks to beat
+
+``` r
+# Random walk with drift
+rwf.e <- tsCV(ts.red, rwf, drift = TRUE, h = 1)
+rwf.crit <- cMAPE(rwf.e, ts.red)
+rwf.rmse <- sqrt(mean(rwf.e^2, na.rm = TRUE))
+rwf.mape <- mean(abs(100*rwf.e/ts.red), na.rm = TRUE)
+
+# Naive
+naive.e <- tsCV(ts.red, naive, h = 1)
+naive.crit <- cMAPE(naive.e, ts.red)
+naive.rmse <- sqrt(mean(naive.e^2, na.rm = TRUE))
+naive.mape <- mean(abs(100*naive.e/ts.red), na.rm = TRUE)
+
+# Seasonal naive
+snaive.e <- tsCV(ts.red, snaive, h = 1)
+snaive.crit <- cMAPE(snaive.e, ts.red)
+snaive.rmse <- sqrt(mean(snaive.e^2, na.rm = TRUE))
+snaive.mape <- mean(abs(100*snaive.e/ts.red), na.rm = TRUE)
+
+# Mean forecast
+meanf.e <- tsCV(ts.red, meanf, h = 1)
+meanf.crit <- cMAPE(meanf.e, ts.red)
+meanf.rmse <- sqrt(mean(meanf.e^2, na.rm = TRUE))
+meanf.mape <- mean(abs(100*meanf.e/ts.red), na.rm = TRUE)
+
+benchmarks <- matrix(c(rwf.crit, rwf.mape, rwf.rmse,
+                       naive.crit, naive.mape, naive.rmse,
+                       snaive.crit, snaive.mape, snaive.rmse,
+                       meanf.crit, meanf.mape, meanf.rmse),
+                     ncol = 3,
+                     byrow = TRUE)
+colnames(benchmarks) <- c("cMAPE", "MAPE", "RMSE")
+rownames(benchmarks) <- c("RWF", "NAIVE", "SNAIVE", "MEANF")
+kable(benchmarks, "markdown")
+```
+
+|        |     cMAPE |      MAPE |     RMSE |
+| :----- | --------: | --------: | -------: |
+| RWF    | 11.896087 |  8.111792 | 1851.276 |
+| NAIVE  | 11.814000 |  7.964862 | 1804.753 |
+| SNAIVE |  9.352565 |  5.565415 | 1360.658 |
+| MEANF  | 22.727547 | 11.931846 | 2537.142 |
+
+## Benchmarks with business day adjustment
+
+``` r
+# Random walk with drift
+rwf.e.adj <- tsCV(ts.red.adj, rwf, drift = TRUE, h = 1)
+rwf.crit.adj <- cMAPE(rwf.e.adj, ts.red.adj)
+rwf.rmse.adj <- sqrt(mean(rwf.e.adj^2, na.rm = TRUE))
+rwf.mape.adj <- mean(abs(100*rwf.e.adj/ts.red.adj), na.rm = TRUE)
+
+# Naive
+naive.e.adj <- tsCV(ts.red.adj, naive, h = 1)
+naive.crit.adj <- cMAPE(naive.e.adj, ts.red.adj)
+naive.rmse.adj <- sqrt(mean(naive.e.adj^2, na.rm = TRUE))
+naive.mape.adj <- mean(abs(100*naive.e.adj/ts.red.adj), na.rm = TRUE)
+
+# Seasonal naive
+snaive.e.adj <- tsCV(ts.red.adj, snaive, h = 1)
+snaive.crit.adj <- cMAPE(snaive.e.adj, ts.red.adj)
+snaive.rmse.adj <- sqrt(mean(snaive.e.adj^2, na.rm = TRUE))
+snaive.mape.adj <- mean(abs(100*snaive.e.adj/ts.red.adj), na.rm = TRUE)
+
+# Mean forecast
+meanf.e.adj <- tsCV(ts.red.adj, meanf, h = 1)
+meanf.crit.adj <- cMAPE(meanf.e.adj, ts.red.adj)
+meanf.rmse.adj <- sqrt(mean(meanf.e.adj^2, na.rm = TRUE))
+meanf.mape.adj <- mean(abs(100*meanf.e.adj/ts.red.adj), na.rm = TRUE)
+
+benchmarks.adj <- matrix(c(rwf.crit.adj, rwf.mape.adj, rwf.rmse.adj,
+                       naive.crit.adj, naive.mape.adj, naive.rmse.adj,
+                       snaive.crit.adj, snaive.mape.adj, snaive.rmse.adj,
+                       meanf.crit.adj, meanf.mape.adj, meanf.rmse.adj),
+                     ncol = 3,
+                     byrow = TRUE)
+colnames(benchmarks.adj) <- c("cMAPE_adj", "MAPE_adj", "RMSE_adj")
+rownames(benchmarks.adj) <- c("RWF", "NAIVE", "SNAIVE", "MEANF")
+kable(benchmarks.adj, "markdown")
+```
+
+|        | cMAPE\_adj | MAPE\_adj | RMSE\_adj |
+| :----- | ---------: | --------: | --------: |
+| RWF    |   9.284173 |  6.381206 |  74.56767 |
+| NAIVE  |   9.217045 |  6.196751 |  72.62863 |
+| SNAIVE |   8.899723 |  5.145806 |  62.34403 |
+| MEANF  |  22.598705 | 11.832974 | 120.24333 |
+
+## Moving average benchmark
+
+``` r
+ma5.e <- tsCV(ts.red, fMA, h = 1)
+ma5.crit <- cMAPE(ma5.e, ts.red)
+ma5.rmse <- sqrt(mean(ma5.e^2, na.rm = TRUE))
+ma5.mape <- mean(abs(100*ma5.e/ts.red), na.rm = TRUE)
+
+ma5.e.adj <- tsCV(ts.red.adj, fMA, h = 1)
+ma5.crit.adj <- cMAPE(ma5.e.adj, ts.red.adj)
+ma5.rmse.adj <- sqrt(mean(ma5.e.adj^2, na.rm = TRUE))
+ma5.mape.adj <- mean(abs(100*ma5.e.adj/ts.red.adj), na.rm = TRUE)
+
+ma5bench <- matrix(c(ma5.crit, ma5.mape, ma5.rmse, 
+                     ma5.crit.adj, ma5.mape.adj, ma5.rmse.adj),
+                   ncol = 3,
+                   byrow = TRUE)
+colnames(ma5bench) <- c("cMAPE", "MAPE", "RMSE")
+rownames(ma5bench) <- c("5-MA", "5-MA ADJ")
+kable(ma5bench, "markdown")
+```
+
+|          |    cMAPE |     MAPE |       RMSE |
+| :------- | -------: | -------: | ---------: |
+| 5-MA     | 8.106023 | 5.291696 | 1213.26245 |
+| 5-MA ADJ | 7.140978 | 4.590194 |   55.74291 |
+
+## Jarno’s forecasts
+
+``` r
+jstl.e <- tsCV(ts.red, fstl, t.window = 6, h = 1)
+jstl.crit <- cMAPE(jstl.e, ts.red)
+jstl.mape <- mean(abs(100*jstl.e/ts.red), na.rm = TRUE)
+jstl.rmse <- sqrt(mean(jstl.e^2, na.rm = TRUE))
+
+jstl.e.adj <- tsCV(ts.red.adj, fstl, t.window = 6, h = 1)
+jstl.crit.adj <- cMAPE(jstl.e.adj, ts.red.adj)
+jstl.mape.adj <- mean(abs(100*jstl.e.adj/ts.red.adj), na.rm = TRUE)
+jstl.rmse.adj <- sqrt(mean(jstl.e.adj^2, na.rm = TRUE))
+
+jets.e <- tsCV(ts.red, fets, h = 1)
+jets.crit <- cMAPE(jets.e, ts.red)
+jets.mape <- mean(abs(100*jets.e/ts.red), na.rm = TRUE)
+jets.rmse <- sqrt(mean(jets.e^2, na.rm = TRUE))
+
+jets.e.adj <- tsCV(ts.red.adj, fets, t.window = 6, h = 1)
+jets.crit.adj <- cMAPE(jets.e.adj, ts.red.adj)
+jets.mape.adj <- mean(abs(100*jets.e.adj/ts.red.adj), na.rm = TRUE)
+jets.rmse.adj <- sqrt(mean(jets.e.adj^2, na.rm = TRUE))
+
+oldbench <- matrix(c(jstl.crit, jstl.mape, jstl.rmse, 
+                     jets.crit, jets.mape, jets.rmse,
+                     jstl.crit.adj, jstl.mape.adj, jstl.rmse.adj,
+                     jets.crit.adj, jets.mape.adj, jets.rmse.adj),
+                   ncol = 3,
+                   byrow = TRUE)
+colnames(oldbench) <- c("cMAPE", "MAPE", "RMSE")
+rownames(oldbench) <- c("STL", "ETS", "STL ADJ", "ETS ADJ")
+kable(oldbench, "markdown")
+```
+
+|         |    cMAPE |     MAPE |       RMSE |
+| :------ | -------: | -------: | ---------: |
+| STL     | 7.141126 | 4.564358 | 1076.40050 |
+| ETS     | 7.654155 | 4.823708 | 1147.76854 |
+| STL ADJ | 5.405171 | 3.457008 |   38.97937 |
+| ETS ADJ | 6.241075 | 3.927705 |   48.91170 |
+
+Adjusted values are consistently better, so we’ll use adjusted from now
+on.
+
+## Complex decompositions
+
+``` r
+stlf.e.adj <- tsCV(ts.red.adj, stlf, h = 1)
+stlf.crit.adj <- cMAPE(stlf.e.adj, ts.red.adj)
+stlf.mape.adj <- mean(abs(100*stlf.e.adj/ts.red.adj), na.rm = TRUE)
+stlf.rmse.adj <- sqrt(mean(stlf.e.adj^2, na.rm = TRUE))
+
+tbats.e.adj <- tsCV(ts.red.adj, fTBATS, h = 1)
+tbats.crit.adj <- cMAPE(tbats.e.adj, ts.red.adj)
+tbats.mape.adj <- mean(abs(100*tbats.e.adj/ts.red.adj), na.rm = TRUE)
+tbats.rmse.adj <- sqrt(mean(tbats.e.adj^2, na.rm = TRUE))
+
+complex <- matrix(c(stlf.crit.adj, stlf.mape.adj, stlf.rmse.adj,
+                    tbats.crit.adj, tbats.mape.adj, tbats.rmse.adj),
+                  ncol = 3,
+                  byrow = TRUE)
+colnames(complex) <- c("cMAPE", "MAPE", "RMSE")
+rownames(complex) <- c("STLF (adj)", "TBATS (adj)")
+kable(complex, "markdown")
+```
+
+|             |    cMAPE |     MAPE |     RMSE |
+| :---------- | -------: | -------: | -------: |
+| STLF (adj)  | 5.325278 | 3.422298 | 38.75729 |
+| TBATS (adj) | 6.178754 | 3.903466 | 56.19404 |
