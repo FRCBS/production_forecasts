@@ -40,3 +40,8 @@ fMA <- function(x, h, order = 5){
 fTBATS <- function(x, h){
   forecast(tbats(x), h = h)
 }
+
+# NN for tsCV
+fnnet <- function(x, h, lambda = 0){
+  forecast(nnetar(x, lambda = lambda), h = h)
+}

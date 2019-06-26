@@ -3,7 +3,8 @@ Benchmarking Lab
 
 ``` r
 # Set working directory
-knitr::opts_knit$set(root.dir = "/home/esa/production_forecasts")
+# knitr::opts_knit$set(root.dir = "/home/esa/production_forecasts") # Working on Ubuntu
+knitr::opts_knit$set(root.dir = "V:/production_forecasts") # Working home
 ```
 
 ## Create original dataset that should remain immutable throughout labbing
@@ -133,30 +134,35 @@ kable(benchmarks.adj, "markdown")
 
 ## Moving average benchmark
 
-``` r
-ma5.e <- tsCV(ts.red, fMA, h = 1)
-ma5.crit <- cMAPE(ma5.e, ts.red)
-ma5.rmse <- sqrt(mean(ma5.e^2, na.rm = TRUE))
-ma5.mape <- mean(abs(100*ma5.e/ts.red), na.rm = TRUE)
+Using adjusted values
 
-ma5.e.adj <- tsCV(ts.red.adj, fMA, h = 1)
+``` r
+# 5-MA
+ma5.e.adj <- tsCV(ts.red.adj, fMA, order = 5, h = 1)
 ma5.crit.adj <- cMAPE(ma5.e.adj, ts.red.adj)
 ma5.rmse.adj <- sqrt(mean(ma5.e.adj^2, na.rm = TRUE))
 ma5.mape.adj <- mean(abs(100*ma5.e.adj/ts.red.adj), na.rm = TRUE)
 
-ma5bench <- matrix(c(ma5.crit, ma5.mape, ma5.rmse, 
-                     ma5.crit.adj, ma5.mape.adj, ma5.rmse.adj),
+# 7-MA
+ma7.e.adj <- tsCV(ts.red.adj, fMA, order = 7, h = 1)
+ma7.crit.adj <- cMAPE(ma7.e.adj, ts.red.adj)
+ma7.rmse.adj <- sqrt(mean(ma7.e.adj^2, na.rm = TRUE))
+ma7.mape.adj <- mean(abs(100*ma7.e.adj/ts.red.adj), na.rm = TRUE)
+
+mabench <- matrix(c(ma7.crit.adj, ma7.mape.adj, ma7.rmse.adj,
+                    ma5.crit.adj, ma5.mape.adj, ma5.rmse.adj),
                    ncol = 3,
                    byrow = TRUE)
-colnames(ma5bench) <- c("cMAPE", "MAPE", "RMSE")
-rownames(ma5bench) <- c("5-MA", "5-MA ADJ")
-kable(ma5bench, "markdown")
+
+colnames(mabench) <- c("cMAPE", "MAPE", "RMSE")
+rownames(mabench) <- c("7-MA ADJ", "5-MA ADJ")
+kable(mabench, "markdown")
 ```
 
-|          |    cMAPE |     MAPE |       RMSE |
-| :------- | -------: | -------: | ---------: |
-| 5-MA     | 8.106023 | 5.291696 | 1213.26245 |
-| 5-MA ADJ | 7.140978 | 4.590194 |   55.74291 |
+|          |    cMAPE |     MAPE |     RMSE |
+| :------- | -------: | -------: | -------: |
+| 7-MA ADJ | 7.212283 | 4.655123 | 54.84904 |
+| 5-MA ADJ | 7.140978 | 4.590194 | 55.74291 |
 
 ## Jarno’s forecasts
 
@@ -228,3 +234,129 @@ kable(complex, "markdown")
 | :---------- | -------: | -------: | -------: |
 | STLF (adj)  | 5.325278 | 3.422298 | 38.75729 |
 | TBATS (adj) | 6.178754 | 3.903466 | 56.19404 |
+
+## Shorter series
+
+We’ll use an MSTL+ETS model and monthly adjusted values, as those have
+been the best performing ones
+
+``` r
+# 5 year rolling window
+stlf5.e.adj <- tsCV(ts.red.adj, stlf, window = 60, h = 1)
+stlf5.crit.adj <- cMAPE(stlf5.e.adj, ts.red.adj)
+stlf5.mape.adj <- mean(abs(100*stlf5.e.adj/ts.red.adj), na.rm = TRUE)
+stlf5.rmse.adj <- sqrt(mean(stlf5.e.adj^2, na.rm = TRUE))
+
+# 4 year rolling window
+stlf4.e.adj <- tsCV(ts.red.adj, stlf, window = 48, h = 1)
+stlf4.crit.adj <- cMAPE(stlf4.e.adj, ts.red.adj)
+stlf4.mape.adj <- mean(abs(100*stlf4.e.adj/ts.red.adj), na.rm = TRUE)
+stlf4.rmse.adj <- sqrt(mean(stlf4.e.adj^2, na.rm = TRUE))
+
+# 3 year rolling window (smallest possible for stl)
+stlf3.e.adj <- tsCV(ts.red.adj, stlf, window = 36, h = 1)
+stlf3.crit.adj <- cMAPE(stlf3.e.adj, ts.red.adj)
+stlf3.mape.adj <- mean(abs(100*stlf3.e.adj/ts.red.adj), na.rm = TRUE)
+stlf3.rmse.adj <- sqrt(mean(stlf3.e.adj^2, na.rm = TRUE))
+
+# From 2012 onwards
+stlf2012.e.adj <- tsCV(tail(ts.red.adj, 72), stlf, h = 1)
+stlf2012.crit.adj <- cMAPE(stlf2012.e.adj, tail(ts.red.adj, 84))
+stlf2012.mape.adj <- mean(abs(100*stlf2012.e.adj/tail(ts.red.adj, 84)), na.rm = TRUE)
+stlf2012.rmse.adj <- sqrt(mean(stlf2012.e.adj^2, na.rm = TRUE))
+
+rolling <- matrix(c(stlf5.crit.adj, stlf5.mape.adj, stlf5.rmse.adj,
+                    stlf4.crit.adj, stlf4.mape.adj, stlf4.rmse.adj,
+                    stlf3.crit.adj, stlf3.mape.adj, stlf3.rmse.adj,
+                    stlf2012.crit.adj, stlf2012.mape.adj, stlf2012.rmse.adj),
+                  ncol = 3,
+                  byrow = TRUE)
+colnames(rolling) <- c("cMAPE", "MAPE", "RMSE")
+rownames(rolling) <- c("STLF 5", "STLF 4", "STLF 3", "STLF 2012")
+kable(rolling, "markdown")
+```
+
+|           |    cMAPE |     MAPE |     RMSE |
+| :-------- | -------: | -------: | -------: |
+| STLF 5    | 4.883666 | 3.152429 | 35.15307 |
+| STLF 4    | 5.124574 | 3.284442 | 36.57382 |
+| STLF 3    | 5.211428 | 3.373942 | 38.57579 |
+| STLF 2012 | 4.720529 | 3.408760 | 33.77122 |
+
+# Smoothed tests
+
+This will have to be done “the old way”, because tSCV() cannot be given
+two different series for error calculation. **THIS WILL MAKE THE RESULTS
+INCOMPARABLE**
+
+``` r
+# Filter
+smooth25.red.adj <- ts(itsmr::smooth.fft(ts.red.adj, .25), start = as.numeric(c(d$year[1], d$month_num[1])), 
+                   end = as.numeric(c(tail(d$year, 1), tail(d$month_num, 1))), frequency = 12)
+smooth10.red.adj <- ts(itsmr::smooth.fft(ts.red.adj, .1), start = as.numeric(c(d$year[1], d$month_num[1])),
+                   end = as.numeric(c(tail(d$year, 1), tail(d$month_num, 1))), frequency = 12)
+
+stl_smooth_plot <- ggplot() 
+stl_smooth_cMAPE <- c()
+stl_smooth_RMSE <- c()
+stl_smooth_MAPE <- c()
+# Loop 
+for(i in seq(from = 48, to = 180, by = 1)){
+  fit <- stl(head(smooth25.red.adj, i), s.window = "periodic", t.window = 7)  # Fit based on history so far
+  fcast <- forecast(fit, h = 1)  # Forecast the next month
+  segment <- ts.red.adj[i + 1]  # Extract that year from the history for errror
+  
+  # Build the plot piece by piece
+  stl_smooth_plot <- stl_smooth_plot + autolayer(fcast)
+  
+  # Calculate raw forecast errors
+  pe <- 100*(data.frame(fcast)$Point.Forecast - segment)/segment
+  crt <- mean(ifelse(test = pe < 0, yes = abs(pe * 2), no = pe), na.rm = TRUE)
+  stl_smooth_cMAPE <- c(stl_smooth_cMAPE, crt) 
+  
+  stl_smooth_RMSE <- c(stl_smooth_RMSE, data.frame(accuracy(fcast, segment))$RMSE)
+  stl_smooth_MAPE <- c(stl_smooth_MAPE, data.frame(accuracy(fcast, segment))$MAPE)
+}
+
+stl_smooth_plot + ggtitle("STL forecast of adjusted smoothed (.25) red cell sales month by month") +
+  scale_x_discrete(limits=c(2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018)) + xlab("Time") +
+  ylab("Unit sales") + autolayer(window(ts.red.adj, start = 2008), colour = FALSE) +
+  geom_text(aes(2018, 1000, label = paste("RMSE: ", as.name(mean(stl_smooth_RMSE))))) + 
+  geom_text(aes(2018, 1050, label = paste("MAPE: ", as.name(mean(stl_smooth_MAPE))))) +
+  geom_text(aes(2018, 1100, label = paste("cMAPE: ", as.name(mean(stl_smooth_cMAPE)))))
+```
+
+![](benchmarking_lab_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+
+``` r
+stl_smooth_plot <- ggplot() 
+stl_smooth_cMAPE <- c()
+stl_smooth_RMSE <- c()
+stl_smooth_MAPE <- c()
+# Loop 
+for(i in seq(from = 48, to = 180, by = 1)){
+  fit <- stl(head(smooth10.red.adj, i), s.window = "periodic", t.window = 7)  # Fit based on history so far
+  fcast <- forecast(fit, h = 1)  # Forecast the next month
+  segment <- ts.red.adj[i + 1]  # Extract that year from the history for errror
+  
+  # Build the plot piece by piece
+  stl_smooth_plot <- stl_smooth_plot + autolayer(fcast)
+  
+  # Calculate raw forecast errors
+  pe <- 100*(data.frame(fcast)$Point.Forecast - segment)/segment
+  crt <- mean(ifelse(test = pe < 0, yes = abs(pe * 2), no = pe), na.rm = TRUE)
+  stl_smooth_cMAPE <- c(stl_smooth_cMAPE, crt) 
+  
+  stl_smooth_RMSE <- c(stl_smooth_RMSE, data.frame(accuracy(fcast, segment))$RMSE)
+  stl_smooth_MAPE <- c(stl_smooth_MAPE, data.frame(accuracy(fcast, segment))$MAPE)
+}
+
+stl_smooth_plot + ggtitle("STL forecast of adjusted smoothed (.10) red cell sales month by month") +
+  scale_x_discrete(limits=c(2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018)) + xlab("Time") +
+  ylab("Unit sales") + autolayer(window(ts.red.adj, start = 2008), colour = FALSE) +
+  geom_text(aes(2018, 1000, label = paste("RMSE: ", as.name(mean(stl_smooth_RMSE))))) + 
+  geom_text(aes(2018, 1050, label = paste("MAPE: ", as.name(mean(stl_smooth_MAPE))))) +
+  geom_text(aes(2018, 1100, label = paste("cMAPE: ", as.name(mean(stl_smooth_cMAPE)))))
+```
+
+![](benchmarking_lab_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
