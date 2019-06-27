@@ -42,6 +42,6 @@ fTBATS <- function(x, h){
 }
 
 # NN for tsCV
-fnnet <- function(x, h, lambda = 0){
-  forecast(nnetar(x, lambda = lambda), h = h)
+fnnet <- function(x, h){
+  forecast(nnetar(x), h = h)
 }

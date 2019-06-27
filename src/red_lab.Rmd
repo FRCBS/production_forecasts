@@ -5,7 +5,8 @@ output: github_document
 
 ```{r setup}
 # Set working directory
-knitr::opts_knit$set(root.dir = "/home/esa/production_forecasts")
+# knitr::opts_knit$set(root.dir = "/home/esa/production_forecasts") # Working on Ubuntu
+knitr::opts_knit$set(root.dir = "V:/production_forecasts") # Working home
 ```
 
 
@@ -15,6 +16,8 @@ library(forecast)
 library(ggplot2)
 library(gridExtra)
 library(knitr)
+library(xlsx)
+source("src/evalhelp.R")
 
 # Load data
 monthly_sales <- read.table("./data/kuukausimyynti.txt", header = T, sep = "\t")
@@ -38,6 +41,7 @@ ts.red <- ts(d$Punasoluvalmisteet,
              frequency = 12)  # This tells the series that it is monthly data
 autoplot(ts.red) + ggtitle("Monthly sales of red cell products") + ylab("Red cell units")
 ```
+
 ## Naive forecast as a benchmark
 ```{r}
 naive_plot <- ggplot() 
@@ -68,6 +72,7 @@ naive_plot + ggtitle("Naive forecast of red cell sales month by month") +
   ylab("Unit sales") + autolayer(window(ts.red, start = 2008), colour = FALSE) +
   geom_text(aes(2018, 26000, label = paste("RMSE: ", as.name(mean(naive_RMSE))))) + geom_text(aes(2018, 26700, label = paste("MAPE: ", as.name(mean(naive_MAPE)))))
 ```
+
 ## First improvement: Business day adjustment
 ```{r}
 # Business day adjustment
