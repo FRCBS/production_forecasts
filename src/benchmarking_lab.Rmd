@@ -6,7 +6,8 @@ output: github_document
 ```{r setup}
 # Set working directory
 # knitr::opts_knit$set(root.dir = "/home/esa/production_forecasts") # Working on Ubuntu
-knitr::opts_knit$set(root.dir = "V:/production_forecasts") # Working home
+# knitr::opts_knit$set(root.dir = "V:/production_forecasts") # Working home
+knitr::opts_knit$set(root.dir = "C:/Users/esatu/production_forecasts") # Working on laptop
 ```
 
 ## Create original dataset that should remain immutable throughout labbing
@@ -15,7 +16,7 @@ library(forecast)
 library(ggplot2)
 library(gridExtra)
 library(knitr)
-library(xlsx)
+#library(xlsx)
 source("src/evalhelp.R")
 
 # Load data
@@ -586,3 +587,27 @@ stl_smooth_plot + ggtitle("STLF forecast of adjusted smoothed (.10) red cell sal
 ```
 
 The smoothing seems to be somewhat effective in minimizing the error. This is however not exactly comparable. I'll have to look into making these comparable with other metrics.
+
+### Regression
+```{r}
+jan <- rep(c(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), 6)
+feb <- rep(c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), 6)
+mar <- rep(c(0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0), 6)
+apr <- rep(c(0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0), 6)
+may <- rep(c(0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0), 6)
+jun <- rep(c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0), 6)
+jul <- rep(c(0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0), 6)
+aug <- rep(c(0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0), 6)
+sep <- rep(c(0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0), 6)
+oct <- rep(c(0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0), 6)
+nov <- rep(c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0), 6)
+dec <- rep(c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), 6)
+```
+
+```{r}
+df <- cbind(as.vector(window(ts.red, start = 2013, end = c(2018, 12))), jan, feb, mar, apr, may, jun, jul, aug, sep, oct, nov, dec)
+```
+```{r}
+df
+```
+
