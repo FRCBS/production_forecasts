@@ -27,8 +27,8 @@ fstl <- function(x, h,  s.window = "periodic", t.window = 7){
 }
 
 # auto.arima for tsCV
-farima <- function(x, h, seasonal = TRUE){
-  forecast(auto.arima(x, seasonal = seasonal), h = h)
+farima <- function(x, h, xreg = NULL){
+  forecast(auto.arima(x, xreg = xreg), h = h)
 }
 
 # Moving Average for tsCV
@@ -44,4 +44,9 @@ fTBATS <- function(x, h){
 # NN for tsCV
 fnnet <- function(x, h){
   forecast(nnetar(x), h = h)
+}
+
+# Linear regression for tsCV
+freg <- function(x, h){
+  forecast(tslm(x ~ trend + season), h = h)
 }

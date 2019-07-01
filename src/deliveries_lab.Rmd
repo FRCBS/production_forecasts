@@ -1,0 +1,82 @@
+---
+title: "Daily Deliveries Lab"
+output: github_document
+---
+
+```{r setup}
+# Set working directory
+knitr::opts_knit$set(root.dir = "/home/esa/production_forecasts") # Working on Ubuntu
+# knitr::opts_knit$set(root.dir = "V:/production_forecasts") # Working home
+```
+
+## Create original dataset that should remain immutable throughout labbing
+```{r message=FALSE}
+library(forecast)
+library(ggplot2)
+library(gridExtra)
+library(knitr)
+library(readxl)
+source("src/evalhelp.R")
+
+# Load data
+dd <- read_excel("./data/deliveries_daily.xlsx", sheet = "Document_CH207")
+colnames(dd) <- c("Date", "Deliveries")
+# Omit empty values
+dd <- na.omit(dd)
+```
+
+## Create the time series object
+```{r}
+ts.dd <- ts(dd$Deliveries, 
+             start = as.numeric(c(2013, 1)), 
+             frequency = 365)  # This tells the series that it is daily data
+autoplot(ts.dd) + ggtitle("Daily deliveries of products") + ylab("Product deliveries")
+
+```
+```{r}
+decomposed <- stl(ts.dd, s.window = "periodic")  # Seasonal and Trend decomposition using LOESS
+seasonal <- decomposed$time.series[, 1]          # Season component
+trend <- decomposed$time.series[, 2]             # Trend component
+remainder <- decomposed$time.series[, 3]         # Remainder component
+
+autoplot(decomposed)  # Plot
+```
+
+
+```{r}
+mon <- rep(c(1, 0, 0, 0, 0, 0, 0), 100)
+tue <- rep(c(0, 1, 0, 0, 0, 0, 0), 100)
+wed <- rep(c(0, 0, 1, 0, 0, 0, 0), 100)
+thu <- rep(c(0, 0, 0, 1, 0, 0, 0), 100)
+fri <- rep(c(0, 0, 0, 0, 1, 0, 0), 100)
+sat <- rep(c(0, 0, 0, 0, 0, 1, 0), 100)
+
+week.m <- matrix(c(mon, tue, wed, thu, fri, sat),
+                 ncol = 6,
+                 byrow = FALSE)
+
+arima.e <- tsCV(tail(ts.dd, 700), farima, xreg = week.m, h = 1)
+arima.crit <- cMAPE(arima.e, tail(ts.dd, 700))
+arima.mape <- mean(abs(100*arima.e/tail(ts.dd, 700)), na.rm = TRUE)
+arima.rmse <- sqrt(mean(arima.e^2, na.rm = TRUE))
+
+arimabench <- matrix(c(arima.crit, arima.mape, arima.rmse),
+               ncol = 3,
+               byrow = TRUE)
+colnames(arimabench) <- c("cMAPE", "MAPE", "RMSE")
+rownames(arimabench) <- c("DynReg")
+kable(arimabench, "markdown")
+```
+```{r}
+ets.e <- tsCV(tail(ts.dd, 70), fets, h = 1)
+ets.crit <- cMAPE(ets.e, tail(ts.dd, 70))
+ets.mape <- mean(abs(100*ets.e/tail(ts.dd, 70)), na.rm = TRUE)
+ets.rmse <- sqrt(mean(ets.e^2, na.rm = TRUE))
+
+etsbench <- matrix(c(ets.crit, ets.mape, ets.rmse),
+               ncol = 3,
+               byrow = TRUE)
+colnames(etsbench) <- c("cMAPE", "MAPE", "RMSE")
+rownames(etsbench) <- c("ETS")
+kable(etsbench, "markdown")
+```

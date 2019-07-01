@@ -1,22 +1,21 @@
----
-title: "Benchmarking Lab"
-output: github_document
----
+Benchmarking Lab: Red Cells
+================
 
-```{r setup}
+``` r
 # Set working directory
-# knitr::opts_knit$set(root.dir = "/home/esa/production_forecasts") # Working on Ubuntu
+knitr::opts_knit$set(root.dir = "/home/esa/production_forecasts") # Working on Ubuntu
 # knitr::opts_knit$set(root.dir = "V:/production_forecasts") # Working home
-knitr::opts_knit$set(root.dir = "C:/Users/esatu/production_forecasts") # Working on laptop
+# knitr::opts_knit$set(root.dir = "C:/Users/esatu/production_forecasts") # Working on laptop
 ```
 
 ## Create original dataset that should remain immutable throughout labbing
-```{r loading_data, message=FALSE}
+
+``` r
 library(forecast)
 library(ggplot2)
 library(gridExtra)
 library(knitr)
-#library(xlsx)
+library(readxl)
 source("src/evalhelp.R")
 
 # Load data
@@ -34,17 +33,19 @@ d <- na.omit(monthly_sales)
 ```
 
 ## Create the time series object
-```{r ts_creation}
+
+``` r
 ts.red <- ts(d$Punasoluvalmisteet, 
              start = as.numeric(c(d$year[1], d$month_num[1])), 
              end = as.numeric(c(tail(d$year, 1), tail(d$month_num, 1))), 
              frequency = 12)  # This tells the series that it is monthly data
 ```
 
-
 ## Previously used production forecasts
+
 These are our true benchmark before any improvements
-```{r old_forecasts}
+
+``` r
 # STL + ETS
 old.stl.e <- tsCV(ts.red, fstl, t.window = 6, h = 1)
 old.stl.crit <- cMAPE(old.stl.e, ts.red)
@@ -69,10 +70,21 @@ rownames(oldbench) <- c("old STL", "old ETS")
 kable(oldbench, "markdown")
 ```
 
+|         |    cMAPE |     MAPE |     RMSE |
+| :------ | -------: | -------: | -------: |
+| old STL | 7.141126 | 4.564358 | 1076.400 |
+| old ETS | 7.654155 | 4.823708 | 1147.769 |
 
 ## Get baseline benchmarks to beat
-These are our absolute worst forecasts we can make. A random walk forecast takes the previous value of the series and walks randomly to some direction. A naive forecast will forecast only the previous value of the series. A seasonal naive will forecast only the previous value of the same season of the series. Mean forecast will forecast the series mean.
-```{r baseline_forecasts}
+
+These are our absolute worst forecasts we can make. A random walk
+forecast takes the previous value of the series and walks randomly to
+some direction. A naive forecast will forecast only the previous value
+of the series. A seasonal naive will forecast only the previous value of
+the same season of the series. Mean forecast will forecast the series
+mean.
+
+``` r
 # Random walk with drift
 rwf.e <- tsCV(ts.red, rwf, drift = TRUE, h = 1)
 rwf.crit <- cMAPE(rwf.e, ts.red)
@@ -107,19 +119,36 @@ colnames(benchmarks) <- c("cMAPE", "MAPE", "RMSE")
 rownames(benchmarks) <- c("RWF", "NAIVE", "SNAIVE", "MEANF")
 kable(benchmarks, "markdown")
 ```
-These are considerably worse than our old forecasts, which is to be expected. The seasonal naive comes quite close, however, with old forecasts improving only by 1 pp. 
+
+|        |     cMAPE |      MAPE |     RMSE |
+| :----- | --------: | --------: | -------: |
+| RWF    | 11.896087 |  8.111792 | 1851.276 |
+| NAIVE  | 11.814000 |  7.964862 | 1804.753 |
+| SNAIVE |  9.352565 |  5.565415 | 1360.658 |
+| MEANF  | 22.727547 | 11.931846 | 2537.142 |
+
+These are considerably worse than our old forecasts, which is to be
+expected. The seasonal naive comes quite close, however, with old
+forecasts improving only by 1 pp.
 
 ## Cutting our series
-Next, we'll limit our series scope to 2013. This ought to improve our forecasts some, as the significant level change that occurred in 2012-2013 doesn't get to affect our modelling. We will later limit this series to the end of 2018 in order to to business day adjustments.
 
-```{r cut_series}
+Next, we’ll limit our series scope to 2013. This ought to improve our
+forecasts some, as the significant level change that occurred in
+2012-2013 doesn’t get to affect our modelling. We will later limit this
+series to the end of 2018 in order to to business day adjustments.
+
+``` r
 # Window
 ts.red.cut <- window(ts.red, start = 2013)
 autoplot(ts.red.cut) + ggtitle("Red cell sales from 2013 onwards")
 ```
-We will now run all of our benchmarks again in a single chunk (to save space).
 
-```{r cut_benchmarking}
+![](benchmarking_lab_red_files/figure-gfm/cut_series-1.png)<!-- --> We
+will now run all of our benchmarks again in a single chunk (to save
+space).
+
+``` r
 # STL + ETS
 old.stl.e <- tsCV(ts.red.cut, fstl, t.window = 6, h = 1)
 old.stl.crit <- cMAPE(old.stl.e, ts.red.cut)
@@ -170,26 +199,58 @@ colnames(cutbench) <- c("cMAPE", "MAPE", "RMSE")
 rownames(cutbench) <- c("STL", "ETS", "RWF", "NAIVE", "SNAIVE", "MEANF")
 kable(cutbench, "markdown")
 ```
-Here we observe the importance of choosing appropriate metrics. The critical MAPE and RMSE improved for our old STL+ETS forecast, while the MAPE got worse. I believe we should primarily follow cMAPE and secondarily RMSE. For ETS, the cMAPE and MAPE got worse, but RMSE improved. Our crude benchmarks all improved according to RMSE, but SNAIVE got slightly worse and now the MEANF outperforms it.
+
+|        |     cMAPE |     MAPE |      RMSE |
+| :----- | --------: | -------: | --------: |
+| STL    |  7.083388 | 4.791456 |  926.5694 |
+| ETS    |  7.925400 | 5.304817 | 1073.5925 |
+| RWF    | 11.404434 | 8.060954 | 1550.7773 |
+| NAIVE  | 11.302589 | 7.572563 | 1483.4533 |
+| SNAIVE | 10.633076 | 5.951755 | 1268.0075 |
+| MEANF  | 10.598851 | 5.688717 | 1166.2895 |
+
+Here we observe the importance of choosing appropriate metrics. The
+critical MAPE and RMSE improved for our old STL+ETS forecast, while the
+MAPE got worse. I believe we should primarily follow cMAPE and
+secondarily RMSE. For ETS, the cMAPE and MAPE got worse, but RMSE
+improved. Our crude benchmarks all improved according to RMSE, but
+SNAIVE got slightly worse and now the MEANF outperforms it.
 
 ## Business day adjustment (series between 2013 - 2018)
-```{r biz_adjustment}
+
+``` r
 # Load business day data
-biz <- read.xlsx("./data/workdays_monthly.xlsx", sheetName = "Tabella")
+biz <- read_excel("./data/workdays_monthly.xlsx", sheet = "Tabella")
+```
+
+    ## New names:
+    ## * `` -> ...1
+
+``` r
 colnames(biz) <- c("month", "days")
 
 # Business day adjustment
 ts.red.adj <- window(ts.red, start = 2013, end = c(2018, 12)) / tail(head(biz$days, 84), 72)
 ```
 
-Let's see how our series looks now
-```{r visualize_adj}
+Let’s see how our series looks now
+
+``` r
 autoplot(ts.red.adj) + ggtitle("Red cell sales 2013-2018, adjusted")
+```
+
+![](benchmarking_lab_red_files/figure-gfm/visualize_adj-1.png)<!-- -->
+
+``` r
 ggseasonplot(ts.red.adj)
 ```
 
-We will build all our future models based on this adjustment. Let's see if it gives any improvement on our earlier benchmarks:
-```{r benchmark_adj}
+![](benchmarking_lab_red_files/figure-gfm/visualize_adj-2.png)<!-- -->
+
+We will build all our future models based on this adjustment. Let’s see
+if it gives any improvement on our earlier benchmarks:
+
+``` r
 # STL + ETS
 new.stl.e <- tsCV(ts.red.adj, fstl, t.window = 6, h = 1)
 new.stl.crit <- cMAPE(new.stl.e, ts.red.adj)
@@ -241,8 +302,18 @@ rownames(adjusted) <- c("STL", "ETS", "RWF", "NAIVE", "SNAIVE", "MEANF")
 kable(adjusted, "markdown")
 ```
 
+|        |     cMAPE |     MAPE |     RMSE |
+| :----- | --------: | -------: | -------: |
+| STL    |  5.703543 | 4.070773 | 39.35312 |
+| ETS    |  6.950004 | 4.370791 | 45.70078 |
+| RWF    |  8.149471 | 5.750502 | 58.54942 |
+| NAIVE  |  8.175598 | 5.530553 | 56.05780 |
+| SNAIVE |  9.955107 | 5.722944 | 57.35310 |
+| MEANF  | 10.900852 | 5.782239 | 55.77007 |
+
 ## Rolling windows
-```{r rolling_windows}
+
+``` r
 # 4 YEARS
 
 # STL + ETS
@@ -432,12 +503,41 @@ rownames(rolling) <- c("STL 4", "ETS 4", "RWF 4", "NAIVE 4", "SNAIVE 4", "MEANF 
 kable(rolling, "markdown")
 ```
 
-*The series isn't long enough to test rolling windows reliably!* These will have to be ignored, probably.
+|          |    cMAPE |     MAPE |     RMSE |
+| :------- | -------: | -------: | -------: |
+| STL 4    | 4.178543 | 3.169198 | 33.44389 |
+| ETS 4    | 5.097152 | 3.941288 | 42.44701 |
+| RWF 4    | 7.799263 | 5.605564 | 51.44502 |
+| NAIVE 4  | 7.747074 | 5.493773 | 50.62243 |
+| SNAIVE 4 | 6.016787 | 4.034754 | 37.50954 |
+| MEANF 4  | 9.619202 | 5.346465 | 52.94899 |
+| STL 3    | 4.780911 | 3.269495 | 34.22830 |
+| ETS 3    | 5.476609 | 3.901995 | 39.99024 |
+| RWF 3    | 7.231668 | 5.063043 | 46.46749 |
+| NAIVE 3  | 7.249407 | 5.000528 | 45.97713 |
+| SNAIVE 3 | 6.723504 | 4.222665 | 38.74439 |
+| MEANF 3  | 8.256172 | 4.617649 | 46.71220 |
+| STL 2    |       NA |       NA |       NA |
+| ETS 2    | 7.182938 | 4.382645 | 44.76268 |
+| RWF 2    | 7.826697 | 5.397157 | 49.71760 |
+| NAIVE 2  | 7.675344 | 5.222206 | 48.37086 |
+| SNAIVE 2 | 7.745853 | 4.730246 | 46.96852 |
+| MEANF 2  | 7.170742 | 4.150209 | 43.85499 |
+| STL 1    |       NA |       NA |       NA |
+| ETS 1    | 6.922765 | 4.286987 | 43.03104 |
+| RWF 1    | 8.480759 | 5.758900 | 56.34982 |
+| NAIVE 1  | 8.201232 | 5.503663 | 53.54849 |
+| SNAIVE 1 | 9.216546 | 5.422790 | 54.08857 |
+| MEANF 1  | 6.716493 | 4.132087 | 42.06495 |
+
+*The series isn’t long enough to test rolling windows reliably\!* These
+will have to be ignored, probably.
 
 ## New models
 
 ### Moving average
-```{r moving_average}
+
+``` r
 # 5-MA
 ma5.e.adj <- tsCV(ts.red.adj, fMA, order = 5, h = 1)
 ma5.crit.adj <- cMAPE(ma5.e.adj, ts.red.adj)
@@ -473,10 +573,20 @@ colnames(mabench) <- c("cMAPE", "MAPE", "RMSE")
 rownames(mabench) <- c("5-MA", "7-MA", "9-MA", "12-MA")
 kable(mabench, "markdown")
 ```
-There was slight imporvement in extending the moving average window, but these scores aren't even remotely competitive.
+
+|       |    cMAPE |     MAPE |     RMSE |
+| :---- | -------: | -------: | -------: |
+| 5-MA  | 7.289893 | 4.728964 | 49.37525 |
+| 7-MA  | 6.701365 | 4.341072 | 45.10486 |
+| 9-MA  | 6.871238 | 4.401900 | 45.06010 |
+| 12-MA | 6.698926 | 4.161522 | 42.27363 |
+
+There was slight improvement in extending the moving average window, but
+these scores aren’t even remotely competitive.
 
 ### Complex decompositions
-```{r complex_decomp}
+
+``` r
 stlf.e.adj <- tsCV(ts.red.adj, stlf, h = 1)
 stlf.crit.adj <- cMAPE(stlf.e.adj, ts.red.adj)
 stlf.mape.adj <- mean(abs(100*stlf.e.adj/ts.red.adj), na.rm = TRUE)
@@ -496,10 +606,16 @@ rownames(complex) <- c("STLF", "TBATS")
 kable(complex, "markdown")
 ```
 
-Multiple seasonal decomposition (STLF) sets our new record at 5.42!
+|       |    cMAPE |     MAPE |     RMSE |
+| :---- | -------: | -------: | -------: |
+| STLF  | 5.421608 | 3.819665 | 37.44415 |
+| TBATS | 7.685357 | 5.266274 | 60.58749 |
+
+Multiple seasonal decomposition (STLF) sets our new record at 5.42\!
 
 ### A neural network
-```{r neural_network}
+
+``` r
 nnetar.e <- tsCV(ts.red.adj, fnnet, h = 1)
 nnetar.crit <- cMAPE(nnetar.e, ts.red.adj)
 nnetar.mape <- mean(abs(100*nnetar.e/ts.red.adj), na.rm = TRUE)
@@ -513,12 +629,19 @@ rownames(nnet) <- c("NN")
 kable(nnet, "markdown")
 ```
 
+|    |    cMAPE |     MAPE |     RMSE |
+| :- | -------: | -------: | -------: |
+| NN | 8.532102 | 5.878688 | 70.02298 |
+
 No improvement with a crude NN, only to be expected.
 
 ### Smoothed tests with stlf (might be broken)
-This will have to be done "the old way", because tSCV() cannot be given two different series for error calculation.
-**THIS WILL MAKE THE RESULTS INCOMPARABLE**
-```{r filtering25}
+
+This will have to be done “the old way”, because tSCV() cannot be given
+two different series for error calculation. **THIS WILL MAKE THE RESULTS
+INCOMPARABLE**
+
+``` r
 # Filter
 smooth25.red.adj <- ts(itsmr::smooth.fft(ts.red.adj, .25), start = 2013, 
                    end = c(2018, 12), frequency = 12)
@@ -555,16 +678,18 @@ stlf_smooth_plot + ggtitle("STLF forecast of adjusted smoothed (.25) red cell sa
   geom_text(aes(2018, 1100, label = paste("cMAPE: ", as.name(mean(stlf_smooth_cMAPE, na.rm = TRUE)))))
 ```
 
-```{r filtering10}
+![](benchmarking_lab_red_files/figure-gfm/filtering25-1.png)<!-- -->
+
+``` r
 stl_smooth_plot <- ggplot() 
 stl_smooth_cMAPE <- c()
 stl_smooth_RMSE <- c()
 stl_smooth_MAPE <- c()
 # Loop 
 for(i in seq(from = 36, to = 72, by = 1)){
-  fit <- stl(head(smooth10.red.adj, i), s.window = "periodic", t.window = 7)  # Fit based on history so far
+  fit <- stlf(head(smooth10.red.adj, i), s.window = "periodic", t.window = 7)  # Fit based on history so far
   fcast <- forecast(fit, h = 1)  # Forecast the next month
-  segment <- ts.red.adj[i + 1]  # Extract that year from the history for errror
+  segment <- ts.red.adj[i + 1]  # Extract that year from the history for error
   
   # Build the plot piece by piece
   stl_smooth_plot <- stl_smooth_plot + autolayer(fcast)
@@ -578,7 +703,7 @@ for(i in seq(from = 36, to = 72, by = 1)){
   stl_smooth_MAPE <- c(stl_smooth_MAPE, data.frame(accuracy(fcast, segment))$MAPE)
 }
 
-stl_smooth_plot + ggtitle("STLF forecast of adjusted smoothed (.10) red cell sales month by month") +
+stl_smooth_plot + ggtitle("STL forecast of adjusted smoothed (.10) red cell sales month by month") +
   scale_x_discrete(limits=c(2013, 2014, 2015, 2016, 2017, 2018)) + xlab("Time") +
   ylab("Unit sales") + autolayer(window(ts.red.adj, start = 2013), colour = FALSE) +
   geom_text(aes(2018, 1000, label = paste("RMSE: ", as.name(mean(stl_smooth_RMSE, na.rm = TRUE))))) + 
@@ -586,10 +711,36 @@ stl_smooth_plot + ggtitle("STLF forecast of adjusted smoothed (.10) red cell sal
   geom_text(aes(2018, 1100, label = paste("cMAPE: ", as.name(mean(stl_smooth_cMAPE, na.rm = TRUE)))))
 ```
 
-The smoothing seems to be somewhat effective in minimizing the error. This is however not exactly comparable. I'll have to look into making these comparable with other metrics.
+![](benchmarking_lab_red_files/figure-gfm/filtering10-1.png)<!-- -->
+
+The smoothing seems to be somewhat effective in minimizing the error.
+This is however not exactly comparable. I’ll have to look into making
+these comparable with other metrics.
 
 ### Regression
-```{r}
+
+``` r
+reg.e <- tsCV(ts.red.adj, freg, h = 1)
+reg.crit <- cMAPE(reg.e, ts.red.adj)
+reg.mape <- mean(abs(100*reg.e/ts.red.adj), na.rm = TRUE)
+reg.rmse <- sqrt(mean(reg.e^2, na.rm = TRUE))
+
+regbench <- matrix(c(reg.crit, reg.mape, reg.rmse),
+               ncol = 3,
+               byrow = TRUE)
+colnames(regbench) <- c("cMAPE", "MAPE", "RMSE")
+rownames(regbench) <- c("linReg")
+kable(regbench, "markdown")
+```
+
+|        |    cMAPE |     MAPE |     RMSE |
+| :----- | -------: | -------: | -------: |
+| linReg | 6.243028 | 4.854166 | 50.45808 |
+
+Simple linear regression does not perform that well. We’ll make it
+dynamic by using dummy variables for months:
+
+``` r
 jan <- rep(c(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), 6)
 feb <- rep(c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), 6)
 mar <- rep(c(0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0), 6)
@@ -601,13 +752,27 @@ aug <- rep(c(0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0), 6)
 sep <- rep(c(0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0), 6)
 oct <- rep(c(0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0), 6)
 nov <- rep(c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0), 6)
-dec <- rep(c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), 6)
+month.m <- matrix(c(jan, feb, mar, apr, may, jun, jul, aug, sep, oct, nov),
+                  ncol = 11,
+                  byrow = FALSE)
+
+arima.e <- tsCV(ts.red.adj, farima, xreg = month.m, h = 1)
+arima.crit <- cMAPE(arima.e, ts.red.adj)
+arima.mape <- mean(abs(100*arima.e/ts.red.adj), na.rm = TRUE)
+arima.rmse <- sqrt(mean(arima.e^2, na.rm = TRUE))
+
+arimabench <- matrix(c(arima.crit, arima.mape, arima.rmse),
+               ncol = 3,
+               byrow = TRUE)
+colnames(arimabench) <- c("cMAPE", "MAPE", "RMSE")
+rownames(arimabench) <- c("DynReg")
+kable(arimabench, "markdown")
 ```
 
-```{r}
-df <- cbind(as.vector(window(ts.red, start = 2013, end = c(2018, 12))), jan, feb, mar, apr, may, jun, jul, aug, sep, oct, nov, dec)
-```
-```{r}
-df
-```
+|        |    cMAPE |    MAPE |  RMSE |
+| :----- | -------: | ------: | ----: |
+| DynReg | 11.60178 | 5.80089 | 52.15 |
 
+Unfortunately this seems to be even worse. Might be due to differences
+in how auto.arima() and tslm() find their best models, but I am not
+sure.
