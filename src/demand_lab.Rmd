@@ -1,5 +1,5 @@
 ---
-title: "Demand Lab: Red Cells (HUS)"
+title: "Demand Lab: Red Cells (Ketju)"
 output: github_document
 ---
 
@@ -17,33 +17,83 @@ library(gridExtra)
 library(knitr)
 library(readxl)
 library(plyr)
+library(lubridate)
 source("src/evalhelp.R")
 
 # Load data
-# HUS deliveríes 2013 -->
-hus.deliv <- read_excel("./data/hus_data.xlsx", sheet = "Punasolutoim. HUS 2013-->")
-colnames(hus.deliv) <- c("time", "deliveries")
-ts.hus.deliv <- ts(hus.deliv$deliveries, start = 2013, frequency = 365)
+# All deliveries
+deliv <- read_excel("./data/ketju_data.xlsx", sheet = "Ketju-punasolutoimitukset 2014-")[, c('Päivämäärä', 'Toimitukset')]
+colnames(deliv) <- c("time", "deliveries")  # Change column names
+ts.deliv <- ts(deliv$deliveries, start = 2014, frequency = 365)
 
-# HUS usage 2018 Q1
-hus.usage <- read_excel("./data/hus_data.xlsx", sheet = "Menekki HUS 2018 Q1")
-colnames(hus.usage) <- c("product", "time", "type")  # Change column names
+# Ketju usage 2014 -->
+usage <- read.csv("./data/ketju_data.csv", header = TRUE, sep = ",", colClasses=c("NULL", "NULL", "NULL", "NULL", "NULL", "NULL", "NULL", "NULL", NA, "NULL", NA))
+colnames(usage) <- c("time", "pcs")  # Change column names
+usage$time <- mdy(usage$time)
+usage <- arrange(usage, time)
+usage <- aggregate(usage$pcs, by = list(usage$time), sum); colnames(usage) <- c("time", "pcs")
+ts.usage <- ts(usage$pcs, start = 2014, frequency = 365)
+
+
+# # HUS usage 2011-2016
+# hus16 <- read_excel("./data/hus_data.xlsx", sheet = "Menekki HUS 2011-2016")[, c('verituote_laatu', 'osastolle vientiaika')]
+# colnames(hus16) <- c("product", "time")  # Change column names
+# hus16 <- hus16[hus16$product == "PUNASOLUVALMISTE", ][, 2]  # Select only red cells and drop label column
+# hus16 <- arrange(hus16, time)  # Arrange in time ascending
+# hus16$time <- as.Date(hus16$time)  # Convert into workable datetime
+# 
+# # HUS usage 2017
+# hus17 <- read_excel("./data/hus_data.xlsx", sheet = "Menekki HUS 2017")[, c('verituote_laatu', 'osastolle vientiaika')]
+# colnames(hus17) <- c("product", "time")  # Change column names
+# hus17 <- hus17[hus17$product == "PUNASOLUVALMISTE", ][, 2]  # Select only red cells and drop label column
+# hus17 <- arrange(hus17, time)  # Arrange in time ascending
+# hus17$time <- as.Date(hus17$time)  # Convert into workable datetime
+# 
+# # HUS usage 2018 Q1
+# hus18 <- read_excel("./data/hus_data.xlsx", sheet = "Menekki HUS 2018 Q1")[, c('verituote_laatu', 'osastolle vientiaika')]
+# colnames(hus18) <- c("product", "time")  # Change column names
+# hus18 <- hus18[hus18$product == "PUNASOLUVALMISTE", ][, 2]  # Select only red cells and drop label column
+# hus18 <- arrange(hus18, time)  # Arrange in time ascending
+# hus18$time <- as.Date(hus18$time)  # Convert into workable datetime
+# 
+# # Combine all HUS usage
+# hus.total <- rbind(hus16, hus17, hus18)
+# 
 ```
+
+Check if the series have missing days
+```{r}
+# date_range <- seq(min(usage$time), max(usage$time), by = 1) 
+# date_range[!date_range %in% usage$time] 
+```
+
 
 ```{r}
-# Find daily counts for usage
-hus.usage.red <- hus.usage[hus.usage$product == "PUNASOLUVALMISTE", ]  # Filter by product
-hus.usage.red$time <- as.Date(hus.usage.red$time)  # Convert into workable datetime
-temp <- aggregate(hus.usage.red, by = list(hus.usage.red$time), length)  # This is really ugly, maybe prettify later
-ts.hus.usage.red <- ts(temp$product, start = 2018, frequency = 365)
-
-
-# Restrict the deliveries for the same time period
-hus.deliv.cut <- window(ts.hus.deliv, start = 2018, end = c(2018, 126))
-
-# Plot
-autoplot(ts.hus.usage.red) + autolayer(hus.deliv.cut)
+autoplot(window(ts.usage, start = 2019)) + autolayer(window(ts.deliv, start = 2019)) + ggtitle("Ketju-menekki vs. Ketju-toimitukset 2019")
 ```
 
-This looks very promising in terms of forecasting.
-
+LEGACY
+```{r}
+# ts.hus.usage.red <- ts.hus.usage.red/max(ts.hus.usage.red)
+# ts.hus.deliv.cut <- hus.deliv.cut/max(hus.deliv.cut)
+# 
+# lag1 <- head(c(0, ts.hus.usage.red), -15)
+# lag2 <- head(c(rep(c(0), 2), ts.hus.usage.red), -16)
+# lag3 <- head(c(rep(c(0), 3), ts.hus.usage.red), -17)
+# lag4 <- head(c(rep(c(0), 4), ts.hus.usage.red), -18)
+# lag5 <- head(c(rep(c(0), 5), ts.hus.usage.red), -19)
+# lag6 <- head(c(rep(c(0), 6), ts.hus.usage.red), -20)
+# lag7 <- head(c(rep(c(0), 7), ts.hus.usage.red), -21)
+# lag8 <- head(c(rep(c(0), 8), ts.hus.usage.red), -22)
+# lag9 <- head(c(rep(c(0), 9), ts.hus.usage.red), -23)
+# lag10 <- head(c(rep(c(0), 10), ts.hus.usage.red), -24)
+# 
+# lag.m <- cbind(lag1, lag2, lag3, lag4, lag5,
+#                lag6, lag7, lag8, lag9, lag10)
+# 
+# flag.m <- cbind(tail(c(0, ts.hus.usage.red), 14))
+# 
+# fcast <- forecast(auto.arima(head(ts.hus.deliv.cut, -14), xreg = lag.m), xreg = head(lag.m, 14), h = 14)
+# 
+# autoplot(fcast) + autolayer(ts.hus.deliv.cut)
+```

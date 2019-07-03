@@ -55,7 +55,7 @@ week.m <- matrix(c(mon, tue, wed, thu, fri, sat),
                  ncol = 6,
                  byrow = FALSE)
 
-arima.e <- tsCV(tail(ts.dd, 364), farima, xreg = week.m, h = 1)
+arima.e <- tsCV(tail(ts.dd, 364), farima, xreg = week.m, h = 1)  # TODO: FIX
 arima.crit <- cMAPE(arima.e, tail(ts.dd, 364))
 arima.mape <- mean(abs(100*arima.e/tail(ts.dd, 364)), na.rm = TRUE)
 arima.rmse <- sqrt(mean(arima.e^2, na.rm = TRUE))
