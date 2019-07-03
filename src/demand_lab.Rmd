@@ -118,6 +118,15 @@ ts.usage <- ts(usage$pcs, start = 2014, frequency = 365)
 autoplot(window(ts.usage, start = 2019)) + autolayer(window(ts.deliv, start = 2019)) + ggtitle("Ketju-menekki vs. Ketju-toimitukset 2019")
 ```
 
+
+```{r}
+# Plot
+usage.p <- ts(cumsum(usage$pcs), start = 2014, frequency = 265)
+deliv.p <- ts(cumsum(deliv.imputed$deliveries), start = 2014, frequency = 265)
+difference <- tail(cumsum(deliv.imputed$deliveries), 1) - tail(cumsum(usage$pcs), 1)
+autoplot(usage.p) + autolayer(deliv.p) + ggtitle(paste("Cumsum difference at end of series: ", difference))
+```
+
 LEGACY
 ```{r}
 # ts.hus.usage.red <- ts.hus.usage.red/max(ts.hus.usage.red)

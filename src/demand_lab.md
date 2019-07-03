@@ -126,6 +126,16 @@ autoplot(window(ts.usage, start = 2019)) + autolayer(window(ts.deliv, start = 20
 
 ![](demand_lab_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
 
+``` r
+# Plot
+usage.p <- ts(cumsum(usage$pcs), start = 2014, frequency = 265)
+deliv.p <- ts(cumsum(deliv.imputed$deliveries), start = 2014, frequency = 265)
+difference <- tail(cumsum(deliv.imputed$deliveries), 1) - tail(cumsum(usage$pcs), 1)
+autoplot(usage.p) + autolayer(deliv.p) + ggtitle(paste("Cumsum difference at end of series: ", difference))
+```
+
+![](demand_lab_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+
 LEGACY
 
 ``` r
