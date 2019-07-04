@@ -121,15 +121,16 @@ ts.usage <- ts(usage$pcs, start = 2014, frequency = 365)
 ```
 
 ``` r
-autoplot(window(ts.usage, start = 2019)) + autolayer(window(ts.deliv, start = 2019)) + ggtitle("Ketju-menekki vs. Ketju-toimitukset 2019")
+autoplot(window(ts.usage, start = 2019)) + autolayer(window(ts.deliv, start = 2019)) + ggtitle("Ketju-menekki vs. Ketju-toimitukset 2019") +
+  theme(legend.position = "none")
 ```
 
 ![](demand_lab_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
 
 ``` r
 # Plot
-usage.p <- ts(cumsum(usage$pcs), start = 2014, frequency = 265)
-deliv.p <- ts(cumsum(deliv.imputed$deliveries), start = 2014, frequency = 265)
+usage.p <- ts(cumsum(usage$pcs), start = 2014, frequency = 365)
+deliv.p <- ts(cumsum(deliv.imputed$deliveries), start = 2014, frequency = 365)
 difference <- tail(cumsum(deliv.imputed$deliveries), 1) - tail(cumsum(usage$pcs), 1)
 autoplot(usage.p) + autolayer(deliv.p) + ggtitle(paste("Cumsum difference at end of series: ", difference))
 ```
