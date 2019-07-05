@@ -29,12 +29,22 @@ deliv$time <- as.Date(deliv$time)
 
 
 # Ketju usage 2014 -->
-usage <- read.csv("./data/ketju_data.csv", header = TRUE, sep = ",", colClasses=c("NULL", "NULL", "NULL", "NULL", "NULL", "NULL", "NULL", "NULL", NA, "NULL", NA))
-colnames(usage) <- c("time", "pcs")  # Change column names
-usage$time <- mdy(usage$time)
-usage <- arrange(usage, time)
-usage <- aggregate(usage$pcs, by = list(usage$time), sum); colnames(usage) <- c("time", "pcs")
+ketju <- read.csv("./data/ketju_data.csv", header = TRUE, sep = ",", colClasses=c("NULL", NA, "NULL", "NULL", "NULL", NA, "NULL", "NULL", NA, NA, NA))
+colnames(ketju) <- c("hospital", "type", "time", "exp", "pcs")  # Change column names
+ketju$time <- mdy(ketju$time)
+ketju$exp <- mdy(ketju$exp)
 ```
+
+    ## Warning: 12312 failed to parse.
+
+``` r
+ketju <- arrange(ketju, time)
+usage <- aggregate(ketju$pcs, by = list(ketju$time), sum); colnames(usage) <- c("time", "pcs")
+```
+
+## Histograms of how fresh blood is used across hospitals
+
+![](ketju_usage_lab_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
 
 Check if the series have missing days
 
@@ -96,8 +106,8 @@ ts.usage <- ts(usage$pcs, start = 2014, frequency = 365)
 ```
 
 ``` r
-Deliveries <- window(ts.deliv, start = 2019)
-Usage <- window(ts.usage, start = 2019)
+Deliveries <- window(ts.deliv, start = 2019, end = c(2019, 31))
+Usage <- window(ts.usage, start = 2019, end = c(2019, 31))
 ggplot() + 
   autolayer(Deliveries) + 
   autolayer(Usage) + 
@@ -108,7 +118,7 @@ ggplot() +
   theme(legend.position = "bottom")
 ```
 
-![](ketju_usage_lab_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+![](ketju_usage_lab_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
 
 ``` r
 # Plot
@@ -123,7 +133,7 @@ ggplot() +
   ggtitle(paste("Cumsum difference at end of series: ", difference))
 ```
 
-![](ketju_usage_lab_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+![](ketju_usage_lab_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
 
 There exists a 6% difference between deliveries and usage at the end of
 series. This is due to the fact that not all blood bags get used that
