@@ -24,25 +24,31 @@ source("src/evalhelp.R")
 Currently under development. In this notebook we study how to use hospital blood product usage data to create demand predictions.
 
 ## Create original datasets that should remain immutable throughout labbing
-```{r message=FALSE}
+```{r create_data, message=FALSE, warning=FALSE}
 # Load data
 # All deliveries
 deliv <- read_excel("./data/ketju_data.xlsx", sheet = "Ketju-punasolutoimitukset 2014-")[, c('Päivämäärä', 'Toimitukset')]
 colnames(deliv) <- c("time", "deliveries")  # Change column names
 deliv$time <- as.Date(deliv$time)
 
-
 # Ketju usage 2014 -->
+# I'm using read.csv() instead of read_excel() here, because this sheet contains some fields that kills read_excel!
 ketju <- read.csv("./data/ketju_data.csv", header = TRUE, sep = ",", colClasses=c("NULL", NA, "NULL", "NULL", "NULL", NA, "NULL", "NULL", NA, NA, NA))
 colnames(ketju) <- c("hospital", "type", "time", "exp", "pcs")  # Change column names
+
+# Ensure compliant time format with lubridate
 ketju$time <- mdy(ketju$time)
-ketju$exp <- mdy(ketju$exp)
+ketju$exp <- mdy(ketju$exp)  # This will produce an error "failed to parse" for fields that aren't dates. It will insert NAs.
+
+# Arrange by time
 ketju <- arrange(ketju, time)
+
+# Find usage
 usage <- aggregate(ketju$pcs, by = list(ketju$time), sum); colnames(usage) <- c("time", "pcs")
 ```
 
 ## Histograms of how fresh blood is used across hospitals
-```{r warning=FALSE, echo=FALSE}
+```{r freshness_per_hospital, warning=FALSE, echo=FALSE}
 # Histograms of used blood difference with expiration date per hospital
 
 # Delete rows with missing values
@@ -53,91 +59,91 @@ ketju$diff <- as.numeric(ketju$exp - ketju$time)
 
 # Plot
 hmlinna <- ggplot(ketju[ketju$hospital == "FIMLAB  HÄMEENLINNA VERIKESKUS", ], aes(x = ketju$diff[ketju$hospital == "FIMLAB  HÄMEENLINNA VERIKESKUS"])) +
-  geom_histogram(bins = 30) +
+  geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
   xlab("HÄMEENL") +
   ylab("count")
 
 phks <- ggplot(ketju[ketju$hospital == "PHKS VERIKESKUS, LAHTI", ], aes(x = ketju$diff[ketju$hospital == "PHKS VERIKESKUS, LAHTI"])) + 
-  geom_histogram(bins = 30) +
+  geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
   xlab("LAHTI") +
   ylab("")
 
 tyks <- ggplot(ketju[ketju$hospital == "TYKSLAB VERIKESKUS", ], aes(x = ketju$diff[ketju$hospital == "TYKSLAB VERIKESKUS"])) + 
-  geom_histogram(bins = 30) +
+  geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
   xlab("TYKSLAB") +
   ylab("")
 
 satadiag <- ggplot(ketju[ketju$hospital == "SATADIAG VERIKESKUS, RAUMA", ], aes(x = ketju$diff[ketju$hospital == "SATADIAG VERIKESKUS, RAUMA"])) +
-  geom_histogram(bins = 30) +
+  geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
   xlab("RAUMA") +
   ylab("")
 
 tampere <- ggplot(ketju[ketju$hospital == "FIMLAB TAMPERE VERIKESKUS", ], aes(x = ketju$diff[ketju$hospital == "FIMLAB TAMPERE VERIKESKUS"])) +
-  geom_histogram(bins = 30) +
+  geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
   xlab("TAMPERE") +
   ylab("")
 
 jkyla <- ggplot(ketju[ketju$hospital == "FIMLAB VERIKESKUS, JYVÄSKYLÄ", ], aes(x = ketju$diff[ketju$hospital == "FIMLAB VERIKESKUS, JYVÄSKYLÄ"])) +
-  geom_histogram(bins = 30) +
+  geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
   xlab("JKYLÄ") +
   ylab("")
 
 kymks <- ggplot(ketju[ketju$hospital == "KYMKS VERIKESKUS, KOTKA", ], aes(x = ketju$diff[ketju$hospital == "KYMKS VERIKESKUS, KOTKA"])) +
-  geom_histogram(bins = 30) +
+  geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
   xlab("KOTKA") +
   ylab("")
 
 ekks <- ggplot(ketju[ketju$hospital == "EKKS VERIKESKUS, LAPPEENRANTA", ], aes(x = ketju$diff[ketju$hospital == "EKKS VERIKESKUS, LAPPEENRANTA"])) +
-  geom_histogram(bins = 30) +
+  geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
   xlab("LRANTA") +
   ylab("")
 
 sjoki <- ggplot(ketju[ketju$hospital == "SEINÄJOEN KS VERIKESKUS", ], aes(x = ketju$diff[ketju$hospital == "SEINÄJOEN KS VERIKESKUS"])) +
-  geom_histogram(bins = 30) +
+  geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
   xlab("SJOKI") +
   ylab("")
 
 vaasa <- ggplot(ketju[ketju$hospital == "VAASAN KS VERIKESKUS", ], aes(x = ketju$diff[ketju$hospital == "VAASAN KS VERIKESKUS"])) +
-  geom_histogram(bins = 30) +
+  geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
   xlab("VAASA") +
   ylab("")
 
 kokkola <- ggplot(ketju[ketju$hospital == "NORDLAB KOKKOLA VERIKESKUS", ], aes(x = ketju$diff[ketju$hospital == "NORDLAB KOKKOLA VERIKESKUS"])) +
-  geom_histogram(bins = 30) +
+  geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
   xlab("KOKKOLA") +
   ylab("")
 
 kuopio <- ggplot(ketju[ketju$hospital == "ISLAB KUOPIO VERIKESKUSI", ], aes(x = ketju$diff[ketju$hospital == "ISLAB KUOPIO VERIKESKUS"])) +
-  geom_histogram(bins = 30) +
+  geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
   xlab("KUOPIO") +
   ylab("")
 
 oulu <- ggplot(ketju[ketju$hospital == "NORDLAB OULU VERIKESKUS", ], aes(x = ketju$diff[ketju$hospital == "NORDLAB OULU VERIKESKUS"])) +
-  geom_histogram(bins = 30) +
+  geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
   xlab("OULU") +
   ylab("")
 
 rovaniemi <- ggplot(ketju[ketju$hospital == "NORDLAB ROVANIEMI VERIKESKUSI", ], aes(x = ketju$diff[ketju$hospital == "NORDLAB ROVANIEMI VERIKESKUS"])) +
-  geom_histogram(bins = 30) +
+  geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
   xlab("RNIEMI") +
   ylab("")
 
 pori <- ggplot(ketju[ketju$hospital == "SATADIAG VERIKESKUS, PORI", ], aes(x = ketju$diff[ketju$hospital == "SATADIAG VERIKESKUS, PORI"])) +
-  geom_histogram(bins = 30) +
+  geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
   xlab("PORI") +
   ylab("")
@@ -150,6 +156,82 @@ grid.arrange(grobs = list(hmlinna, phks, tyks, satadiag, tampere, jkyla, kymks,
                                     c(10, 11, 12),
                                     c(13, 14, 15)))
 ```
+
+## Same histogram but with blood types
+```{r freshness_per_type, warning=FALSE, echo=FALSE}
+# Plot
+Aminus <- ggplot(ketju[ketju$type == "A-", ], aes(x = ketju$diff[ketju$type == "A-"])) +
+  geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
+  xlim(c(0, 35)) +
+  xlab("A-") +
+  ylab("count")
+
+Aplus <- ggplot(ketju[ketju$type == "A+", ], aes(x = ketju$diff[ketju$type == "A+"])) +
+  geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
+  xlim(c(0, 35)) +
+  xlab("A+") +
+  ylab("")
+
+Bminus <- ggplot(ketju[ketju$type == "B-", ], aes(x = ketju$diff[ketju$type == "B-"])) +
+  geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
+  xlim(c(0, 35)) +
+  xlab("B-") +
+  ylab("")
+
+Bplus <- ggplot(ketju[ketju$type == "B+", ], aes(x = ketju$diff[ketju$type == "B+"])) +
+  geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
+  xlim(c(0, 35)) +
+  xlab("B+") +
+  ylab("")
+
+ABminus <- ggplot(ketju[ketju$type == "AB-", ], aes(x = ketju$diff[ketju$type == "AB-"])) +
+  geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
+  xlim(c(0, 35)) +
+  xlab("AB-") +
+  ylab("")
+
+ABplus <- ggplot(ketju[ketju$type == "AB+", ], aes(x = ketju$diff[ketju$type == "AB+"])) +
+  geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
+  xlim(c(0, 35)) +
+  xlab("AB+") +
+  ylab("")
+
+Ominus <- ggplot(ketju[ketju$type == "O-", ], aes(x = ketju$diff[ketju$type == "O-"])) +
+  geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
+  xlim(c(0, 35)) +
+  xlab("O-") +
+  ylab("")
+
+Oplus <- ggplot(ketju[ketju$type == "O+", ], aes(x = ketju$diff[ketju$type == "O+"])) +
+  geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
+  xlim(c(0, 35)) +
+  xlab("O+") +
+  ylab("")
+
+grid.arrange(grobs = list(Aminus, Aplus, 
+                          Bminus, Bplus,
+                          ABminus, ABplus, 
+                          Ominus, Oplus),
+             layout_matrix = rbind(c(1, 2),
+                                    c(3, 4),
+                                    c(5, 6),
+                                    c(7, 8)))
+
+
+```
+
+## Series of usage
+```{r}
+all.dates <- seq.Date(
+  min()
+)
+
+hlinna.data <- ketju[ketju$hospital == "FIMLAB  HÄMEENLINNA VERIKESKUS", ]
+usage.hlinna <- aggregate(hlinna.data$pcs, by = list(hlinna.data$time), sum); colnames(usage.hlinna) <- c("time", "pcs")
+# ts.hlinna <- ts(aggregate(ketju[ketju$hospital == "FIMLAB  HÄMEENLINNA VERIKESKUS", ]$pcs, by = list(ketju[ketju$hospital == "FIMLAB  HÄMEENLINNA VERIKESKUS", ]$time), sum)$x, start = 2014, frequency = 365)
+# autoplot(window(ts.hlinna, start = 2019))
+```
+
 
 Check if the series have missing days
 ```{r}

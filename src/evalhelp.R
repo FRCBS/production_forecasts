@@ -3,7 +3,37 @@
 # For the purposes of FRCBS Production Forecasting.
 # Author: Esa Turkulainen
 # Genesis: 25.6.2019
+# Updated: 8.7.2019
 
+
+# Time series imputation function
+make_whole <- function(df, interpolate = TRUE){
+  # If the user chooses to interpolate, a ts object will be returned.
+  # Setting interpolate = FALSE will return a dataframe with NAs
+  # The function also returns a df of all NA dates. It will be packed into a list
+  # with the entire series.
+  
+  # Create a full sequence of dates
+  all.dates <- (seq.Date(min(df$time),
+                        max(df$time),
+                        "day"))
+  # Merge into a whole set with NAs
+  whole <- merge(x = data.frame(time = all.dates),
+                 y = df,
+                 all.x = TRUE)
+  # Separate days with NA (because we want to mark 'em on the plot)
+  missing <- as.Date(whole[is.na(whole[, 2]), ]$time)
+  
+  # Interpolate if true
+  if(interpolate){
+    
+    return(list(zoo::na.approx(ts(df[, 2], start = 2014, frequency = 365)), 
+                missing))  # Convert to ts before returning
+  }
+  else{
+    return(list(whole, missing))
+  }
+}
 
 # Critical MAPE for critical model estimation
 cMAPE <- function(forecast_errors, actual_values){

@@ -27,24 +27,29 @@ deliv <- read_excel("./data/ketju_data.xlsx", sheet = "Ketju-punasolutoimitukset
 colnames(deliv) <- c("time", "deliveries")  # Change column names
 deliv$time <- as.Date(deliv$time)
 
-
 # Ketju usage 2014 -->
+# I'm using read.csv() instead of read_excel() here, because this sheet contains some fields that kills read_excel!
 ketju <- read.csv("./data/ketju_data.csv", header = TRUE, sep = ",", colClasses=c("NULL", NA, "NULL", "NULL", "NULL", NA, "NULL", "NULL", NA, NA, NA))
 colnames(ketju) <- c("hospital", "type", "time", "exp", "pcs")  # Change column names
+
+# Ensure compliant time format with lubridate
 ketju$time <- mdy(ketju$time)
-ketju$exp <- mdy(ketju$exp)
-```
+ketju$exp <- mdy(ketju$exp)  # This will produce an error "failed to parse" for fields that aren't dates. It will insert NAs.
 
-    ## Warning: 12312 failed to parse.
-
-``` r
+# Arrange by time
 ketju <- arrange(ketju, time)
+
+# Find usage
 usage <- aggregate(ketju$pcs, by = list(ketju$time), sum); colnames(usage) <- c("time", "pcs")
 ```
 
 ## Histograms of how fresh blood is used across hospitals
 
-![](ketju_usage_lab_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
+![](ketju_usage_lab_files/figure-gfm/freshness_per_hospital-1.png)<!-- -->
+
+## Same histogram but with blood types
+
+![](ketju_usage_lab_files/figure-gfm/freshness_per_type-1.png)<!-- -->
 
 Check if the series have missing days
 
@@ -118,7 +123,7 @@ ggplot() +
   theme(legend.position = "bottom")
 ```
 
-![](ketju_usage_lab_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+![](ketju_usage_lab_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
 
 ``` r
 # Plot
@@ -133,7 +138,7 @@ ggplot() +
   ggtitle(paste("Cumsum difference at end of series: ", difference))
 ```
 
-![](ketju_usage_lab_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+![](ketju_usage_lab_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
 
 There exists a 6% difference between deliveries and usage at the end of
 series. This is due to the fact that not all blood bags get used that
