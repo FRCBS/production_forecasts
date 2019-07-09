@@ -22,13 +22,12 @@ make_whole <- function(df, interpolate = TRUE){
                  y = df,
                  all.x = TRUE)
   # Separate days with NA (because we want to mark 'em on the plot)
-  missing <- as.Date(whole[is.na(whole[, 2]), ]$time)
+  missing <- whole[is.na(whole[, 2]), ]$time
   
   # Interpolate if true
   if(interpolate){
-    
-    return(list(zoo::na.approx(ts(df[, 2], start = 2014, frequency = 365)), 
-                missing))  # Convert to ts before returning
+    return(list(data.frame(time = whole[, 1], pcs = zoo::na.approx(ts(whole[, 2], start = 2014, frequency = 365))), 
+                missing))
   }
   else{
     return(list(whole, missing))

@@ -51,95 +51,106 @@ usage <- aggregate(ketju$pcs, by = list(ketju$time), sum); colnames(usage) <- c(
 
 ![](ketju_usage_lab_files/figure-gfm/freshness_per_type-1.png)<!-- -->
 
-Check if the series have missing days
+## Series of usage
 
 ``` r
-date_range <- seq(min(deliv$time), max(deliv$time), by = 1)
-date_range[!date_range %in% deliv$time]
+# Create a convenience vector for hospital tags
+hospitals <-c("FIMLAB  HÄMEENLINNA VERIKESKUS", "PHKS VERIKESKUS, LAHTI", "TYKSLAB VERIKESKUS", "SATADIAG VERIKESKUS, RAUMA", 
+              "FIMLAB TAMPERE VERIKESKUS", "FIMLAB VERIKESKUS, JYVÄSKYLÄ", "KYMKS VERIKESKUS, KOTKA", "EKKS VERIKESKUS, LAPPEENRANTA", 
+              "SEINÄJOEN KS VERIKESKUS", "VAASAN KS VERIKESKUS", "NORDLAB KOKKOLA VERIKESKUS", "ISLAB KUOPIO VERIKESKUS", 
+              "NORDLAB OULU VERIKESKUS", "NORDLAB ROVANIEMI VERIKESKUS", "SATADIAG VERIKESKUS, PORI")
+plots <- list()
+i = 0
+for(hospital in hospitals){
+   i <- i + 1
+  hospital.data <- ketju[ketju$hospital == hospital, ]
+  hospital.usage <- aggregate(hospital.data$pcs, by = list(hospital.data$time), sum)
+  colnames(hospital.usage) <- c("time", "pcs")
+  temp <- make_whole(hospital.usage)
+  hospital.whole <- temp[[1]]
+  hospital.missing <- temp[[2]]
+
+  # Plot
+  hospital.plot <- ggplot() + 
+    geom_line(data = hospital.whole, aes(x = time, y = pcs)) +
+    geom_vline(xintercept = hospital.missing, color = "red") +
+    xlab("time") +
+    ggtitle(paste(hospital, "\n missing data: ", round(length(hospital.missing)/length(hospital.whole$pcs)*100, digits = 2), "%")) +
+    theme(plot.title = element_text(size = 8))
+  
+  plots[[i]] <- hospital.plot
+ 
+}
+
+ml <- marrangeGrob(plots, nrow=2, ncol=2)
+ml
 ```
 
-    ##  [1] "2014-01-26" "2014-03-09" "2015-01-18" "2015-03-29" "2015-06-27"
-    ##  [6] "2016-08-07" "2016-11-06" "2017-01-06" "2017-02-12" "2017-04-02"
-    ## [11] "2017-05-21" "2017-06-25" "2017-07-30" "2018-01-14" "2018-02-04"
-    ## [16] "2018-05-26" "2018-06-03" "2018-06-10" "2018-07-21" "2018-08-19"
-    ## [21] "2019-02-24" "2019-03-02" "2019-03-09" "2019-04-28"
+![](ketju_usage_lab_files/figure-gfm/data_goodness-1.png)<!-- -->![](ketju_usage_lab_files/figure-gfm/data_goodness-2.png)<!-- -->![](ketju_usage_lab_files/figure-gfm/data_goodness-3.png)<!-- -->![](ketju_usage_lab_files/figure-gfm/data_goodness-4.png)<!-- -->
 
-The deliveries are missing 24 days. We will impute.
+The problem might be that 0s are not recorded, so we can’t say what’s
+actually missing data and what’s just a data point of zero. Let’s limit
+our explorations to 2019 for now. This probably means we’ll have to
+exclude
+RAUMA.
 
 ``` r
-deliv.imputed <- as.data.frame(rbind(deliv,
-                                     c("2014-01-26", deliv$deliveries[deliv$time == "2014-01-19"]),
-                                     c("2014-03-09", deliv$deliveries[deliv$time == "2014-03-02"]),
-                                     c("2015-01-18", deliv$deliveries[deliv$time == "2015-01-11"]),
-                                     c("2015-03-29", deliv$deliveries[deliv$time == "2015-03-22"]),
-                                     c("2015-06-27", deliv$deliveries[deliv$time == "2015-06-20"]),
-                                     c("2016-08-07", deliv$deliveries[deliv$time == "2016-07-31"]),
-                                     c("2016-11-06", deliv$deliveries[deliv$time == "2016-10-30"]),
-                                     c("2017-01-06", deliv$deliveries[deliv$time == "2016-12-30"]),
-                                     c("2017-02-12", deliv$deliveries[deliv$time == "2017-02-05"]),
-                                     c("2017-04-02", deliv$deliveries[deliv$time == "2017-03-26"]),
-                                     c("2017-05-21", deliv$deliveries[deliv$time == "2017-05-14"]),
-                                     c("2017-06-25", deliv$deliveries[deliv$time == "2017-06-18"]),
-                                     c("2017-07-30", deliv$deliveries[deliv$time == "2017-07-23"]),
-                                     c("2018-01-14", deliv$deliveries[deliv$time == "2018-01-07"]),
-                                     c("2018-02-04", deliv$deliveries[deliv$time == "2018-01-28"]),
-                                     c("2018-05-26", deliv$deliveries[deliv$time == "2018-05-19"]),
-                                     c("2018-06-03", deliv$deliveries[deliv$time == "2018-05-27"]),
-                                     c("2018-06-10", deliv$deliveries[deliv$time == "2018-06-04"]),
-                                     c("2018-07-21", deliv$deliveries[deliv$time == "2018-07-14"]),
-                                     c("2018-08-19", deliv$deliveries[deliv$time == "2018-08-12"]),
-                                     c("2019-02-24", deliv$deliveries[deliv$time == "2019-02-17"]),
-                                     c("2019-03-02", deliv$deliveries[deliv$time == "2019-02-23"]),
-                                     c("2019-03-09", deliv$deliveries[deliv$time == "2019-03-03"]),
-                                     c("2019-04-28", deliv$deliveries[deliv$time == "2019-04-21"]))); colnames(deliv.imputed) <- c("time", "deliveries")
+hospitals <- c("FIMLAB  HÄMEENLINNA VERIKESKUS", "PHKS VERIKESKUS, LAHTI", "TYKSLAB VERIKESKUS", 
+              "FIMLAB TAMPERE VERIKESKUS", "FIMLAB VERIKESKUS, JYVÄSKYLÄ", "KYMKS VERIKESKUS, KOTKA", "EKKS VERIKESKUS, LAPPEENRANTA", 
+              "SEINÄJOEN KS VERIKESKUS", "VAASAN KS VERIKESKUS", "NORDLAB KOKKOLA VERIKESKUS", "ISLAB KUOPIO VERIKESKUS", 
+              "NORDLAB OULU VERIKESKUS", "NORDLAB ROVANIEMI VERIKESKUS", "SATADIAG VERIKESKUS, PORI")
 
-deliv.imputed <- arrange(deliv.imputed, time)
+plots <- list()
+i = 0
+for(hospital in hospitals){
+   i <- i + 1
+  hospital.data <- ketju[ketju$hospital == hospital, ]
+  hospital.usage <- aggregate(hospital.data$pcs, by = list(hospital.data$time), sum)
+  colnames(hospital.usage) <- c("time", "pcs")
+  hospital.usage <- hospital.usage[hospital.usage$time >= as.Date("2019-01-01"), ]
+  temp <- make_whole(hospital.usage)
+  hospital.whole <- temp[[1]]
+  hospital.missing <- temp[[2]]
+
+  # Plot
+  hospital.plot <- ggplot() + 
+    geom_line(data = hospital.whole, aes(x = time, y = pcs)) +
+    geom_vline(xintercept = hospital.missing, color = "red") +
+    ggtitle(paste(hospital, "\n missing data: ", round(length(hospital.missing)/length(hospital.whole$pcs)*100, digits = 2), "%")) +
+    theme(plot.title = element_text(size = 8)) +
+    ylab("")
+  
+  plots[[i]] <- hospital.plot
+ 
+}
+
+ml <- marrangeGrob(plots, nrow=2, ncol=2)
+ml
 ```
+
+![](ketju_usage_lab_files/figure-gfm/2019_series-1.png)<!-- -->![](ketju_usage_lab_files/figure-gfm/2019_series-2.png)<!-- -->![](ketju_usage_lab_files/figure-gfm/2019_series-3.png)<!-- -->![](ketju_usage_lab_files/figure-gfm/2019_series-4.png)<!-- -->
+
+## Total usage across all hospitals (in 2019, *without imputation*)
+
+![](ketju_usage_lab_files/figure-gfm/total_2019_wo_imput-1.png)<!-- -->
+
+## Total usage *with imputation*
 
 ``` r
-date_range <- seq(min(deliv.imputed$time), max(deliv.imputed$time), by = 1)
-date_range[!date_range %in% deliv.imputed$time]
+# hospitals <- c("FIMLAB  HÄMEENLINNA VERIKESKUS", "PHKS VERIKESKUS, LAHTI", "TYKSLAB VERIKESKUS", 
+#               "FIMLAB TAMPERE VERIKESKUS", "FIMLAB VERIKESKUS, JYVÄSKYLÄ", "KYMKS VERIKESKUS, KOTKA", "EKKS VERIKESKUS, LAPPEENRANTA", 
+#               "SEINÄJOEN KS VERIKESKUS", "VAASAN KS VERIKESKUS", "NORDLAB KOKKOLA VERIKESKUS", "ISLAB KUOPIO VERIKESKUS", 
+#               "NORDLAB OULU VERIKESKUS", "NORDLAB ROVANIEMI VERIKESKUS", "SATADIAG VERIKESKUS, PORI")
+# 
+# for(hospital in hospitals){
+#   hospital.data <- ketju[ketju$hospital == hospital, ]
+#   hospital.usage <- aggregate(hospital.data$pcs, by = list(hospital.data$time), sum)
+#   colnames(hospital.usage) <- c("time", "pcs")
+#   hospital.usage <- hospital.usage[hospital.usage$time >= as.Date("2019-01-01"), ]
+#   temp <- make_whole(hospital.usage)
+#   hospital.whole <- temp[[1]]
+#   hospital.missing <- temp[[2]]
+# }
+# 
+# total.usage <- aggregate(total$pcs, by = list(total$time), sum)
 ```
-
-    ## Date of length 0
-
-## Create time series
-
-``` r
-ts.deliv <- ts(deliv.imputed$deliveries, start = 2014, frequency = 365)
-ts.usage <- ts(usage$pcs, start = 2014, frequency = 365)
-```
-
-``` r
-Deliveries <- window(ts.deliv, start = 2019, end = c(2019, 31))
-Usage <- window(ts.usage, start = 2019, end = c(2019, 31))
-ggplot() + 
-  autolayer(Deliveries) + 
-  autolayer(Usage) + 
-  ggtitle("Ketju-menekki vs. Ketju-toimitukset 2019") +
-  ylab("Units") +
-  xlab("Time") +
-  scale_fill_discrete(name = "Series", labels = c("Deliveries", "Usage")) +
-  theme(legend.position = "bottom")
-```
-
-![](ketju_usage_lab_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
-
-``` r
-# Plot
-usage.c <- ts(cumsum(usage$pcs), start = 2014, frequency = 365)
-deliv.c <- ts(cumsum(deliv.imputed$deliveries), start = 2014, frequency = 365)
-difference <- tail(cumsum(deliv.imputed$deliveries), 1) - tail(cumsum(usage$pcs), 1)
-ggplot() + 
-  autolayer(usage.c) + 
-  autolayer(deliv.c) + 
-  ylab("Units") +
-  xlab("Time") +
-  ggtitle(paste("Cumsum difference at end of series: ", difference))
-```
-
-![](ketju_usage_lab_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
-
-There exists a 6% difference between deliveries and usage at the end of
-series. This is due to the fact that not all blood bags get used that
-get delivered\!
