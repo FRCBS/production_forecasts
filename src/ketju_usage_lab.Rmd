@@ -17,6 +17,7 @@ library(knitr)
 library(readxl)
 library(plyr)
 library(lubridate)
+library(numbers)
 source("src/evalhelp.R")
 ```
 
@@ -298,23 +299,107 @@ usage.2019 <- usage[usage$time >= "2019-01-01" & usage$time <= "2019-06-17", ]
 ggplot() + geom_line(data = usage.2019, aes(x = time, y = pcs))
 ```
 
-## Total usage *with imputation*
+## Difference in total usage *with and without imputation*
+```{r total_2019_imputed, echo=FALSE}
+hospitals <- c("FIMLAB  HÄMEENLINNA VERIKESKUS", "PHKS VERIKESKUS, LAHTI", "TYKSLAB VERIKESKUS",
+              "FIMLAB TAMPERE VERIKESKUS", "FIMLAB VERIKESKUS, JYVÄSKYLÄ", "KYMKS VERIKESKUS, KOTKA", "EKKS VERIKESKUS, LAPPEENRANTA",
+              "SEINÄJOEN KS VERIKESKUS", "VAASAN KS VERIKESKUS", "NORDLAB KOKKOLA VERIKESKUS", "ISLAB KUOPIO VERIKESKUS",
+              "NORDLAB OULU VERIKESKUS", "NORDLAB ROVANIEMI VERIKESKUS", "SATADIAG VERIKESKUS, PORI")
+
+total <- data.frame(time = as.Date("2018-01-01"), pcs = 0)
+total.missing <- c()
+for(hospital in hospitals){
+  hospital.data <- ketju[ketju$hospital == hospital, ]
+  hospital.usage <- aggregate(hospital.data$pcs, by = list(hospital.data$time), sum)
+  colnames(hospital.usage) <- c("time", "pcs")
+  hospital.usage <- hospital.usage[hospital.usage$time >= as.Date("2018-01-01"), ]
+  temp <- make_whole(hospital.usage)
+  hospital.whole <- temp[[1]]
+  hospital.missing <- temp[[2]]
+  total <- rbind(total, hospital.whole)
+  total.missing <- c(total.missing, hospital.missing)
+}
+
+total.usage <- aggregate(total$pcs, by = list(total$time), sum); colnames(total.usage) <- c("time", "pcs")
+total.usage <- total.usage[total.usage$time >= "2018-01-01" & total.usage$time <= "2019-06-17", ]
+
+# plot
+ggplot() + 
+  geom_line(data = total.usage, aes(x = time, y = pcs, colour = "imputed")) + 
+  geom_line(data = usage.2019, aes(x = time, y = pcs, colour = "as is")) + 
+  scale_colour_manual(values=c("black", "blue")) +
+  theme(legend.position = "bottom") +
+  xlab("")
+```
+
+## Forecasting usage
 ```{r}
-# hospitals <- c("FIMLAB  HÄMEENLINNA VERIKESKUS", "PHKS VERIKESKUS, LAHTI", "TYKSLAB VERIKESKUS", 
-#               "FIMLAB TAMPERE VERIKESKUS", "FIMLAB VERIKESKUS, JYVÄSKYLÄ", "KYMKS VERIKESKUS, KOTKA", "EKKS VERIKESKUS, LAPPEENRANTA", 
-#               "SEINÄJOEN KS VERIKESKUS", "VAASAN KS VERIKESKUS", "NORDLAB KOKKOLA VERIKESKUS", "ISLAB KUOPIO VERIKESKUS", 
-#               "NORDLAB OULU VERIKESKUS", "NORDLAB ROVANIEMI VERIKESKUS", "SATADIAG VERIKESKUS, PORI")
-# 
-# for(hospital in hospitals){
-#   hospital.data <- ketju[ketju$hospital == hospital, ]
-#   hospital.usage <- aggregate(hospital.data$pcs, by = list(hospital.data$time), sum)
-#   colnames(hospital.usage) <- c("time", "pcs")
-#   hospital.usage <- hospital.usage[hospital.usage$time >= as.Date("2019-01-01"), ]
-#   temp <- make_whole(hospital.usage)
-#   hospital.whole <- temp[[1]]
-#   hospital.missing <- temp[[2]]
-# }
-# 
-# total.usage <- aggregate(total$pcs, by = list(total$time), sum)
+ts.usage <- ts(total.usage$pcs, start = c(2018, 1), frequency = 365)
+
+# Features: weekdays, months
+mon <- rep(c(1, 0, 0, 0, 0, 0, 0), 52)
+tue <- rep(c(0, 1, 0, 0, 0, 0, 0), 52)
+wed <- rep(c(0, 0, 1, 0, 0, 0, 0), 52)
+thu <- rep(c(0, 0, 0, 1, 0, 0, 0), 52)
+fri <- rep(c(0, 0, 0, 0, 1, 0, 0), 52)
+sat <- rep(c(0, 0, 0, 0, 0, 1, 0), 52)
+#sun <- rep(c(0, 0, 0, 0, 0, 0, 1), 52)
+
+# jan <- c(rep(1, 31), rep(0, (365-31)))
+# feb <- c(rep(0, 31), rep(1, 28), rep(0, (365-59)))
+# mar <- c(rep(0, 59), rep(1, 31), rep(0, (365-90)))
+# apr <- c(rep(0, 90), rep(1, 30), rep(0, (365-120)))
+# may <- c(rep(0, 120), rep(1, 31), rep(0, (365-151)))
+# jun <- c(rep(0, 151), rep(1, 30), rep(0, (365-181)))
+# jul <- c(rep(0, 181), rep(1, 31), rep(0, (365-212)))
+# aug <- c(rep(0, 212), rep(1, 31), rep(0, (365-243)))
+# sep <- c(rep(0, 243), rep(1, 30), rep(0, (365-273)))
+# oct <- c(rep(0, 273), rep(1, 31), rep(0, (365-304)))
+# nov <- c(rep(0, 304), rep(1, 30), rep(0, (365-334)))
+# dec <- c(rep(0, 334), rep(1, 31))
+
+usage.feature.matrix <- matrix(c(mon, tue, wed, thu, fri, sat),
+                              ncol = 6,
+                              byrow = FALSE)
+
+usage.e <- tsCV(ts.usage, farima, h = 1)
+usage.crit <- cMAPE(usage.e, ts.usage)
+usage.mape <- mean(abs(100*usage.e/ts.usage), na.rm = TRUE)
+usage.rmse <- sqrt(mean(usage.e^2, na.rm = TRUE))
+
+# Table
+usagebench <- matrix(c(usage.crit, usage.mape, usage.rmse),
+                   ncol = 3,
+                   byrow = TRUE)
+
+colnames(usagebench) <- c("cMAPE", "MAPE", "RMSE")
+rownames(usagebench) <- c("DynReg")
+kable(usagebench, "markdown")
+```
+
+
+
+## Simulation of storage
+```{r}
+# Storage: 3000
+# Expiration of products = 28 days
+
+# Scenario 1: Storage is filled based on previous week's demand
+STORAGE = 3000
+
+for(i in seq(length(total.usage$pcs))){
+  if(rem(i, 7) == 0){
+    #print(paste("Adding ", round(sum(total.usage$pcs[(i-7) : i])), " to the storage."))
+    STORAGE <- STORAGE + round(sum(total.usage$pcs[(i-7) : i]))
+  }
+  #print(paste("Depleting storage by ", round(total.usage$pcs[i])))
+  STORAGE <- STORAGE - round(total.usage$pcs[i])
+  if(STORAGE <= 0){
+   # print(paste("Storage lasted ", i, " days."))
+    break
+  }
+}
+print(paste("Storage at the end of series: ", STORAGE))
+
 ```
 
