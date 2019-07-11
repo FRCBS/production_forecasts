@@ -139,6 +139,57 @@ ml
 
 ![](ketju_usage_lab_files/figure-gfm/total_2019_imputed-1.png)<!-- -->
 
+## Deliveries and usage
+
+``` r
+ggplot() + 
+  geom_line(data = total.usage[total.usage$time >= "2019-01-01", ], aes(x = time, y = pcs, colour = "usage")) +
+  geom_line(data = deliv[deliv$time >= "2019-01-01", ], aes(x = time, y = deliveries, colour = "deliveries")) +
+  scale_colour_manual(values = c("black", "#DF013A")) +
+  theme(legend.position = "bottom")
+```
+
+![](ketju_usage_lab_files/figure-gfm/unnamed-chunk-1-1.png)<!-- -->
+
+``` r
+combined <- data.frame(usage = head(total.usage[total.usage$time >= "2019-01-01", ]$pcs, 163), deliveries = deliv[deliv$time >= "2019-01-01", ]$deliveries)
+
+# Same week sum
+diff0 <- 0
+for(i in seq(from = 7, to = 156, by = 1)){
+  diff0 <- diff0 + abs(sum(combined$usage[i:(i+6)]) - sum(combined$deliveries[i:(i+6)]))
+}
+avg0 <- diff0/156
+
+# Next week sum
+diff1 <- 0
+for(i in seq(from = 7, to = 149, by = 1)){
+  diff1 <- diff1 + abs(sum(combined$usage[i:(i+6)]) - sum(combined$deliveries[(i+7):(i+13)]))
+}
+avg1 <- diff1/149
+
+# Second week sum
+diff2 <- 0
+for(i in seq(from = 7, to = 142, by = 1)){
+  diff2 <- diff2 + abs(sum(combined$usage[i:(i+6)]) - sum(combined$deliveries[(i+14):(i+20)]))
+}
+avg2 <- diff2/142
+
+# Third week sum
+diff3 <- 0
+for(i in seq(from = 7, to = 135, by = 1)){
+  diff3 <- diff3 + abs(sum(combined$usage[i:(i+6)]) - sum(combined$deliveries[(i+21):(i+27)]))
+}
+avg3 <- diff3/135
+
+print(paste("Same week average diff: ", round(avg0, digits = 2), "\n",
+            "Next week average diff: ", round(avg1, digits = 2), "\n",
+            "Second week average diff: ", round(avg2, digits = 2), "\n",
+            "Third week average diff: ", round(avg3, digits = 2)))
+```
+
+    ## [1] "Same week average diff:  226.78 \n Next week average diff:  241.28 \n Second week average diff:  235.19 \n Third week average diff:  225.53"
+
 ## Forecasting usage
 
 ``` r
