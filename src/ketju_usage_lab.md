@@ -48,9 +48,19 @@ usage <- aggregate(ketju$pcs, by = list(ketju$time), sum); colnames(usage) <- c(
 
 ![](ketju_usage_lab_files/figure-gfm/freshness_per_hospital-1.png)<!-- -->
 
+The x-axis can be read as “days until an used product would’ve expired”,
+so a larger number corresponds to a fresher product. We see a similar
+pattern across all hospitals: products are used in a manner that
+resembles a “weekly cycle”. Most products are used 21 days from
+expiration, then 14 days, then 7 days…
+
 ## Same histogram but with blood types
 
 ![](ketju_usage_lab_files/figure-gfm/freshness_per_type-1.png)<!-- -->
+
+Here we observe the same weekly pattern, but the shape of **+** products
+is somewhat different from **-** products. Older products are used more
+with **-** products.
 
 ## Series of usage
 
@@ -89,10 +99,10 @@ ml
 
 ![](ketju_usage_lab_files/figure-gfm/data_goodness-1.png)<!-- -->![](ketju_usage_lab_files/figure-gfm/data_goodness-2.png)<!-- -->![](ketju_usage_lab_files/figure-gfm/data_goodness-3.png)<!-- -->![](ketju_usage_lab_files/figure-gfm/data_goodness-4.png)<!-- -->
 
-The problem might be that 0s are not recorded, so we can’t say what’s
-actually missing data and what’s just a data point of zero. Let’s limit
-our explorations to 2019 for now. This probably means we’ll have to
-exclude
+These are daily red cell product usage data from each hospital. A red
+line means a missing data point. The missing data point might just be a
+zero, which is most probable with RAUMA. Let’s limit our explorations to
+2019 for now. This probably means we’ll have to exclude
 RAUMA.
 
 ``` r
@@ -131,6 +141,9 @@ ml
 
 ![](ketju_usage_lab_files/figure-gfm/2019_series-1.png)<!-- -->![](ketju_usage_lab_files/figure-gfm/2019_series-2.png)<!-- -->![](ketju_usage_lab_files/figure-gfm/2019_series-3.png)<!-- -->![](ketju_usage_lab_files/figure-gfm/2019_series-4.png)<!-- -->
 
+There is a “clear” weekly seasonality in most hospitals, and it is more
+pronounced where a lot of blood is used.
+
 ## Total usage across all hospitals (in 2019, *without imputation*)
 
 ![](ketju_usage_lab_files/figure-gfm/total_2019_wo_imput-1.png)<!-- -->
@@ -139,7 +152,10 @@ ml
 
 ![](ketju_usage_lab_files/figure-gfm/total_2019_imputed-1.png)<!-- -->
 
-## Deliveries and usage
+The imputed series does not differ significantly from the raw series, so
+we can probably use either.
+
+## Deliveries and usage 2019
 
 ``` r
 ggplot() + 
@@ -267,32 +283,20 @@ cat(paste("Same day average diff: ", round(davg0, digits = 2), "\n",
     ##  Fifth day average diff:  -30.25 
     ##  Sixth day average diff:  -29.77
 
+Same +10 % difference.
+
 ## Forecasting usage
 
 ``` r
 ts.usage <- ts(total.usage$pcs, start = c(2018, 1), frequency = 365)
 
-# Features: weekdays, months
+# Features: weekdays
 mon <- rep(c(1, 0, 0, 0, 0, 0, 0), 52)
 tue <- rep(c(0, 1, 0, 0, 0, 0, 0), 52)
 wed <- rep(c(0, 0, 1, 0, 0, 0, 0), 52)
 thu <- rep(c(0, 0, 0, 1, 0, 0, 0), 52)
 fri <- rep(c(0, 0, 0, 0, 1, 0, 0), 52)
 sat <- rep(c(0, 0, 0, 0, 0, 1, 0), 52)
-#sun <- rep(c(0, 0, 0, 0, 0, 0, 1), 52)
-
-# jan <- c(rep(1, 31), rep(0, (365-31)))
-# feb <- c(rep(0, 31), rep(1, 28), rep(0, (365-59)))
-# mar <- c(rep(0, 59), rep(1, 31), rep(0, (365-90)))
-# apr <- c(rep(0, 90), rep(1, 30), rep(0, (365-120)))
-# may <- c(rep(0, 120), rep(1, 31), rep(0, (365-151)))
-# jun <- c(rep(0, 151), rep(1, 30), rep(0, (365-181)))
-# jul <- c(rep(0, 181), rep(1, 31), rep(0, (365-212)))
-# aug <- c(rep(0, 212), rep(1, 31), rep(0, (365-243)))
-# sep <- c(rep(0, 243), rep(1, 30), rep(0, (365-273)))
-# oct <- c(rep(0, 273), rep(1, 31), rep(0, (365-304)))
-# nov <- c(rep(0, 304), rep(1, 30), rep(0, (365-334)))
-# dec <- c(rep(0, 334), rep(1, 31))
 
 usage.feature.matrix <- matrix(c(mon, tue, wed, thu, fri, sat),
                               ncol = 6,
@@ -316,29 +320,3 @@ kable(usagebench, "markdown")
 |        |    cMAPE |     MAPE |     RMSE |
 | :----- | -------: | -------: | -------: |
 | DynReg | 26.29518 | 17.23969 | 61.10245 |
-
-## Simulation of storage
-
-``` r
-# Storage: 3000
-# Expiration of products = 28 days
-
-# Scenario 1: Storage is filled based on previous week's demand
-STORAGE = 3000
-
-for(i in seq(length(total.usage$pcs))){
-  if(rem(i, 7) == 0){
-    #print(paste("Adding ", round(sum(total.usage$pcs[(i-7) : i])), " to the storage."))
-    STORAGE <- STORAGE + round(sum(total.usage$pcs[(i-7) : i]))
-  }
-  #print(paste("Depleting storage by ", round(total.usage$pcs[i])))
-  STORAGE <- STORAGE - round(total.usage$pcs[i])
-  if(STORAGE <= 0){
-   # print(paste("Storage lasted ", i, " days."))
-    break
-  }
-}
-print(paste("Storage at the end of series: ", STORAGE))
-```
-
-    ## [1] "Storage at the end of series:  16199"
