@@ -32,7 +32,10 @@ Minimalistic (less visuals) benchmarking pipeline for finding the best models wi
 Best model for plasma series: adjusted dynamic regression (by a large margin!)
 
 **ketju_usage_lab.(R)md**
-Currently under development. In this notebook we study how to use hospital blood product usage data to create demand predictions.
+Currently retired (but might see intermittent development). In this notebook we study how to use hospital blood product usage data to create demand predictions.
+
+**delivery_lab.(R)md**
+Currently under development. In this notebook we try weekly and monthly forecasting with delivery data and see how it compares with earlier production forecasts.
 
 ## Functions
 
