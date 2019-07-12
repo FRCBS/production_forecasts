@@ -341,41 +341,105 @@ ggplot() +
   theme(legend.position = "bottom")
 ```
 
-```{r}
-combined <- data.frame(usage = head(total.usage[total.usage$time >= "2019-01-01", ]$pcs, 163), deliveries = deliv[deliv$time >= "2019-01-01", ]$deliveries)
+```{r weekly_diffs}
+combined <- data.frame(usage = head(total.usage[total.usage$time >= "2018-01-01", ]$pcs, 521), deliveries = deliv[deliv$time >= "2018-01-01", ]$deliveries)
 
-# Same week sum
+# Same week avg diff
 diff0 <- 0
-for(i in seq(from = 7, to = 156, by = 1)){
-  diff0 <- diff0 + abs(sum(combined$usage[i:(i+6)]) - sum(combined$deliveries[i:(i+6)]))
+for(i in seq(from = 7, to = 469, by = 7)){
+  diff0 <- diff0 + (sum(combined$usage[i:(i+6)]) - sum(combined$deliveries[i:(i+6)]))
 }
-avg0 <- diff0/156
+avg0 <- diff0/67
 
 # Next week sum
 diff1 <- 0
-for(i in seq(from = 7, to = 149, by = 1)){
-  diff1 <- diff1 + abs(sum(combined$usage[i:(i+6)]) - sum(combined$deliveries[(i+7):(i+13)]))
+for(i in seq(from = 7, to = 469, by = 7)){
+  diff1 <- diff1 + (sum(combined$usage[i:(i+6)]) - sum(combined$deliveries[(i+7):(i+13)]))
 }
-avg1 <- diff1/149
+avg1 <- diff1/67
 
 # Second week sum
 diff2 <- 0
-for(i in seq(from = 7, to = 142, by = 1)){
-  diff2 <- diff2 + abs(sum(combined$usage[i:(i+6)]) - sum(combined$deliveries[(i+14):(i+20)]))
+for(i in seq(from = 7, to = 469, by = 7)){
+  diff2 <- diff2 + (sum(combined$usage[i:(i+6)]) - sum(combined$deliveries[(i+14):(i+20)]))
 }
-avg2 <- diff2/142
+avg2 <- diff2/67
 
 # Third week sum
 diff3 <- 0
-for(i in seq(from = 7, to = 135, by = 1)){
-  diff3 <- diff3 + abs(sum(combined$usage[i:(i+6)]) - sum(combined$deliveries[(i+21):(i+27)]))
+for(i in seq(from = 7, to = 469, by = 7)){
+  diff3 <- diff3 + (sum(combined$usage[i:(i+6)]) - sum(combined$deliveries[(i+21):(i+27)]))
 }
-avg3 <- diff3/135
+avg3 <- diff3/67
 
-print(paste("Same week average diff: ", round(avg0, digits = 2), "\n",
+cat(paste("Same week average diff: ", round(avg0, digits = 2), "\n",
             "Next week average diff: ", round(avg1, digits = 2), "\n",
             "Second week average diff: ", round(avg2, digits = 2), "\n",
             "Third week average diff: ", round(avg3, digits = 2)))
+```
+
+Same week difference seems to be the smallest, but only by a very small margin. The difference constitutes a 10.79 % error, which is slightly higher than what we want. Let's go to the daily level and see what happens.
+
+```{r daily_diffs}
+
+# Same day avg diff
+ddiff0 <- 0
+for(i in seq(from = 7, to = 469, by = 1)){
+  ddiff0 <- ddiff0 + (combined$usage[i] - combined$deliveries[i])
+}
+davg0 <- ddiff0/462
+
+# Next day diff
+ddiff1 <- 0
+for(i in seq(from = 7, to = 469, by = 1)){
+  ddiff1 <- ddiff1 + (combined$usage[i] - combined$deliveries[i+1])
+}
+davg1 <- ddiff1/462
+
+# Second day diff
+ddiff2 <- 0
+for(i in seq(from = 7, to = 469, by = 1)){
+  ddiff2 <- ddiff2 + (combined$usage[i] - combined$deliveries[i+2])
+}
+davg2 <- ddiff2/462
+
+# Third day diff
+ddiff3 <- 0
+for(i in seq(from = 7, to = 469, by = 1)){
+  ddiff3 <- ddiff3 + (combined$usage[i] - combined$deliveries[i+3])
+}
+davg3 <- ddiff3/462
+
+# Fourth day diff
+ddiff4 <- 0
+for(i in seq(from = 7, to = 469, by = 1)){
+  ddiff4 <- ddiff4 + (combined$usage[i] - combined$deliveries[i+4])
+}
+davg4 <- ddiff4/462
+
+# Fifth day diff
+ddiff5 <- 0
+for(i in seq(from = 7, to = 469, by = 1)){
+  ddiff5 <- ddiff5 + (combined$usage[i] - combined$deliveries[i+5])
+}
+davg5 <- ddiff5/462
+
+# Sixth day diff
+ddiff6 <- 0
+for(i in seq(from = 7, to = 469, by = 1)){
+  ddiff6 <- ddiff6 + (combined$usage[i] - combined$deliveries[i+6])
+}
+davg6 <- ddiff6/462
+
+cat(paste("Same day average diff: ", round(davg0, digits = 2), "\n",
+          "Next day average diff: ", round(davg1, digits = 2), "\n",
+          "Second day average diff: ", round(davg2, digits = 2), "\n",
+          "Third day average diff: ", round(davg3, digits = 2), "\n",
+          "Fourth day average diff: ", round(davg4, digits = 2), "\n",
+          "Fifth day average diff: ", round(davg5, digits = 2), "\n",
+          "Sixth day average diff: ", round(davg6, digits = 2)
+          )
+    )
 ```
 
 
