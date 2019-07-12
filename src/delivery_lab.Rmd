@@ -1,0 +1,34 @@
+---
+title: "Delivery Lab: Red Cells (all)"
+output: github_document
+---
+
+```{r setup, echo=FALSE}
+# Set working directory
+knitr::opts_knit$set(root.dir = "/home/esa/production_forecasts") # Working on Ubuntu
+# knitr::opts_knit$set(root.dir = "V:/production_forecasts") # Working home
+```
+
+```{r imports, message=FALSE}
+library(forecast)
+library(ggplot2)
+library(gridExtra)
+library(knitr)
+library(readxl)
+library(plyr)
+library(lubridate)
+library(numbers)
+source("src/evalhelp.R")
+```
+
+
+```{r load_data, message=FALSE}
+deliv <- read_excel("./data/ketju_data.xlsx", sheet = "Punasolutoimitukset kaikki")[, c('Päivämäärä', 'Toimitukset punasolut')]
+colnames(deliv) <- c("time", "deliveries")  # Change column names
+deliv$time <- as.Date(deliv$time)
+```
+
+```{r}
+ggplot(data = deliv, aes(x = time, y = deliveries)) + geom_point() + geom_line()
+```
+

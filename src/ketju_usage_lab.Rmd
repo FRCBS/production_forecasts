@@ -22,7 +22,7 @@ source("src/evalhelp.R")
 ```
 
 # Intro
-Currently under development. In this notebook we study how to use hospital blood product usage data to create demand predictions.
+In this notebook we study how to use hospital blood product usage data to create demand predictions.
 
 ## Create original datasets that should remain immutable throughout labbing
 ```{r create_data, message=FALSE, warning=FALSE}
@@ -234,6 +234,50 @@ hospitals <-c("FIMLAB  HÄMEENLINNA VERIKESKUS", "PHKS VERIKESKUS, LAHTI", "TYKS
               "SEINÄJOEN KS VERIKESKUS", "VAASAN KS VERIKESKUS", "NORDLAB KOKKOLA VERIKESKUS", "ISLAB KUOPIO VERIKESKUS", 
               "NORDLAB OULU VERIKESKUS", "NORDLAB ROVANIEMI VERIKESKUS", "SATADIAG VERIKESKUS, PORI")
 plots <- list()
+# variances <- list()
+i = 0
+for(hospital in hospitals){
+   i <- i + 1
+  hospital.data <- ketju[ketju$hospital == hospital, ]
+  hospital.usage <- aggregate(hospital.data$pcs, by = list(hospital.data$time), sum)
+  colnames(hospital.usage) <- c("time", "pcs")
+  temp <- make_whole(hospital.usage)
+  hospital.whole <- temp[[1]]
+  hospital.missing <- temp[[2]]
+  # 
+  # # Yearly variance
+  # vars <- c()
+  # for(i in seq(from = 1, to = 1825, by = 365)){
+  #   vars <- c(vars, var(hospital.whole$pcs[i:(i+364)]))
+  # }
+
+  # Plot
+  hospital.plot <- ggplot() + 
+    geom_line(data = hospital.whole, aes(x = time, y = pcs)) +
+    geom_vline(xintercept = hospital.missing, color = "red") +
+    xlab("time") +
+    ggtitle(paste(hospital, "\n missing data: ", round(length(hospital.missing)/length(hospital.whole$pcs)*100, digits = 2), "%")) +
+    theme(plot.title = element_text(size = 8))
+  
+  plots[[i]] <- hospital.plot
+  # variances[[i]] <- vars
+ 
+}
+
+ml <- marrangeGrob(plots, nrow=2, ncol=2)
+ml
+```
+
+These are daily red cell product usage data from each hospital. A red line means a missing data point. The missing data point might just be a zero, which is most probable with RAUMA. 
+
+## Changes in variance
+```{r changes_in_variance, warning=FALSE, message=FALSE}
+# Create a convenience vector for hospital tags
+hospitals <-c("FIMLAB  HÄMEENLINNA VERIKESKUS", "PHKS VERIKESKUS, LAHTI", "TYKSLAB VERIKESKUS", "SATADIAG VERIKESKUS, RAUMA", 
+              "FIMLAB TAMPERE VERIKESKUS", "FIMLAB VERIKESKUS, JYVÄSKYLÄ", "KYMKS VERIKESKUS, KOTKA", "EKKS VERIKESKUS, LAPPEENRANTA", 
+              "SEINÄJOEN KS VERIKESKUS", "VAASAN KS VERIKESKUS", "NORDLAB KOKKOLA VERIKESKUS", "ISLAB KUOPIO VERIKESKUS", 
+              "NORDLAB OULU VERIKESKUS", "NORDLAB ROVANIEMI VERIKESKUS", "SATADIAG VERIKESKUS, PORI")
+plots <- list()
 i = 0
 for(hospital in hospitals){
    i <- i + 1
@@ -244,10 +288,21 @@ for(hospital in hospitals){
   hospital.whole <- temp[[1]]
   hospital.missing <- temp[[2]]
 
+  # Yearly variance
+  vars <- data.frame(years = 0, variance = 0)
+  year <- 2013
+  for(j in seq(from = 1, to = 1825, by = 365)){
+    year <- year + 1
+    
+    vars <- rbind(vars, data.frame(years = year, variance = var(hospital.whole$pcs[j:(j+364)])))
+  }
+
+  vars <- vars[vars$years != 0, ]
+  
   # Plot
-  hospital.plot <- ggplot() + 
-    geom_line(data = hospital.whole, aes(x = time, y = pcs)) +
-    geom_vline(xintercept = hospital.missing, color = "red") +
+  hospital.plot <- ggplot(data = vars, aes(x = years, y = variance)) + 
+    geom_bar(stat = "identity", fill = "#DF013A") +
+    geom_text(data = vars, aes(x = years, y = variance, label = round(variance, digits = 2)), vjust = 2) +
     xlab("time") +
     ggtitle(paste(hospital, "\n missing data: ", round(length(hospital.missing)/length(hospital.whole$pcs)*100, digits = 2), "%")) +
     theme(plot.title = element_text(size = 8))
@@ -260,7 +315,9 @@ ml <- marrangeGrob(plots, nrow=2, ncol=2)
 ml
 ```
 
-These are daily red cell product usage data from each hospital. A red line means a missing data point. The missing data point might just be a zero, which is most probable with RAUMA. Let's limit our explorations to 2019 for now. This probably means we'll have to exclude RAUMA.
+Seems that the variance is not consistently higher in 2018 as previously thought.
+
+Let's limit our explorations to 2019 for now. This probably means we'll have to exclude RAUMA.
 
 ```{r 2019_series, warning=FALSE, message=FALSE}
 hospitals <- c("FIMLAB  HÄMEENLINNA VERIKESKUS", "PHKS VERIKESKUS, LAHTI", "TYKSLAB VERIKESKUS", 
@@ -301,8 +358,16 @@ There is a "clear" weekly seasonality in most hospitals, and it is more pronounc
 
 ## Total usage across all hospitals (in 2019, *without imputation*)
 ```{r total_2019_wo_imput, echo=FALSE}
+labs <- rep(c("other", "other", "thursday", "other", "other", "sunday", "monday"), 24)
 usage.2019 <- usage[usage$time >= "2019-01-01" & usage$time <= "2019-06-17", ]
-ggplot() + geom_line(data = usage.2019, aes(x = time, y = pcs))
+usage.2019.labbed <- usage.2019
+usage.2019.labbed["labs"] <- labs
+ggplot(data = usage.2019.labbed, aes(x = time, y = pcs)) + 
+  geom_line() + 
+  geom_point(aes(colour = factor(labs))) +
+  scale_colour_manual(values = c("#DF013A", "black", "blue", "#298A08")) +
+  theme(legend.position = "bottom")
+  
 ```
 
 ## Difference in total usage *with and without imputation*
@@ -482,3 +547,9 @@ colnames(usagebench) <- c("cMAPE", "MAPE", "RMSE")
 rownames(usagebench) <- c("DynReg")
 kable(usagebench, "markdown")
 ```
+
+## Has the variance of blood usage changed during the years?
+```{r}
+usage
+```
+
