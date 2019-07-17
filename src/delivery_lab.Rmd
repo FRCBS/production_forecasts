@@ -5,8 +5,8 @@ output: github_document
 
 ```{r setup, echo=FALSE}
 # Set working directory
-#knitr::opts_knit$set(root.dir = "/home/esa/production_forecasts") # Working on Ubuntu
-knitr::opts_knit$set(root.dir = "V:/production_forecasts") # Working home
+knitr::opts_knit$set(root.dir = "/home/esa/production_forecasts") # Working on Ubuntu
+#knitr::opts_knit$set(root.dir = "V:/production_forecasts") # Working home
 ```
 
 ```{r imports, message=FALSE}
@@ -18,80 +18,148 @@ library(readxl)
 library(plyr)
 library(lubridate)
 library(numbers)
+library(data.table)
 source("src/evalhelp.R")
 ```
 
+```{r read_files}
+# Get all the files
+dfold <- "/home/esa/production_forecasts/data/FACS/"
+files <- list.files(path = dfold, pattern = "FAC0091_*")
 
-```{r load_data, message=FALSE}
-# deliv <- read_excel("./data/ketju_data.xlsx", sheet = "Punasolutoimitukset kaikki")[, c('Päivämäärä', 'Toimitukset punasolut')]
-deliv <- read_excel("./data/deliveries_daily.xlsx", sheet = "Document_CH207")[, c('Päivämäärä', 'Toimitukset')]
-colnames(deliv) <- c("time", "deliveries")  # Change column names
-deliv$time <- as.Date(deliv$time)
+# Compile a dataframe by going over all files
+dlist <- list()
+for (i in files) {
+  # Read a single file to a df called d
+  d <- read.delim(file = paste0(dfold, "/", i), header = FALSE, sep = ";", stringsAsFactors = FALSE, colClasses = 'character')
+  if(length(d) == 26){
+    d <- d[, !(names(d) %in% c("V10"))]  # The column numbers unfortunately vary between files, so we'll adjust
+    }
+  colnames(d) <- c("V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10",
+                   "V11", "V12", "V13", "V14", "V15", "V16", "V17", "V18", "V19", "V20",
+                   "V21", "V22", "V23", "V24", "V25")  # This is done so as to have easier column handling later on
+  dlist[[i]] <- d
+}
 
+d <- as.data.frame(rbindlist(dlist, fill = TRUE))
 
+# Sales
 sales <- read.table("./data/kuukausimyynti.txt", header = T, sep = "\t")
-
 # Sales data begins January 2004 and ends on April 2019
 sales$date <- seq(from = as.Date("2004-01-01"), to = as.Date("2019-04-01"), by = "month")
-
 # We'll be examining only red cells for now, so we'll drop everything we don't need
 keep = c("Punasoluvalmisteet", "date")
 sales <- sales[keep]
 ```
 
+```{r modify_dataframe}
+# Divide into distributions (P) and returns (R)
+P <- d[d$V1 == "P", ]
+R <- d[d$V1 == "R", ]
 
-## Data integrity check
-```{r}
-# Daily series, whole
-alldates <- seq(from = as.Date("2013-01-01"), to = as.Date("2019-01-01"), by = "day")
-# Monthly series, whole
-allmonths <- seq(from = as.Date("2013-01-01"), to = as.Date("2019-01-01"), by = "month")
+# For distributions, we'll keep Distribution date, Quantity, ABO type, Volume, Exp date
+keep <- c("V12", "V18", "V20", "V22", "V24")
+distr <- P[keep]
+colnames(distr) <- c("date", "quantity", "ABO", "volume", "exp")
 
-# Deliveries
-deliv <- deliv[deliv$time >= "2013-01-01" & deliv$time <= "2019-01-01", ]
-deliv.missing <- alldates[!alldates %in% deliv$time]
+# For returns we keep the return date
+keep <- c("V4", "V7")
+retrn <- R[keep]
+colnames(retrn) <- c("date", "quantity")
 
-# Sales
-sales <- sales[sales$date >= "2013-01-01", ]
-sales.missing <- allmonths[!allmonths %in% sales$date]
+# Datify
+distr$date <- dmy(distr$date); distr$exp <- dmy(distr$exp)
+retrn$date <- dmy(retrn$date)
 
-print(deliv.missing)
-print(sales.missing)
-
+# Numerify
+distr$quantity <- as.numeric(distr$quantity); distr$volume <- as.numeric(distr$volume)
+retrn$quantity <- as.numeric(retrn$quantity)
 ```
 
-Only deliveries are missing days. We'll probably want to start our analysis at 2014, as 4 missing days in October 2013 correspond already to a ~3200 unit error.
+```{r create_datasets}
+all.distr <- aggregate(distr$quantity, by = list(distr$date), sum); colnames(all.distr) <- c("date", "pcs")
 
-## First sanity check: does delivery data agree with sales data?
-```{r}
+# O minus
+Ominus <- distr[distr$ABO == "O -", ]
+Ominus.distr <- aggregate(Ominus$quantity, by = list(Ominus$date), sum); colnames(Ominus.distr) <- c("date", "pcs")
+
+# O plus
+Oplus <- distr[distr$ABO == "O +", ]
+Oplus.distr <- aggregate(Oplus$quantity, by = list(Oplus$date), sum); colnames(Oplus.distr) <- c("date", "pcs")
+
+# A minus
+Aminus <- distr[distr$ABO == "A -", ]
+Aminus.distr <- aggregate(Aminus$quantity, by = list(Aminus$date), sum); colnames(Aminus.distr) <- c("date", "pcs")
+
+# A plus
+Aplus <- distr[distr$ABO == "A +", ]
+Aplus.distr <- aggregate(Aplus$quantity, by = list(Aplus$date), sum); colnames(Aplus.distr) <- c("date", "pcs")
+
+# B minus
+Bminus <- distr[distr$ABO == "B -", ]
+Bminus.distr <- aggregate(Bminus$quantity, by = list(Bminus$date), sum); colnames(Bminus.distr) <- c("date", "pcs")
+
+# B plus
+Bplus <- distr[distr$ABO == "B +", ]
+Bplus.distr <- aggregate(Bplus$quantity, by = list(Bplus$date), sum); colnames(Bplus.distr) <- c("date", "pcs")
+
+# AB minus
+ABminus <- distr[distr$ABO == "AB-", ]
+ABminus.distr <- aggregate(ABminus$quantity, by = list(ABminus$date), sum); colnames(ABminus.distr) <- c("date", "pcs")
+
+# AB plus
+ABplus <- distr[distr$ABO == "AB+", ]
+ABplus.distr <- aggregate(ABplus$quantity, by = list(ABplus$date), sum); colnames(ABplus.distr) <- c("date", "pcs")
+```
+
+*Notes for development phase: 4% of the data is missing "ABO" and "volume" information. 4% is too much to be outright omitted, but now we have the problem where the smaller ABO series don't add up to "all.distr".*
+
+## First sanity check: does distribution data agree with sales data?
+```{r monthly}
 # Sum deliveries into monthly bins
-deliv.monthly <- aggregate(deliveries ~ month(time) + year(time), data = deliv, FUN = sum)
+distr.monthly <- aggregate(pcs ~ month(date) + year(date), data = all.distr, FUN = sum)
 data <- data.frame(date = seq(from = as.Date("2014-01-01"), to = as.Date("2018-12-01"), by = "month"),
-                   deliv = deliv.monthly[deliv.monthly$`year(time)` >= 2014 & deliv.monthly$`year(time)` <= 2018, ]$deliveries,
+                   distr = distr.monthly[distr.monthly$`year(date)` >= 2014 & distr.monthly$`year(date)` <= 2018, ]$pcs,
                    sales = sales[sales$date >= "2014-01-01" & sales$date <= "2018-12-01", ]$Punasoluvalmisteet)
 ```
 
-
-```{r}
+```{r plot}
 # Plot
 ggplot() + 
-  geom_line(data = data, aes(x = date, y = deliv, colour = "deliveries"), size = 1) + 
-  geom_point(data = data, aes(x = date, y = deliv, colour = "deliveries")) +
+  geom_line(data = data, aes(x = date, y = distr, colour = "distribution"), size = 1) + 
+  geom_point(data = data, aes(x = date, y = distr, colour = "distribution")) +
   geom_line(data = data, aes(x = date, y = sales, colour = "sales"), size = 1) + 
   geom_point(data = data, aes(x = date, y = sales, colour = "sales")) +
   scale_color_manual(values = c("#DF013A", "#298A08")) +
   theme(legend.position = "bottom", legend.margin = margin(t = -20, b = 20)) +
-  labs(title = "Deliveries vs. Sales",
-       subtitle = "Deliveries correspond to sales with adequate accuracy",
-       caption = "Note: No missing data points during this period", 
+  labs(title = "Distribution vs. Sales",
+       subtitle = "Distribution does not correspond with sales. Why?",
+       caption = "Note: Missing data points have not been checked", 
+       x = "", y = "blood bags") 
+```
+
+The distributions data is not comparable with the sales data. The overall shape of the series is very similar, but the level is wholly different. The similarity might not be enough though, let's do a level correction and see how well our series match then.
+
+```{r level_correction}
+# Plot with level correction (-4000 to distributions)
+ggplot() + 
+  geom_line(data = data, aes(x = date, y = distr -4000, colour = "distribution"), size = 1) + 
+  geom_point(data = data, aes(x = date, y = distr -4000, colour = "distribution")) +
+  geom_line(data = data, aes(x = date, y = sales, colour = "sales"), size = 1) + 
+  geom_point(data = data, aes(x = date, y = sales, colour = "sales")) +
+  scale_color_manual(values = c("#DF013A", "#298A08")) +
+  theme(legend.position = "bottom", legend.margin = margin(t = -20, b = 20)) +
+  labs(title = "Distribution vs. Sales",
+       subtitle = "Distribution does not correspond with sales. Why?",
+       caption = "Note: Missing data points have not been checked", 
        x = "", y = "blood bags") 
 ```
 
 ## Forecasting deliveries
 ```{r}
-deliv.mts <- msts(deliv$deliveries, start = 2013, seasonal.periods=c(7,365.25))
-deliv.mts <- window(deliv.mts, start = 2014)
-fit <- tbats(deliv.mts)
+distr.mts<- msts(all.distr$pcs, start = 2013, seasonal.periods = c(7, 365.25))
+distr.mts<- window(distr.mts, start = 2014)
+fit <- tbats(distr.mts)
 ```
 
 ```{r}
@@ -109,11 +177,11 @@ for (i in 1:15){
       RUNNING PARTITION ", i)
   
   nTest <- 7*i
-  nTrain <- length(deliv.mts) - nTest
-  train <- window(deliv.mts, 
+  nTrain <- length(distr.mts) - nTest
+  train <- window(distr.mts, 
                   start = decimal_date(as.Date("2014-01-01")), 
                   end = c(decimal_date(as.Date("2014-01-01")), nTrain))
-  test <- window(deliv.mts, 
+  test <- window(distr.mts, 
                  start = c(decimal_date(as.Date("2014-01-01")), (nTrain + 1)), 
                  end = c(decimal_date(as.Date("2014-01-01")), (nTrain + 7)))
   
@@ -140,16 +208,16 @@ cat("
 
 Let's try linear regression with refitted residuals (to deal with multiseasonality).
 ```{r}
-deliv.ts <- ts(deliv$deliveries, start = decimal_date(as.Date("2014-01-01")), frequency = 7)
-deliv.lm <- tslm(deliv.ts ~ trend + season)
+distr.ts <- ts(all.distr$pcs, start = decimal_date(as.Date("2014-01-01")), frequency = 7)
+distr.lm <- tslm(distr.ts ~ trend + season)
 ```
 
 ```{r}
-res.arima <- auto.arima(deliv.lm$residuals)
+res.arima <- auto.arima(distr.lm$residuals)
 res.arima.fcast <- forecast(res.arima, h = 21)
 resf <- as.numeric(res.arima.fcast$mean)
 
-lmfcast <- forecast(deliv.lm, h = 21)
+lmfcast <- forecast(distr.lm, h = 21)
 lmf <- as.numeric(lmfcast$mean)
 
 fcast <- lmf + resf
@@ -171,11 +239,11 @@ for (i in 1:15){
       RUNNING PARTITION ", i)
   
   nTest <- 7*i  
-  nTrain <- length(deliv.ts) - nTest 
-  train <- window(deliv.ts, 
+  nTrain <- length(distr.ts) - nTest 
+  train <- window(distr.ts, 
                   start = decimal_date(as.Date("2014-01-01")), 
                   end = c(decimal_date(as.Date("2014-01-01")), nTrain))
-  test <- window(deliv.ts, 
+  test <- window(distr.ts, 
                  start = c(decimal_date(as.Date("2014-01-01")), (nTrain + 1)), 
                  end = c(decimal_date(as.Date("2014-01-01")), (nTrain + 7)))
   
@@ -206,4 +274,4 @@ cat("
     MIN: ", round(min(mapes), digits = 2))
 ```
 
-The errors seem to be somewhat similar.
+The errors are exactly similar.
