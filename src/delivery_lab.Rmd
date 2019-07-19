@@ -114,6 +114,74 @@ ABplus.distr <- aggregate(ABplus$quantity, by = list(ABplus$date), sum); colname
 
 *Notes for development phase: 4% of the data is missing "ABO" and "volume" information. 4% is too much to be outright omitted, but now we have the problem where the smaller ABO series don't add up to "all.distr".*
 
+## Data goodness checks
+```{r}
+alldates <- seq(from = as.Date("2014-01-01"), to = as.Date("2019-07-07"), by = "day")
+typedates <- list(all.distr$date, Ominus.distr$date, Oplus.distr$date, Aminus.distr$date, Aplus.distr$date, Bminus.distr$date, Bplus.distr$date, ABminus.distr$date, ABplus.distr$date)
+types <- list("All", "O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+")
+for(i in seq(9)){
+  cat("Missing observations in ", types[[i]], ": ", length(alldates[!alldates %in% typedates[[i]]]), "\n")
+}
+```
+
+Some blood types seem to have quite a lot of missing days. Let's look at the series more closely to get an estimate of the ratio between zeros and actual missing data.
+
+```{r histograms, warning = FALSE}
+ggplot(data = all.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
+  labs(title = "All",
+       subtitle = "Smallest value found: 2",
+       caption = "", 
+       x = "pcs", y = "count")
+
+ggplot(data = Ominus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
+  labs(title = "O-",
+       subtitle = "All 7 missing values could be zeroes",
+       caption = "", 
+       x = "pcs", y = "count")
+
+ggplot(data = Oplus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
+  labs(title = "O+",
+       subtitle = "Smallest value found: 4",
+       caption = "", 
+       x = "pcs", y = "count")
+
+ggplot(data = Aminus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
+  labs(title = "A-",
+       subtitle = "All 32 missing values could be zeroes",
+       caption = "", 
+       x = "pcs", y = "count")
+
+ggplot(data = Aplus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
+  labs(title = "A+",
+       subtitle = "Smallest value found: 1",
+       caption = "", 
+       x = "pcs", y = "count")
+
+ggplot(data = Bminus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
+  labs(title = "B-",
+       subtitle = "129 zeroes would be a lot, possibly missing data?",
+       caption = "", 
+       x = "pcs", y = "count")
+
+ggplot(data = Bplus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
+  labs(title = "B+",
+       subtitle = "All 33 missing values could be zeroes",
+       caption = "", 
+       x = "pcs", y = "count")
+
+ggplot(data = ABminus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
+  labs(title = "AB-",
+       subtitle = "353 zeroes would be a lot, possibly missing data?",
+       caption = "", 
+       x = "pcs", y = "count")
+
+ggplot(data = ABplus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
+  labs(title = "AB+",
+       subtitle = "140 zeroes would be a lot, possibly missing data?",
+       caption = "", 
+       x = "pcs", y = "count")
+```
+
 ## First sanity check: does distribution data agree with sales data?
 ```{r monthly}
 # Sum deliveries into monthly bins
@@ -134,7 +202,7 @@ ggplot() +
   theme(legend.position = "bottom", legend.margin = margin(t = -20, b = 20)) +
   labs(title = "Distribution vs. Sales",
        subtitle = "Distribution does not correspond with sales. Why?",
-       caption = "Note: Missing data points have not been checked", 
+       caption = "Note: Possibly some missing data points in the distribution series", 
        x = "", y = "blood bags") 
 ```
 
@@ -151,14 +219,14 @@ ggplot() +
   theme(legend.position = "bottom", legend.margin = margin(t = -20, b = 20)) +
   labs(title = "Distribution vs. Sales",
        subtitle = "Distribution does not correspond with sales. Why?",
-       caption = "Note: Missing data points have not been checked", 
+       caption = "Note: Level correction of -4000 pcs applied to distributions data", 
        x = "", y = "blood bags") 
 ```
 
 ## Forecasting deliveries
 ```{r}
-distr.mts<- msts(all.distr$pcs, start = 2013, seasonal.periods = c(7, 365.25))
-distr.mts<- window(distr.mts, start = 2014)
+distr.mts <- msts(all.distr$pcs, start = 2013, seasonal.periods = c(7, 365.25))
+distr.mts <- window(distr.mts, start = 2014)
 fit <- tbats(distr.mts)
 ```
 
@@ -265,13 +333,44 @@ cat("
     ===========================
     
     MAPE
-    AVG: ", round(mean(mapes), digits = 2),
+    AVG: ", round(mean(lm.mapes), digits = 2),
     "
-    SD: ", round(sd(mapes), digits = 2),
+    SD: ", round(sd(lm.mapes), digits = 2),
     "
-    MAX: ", round(max(mapes), digits = 2),
+    MAX: ", round(max(lm.mapes), digits = 2),
     "
-    MIN: ", round(min(mapes), digits = 2))
+    MIN: ", round(min(lm.mapes), digits = 2))
 ```
 
-The errors are exactly similar.
+TBATS performs slightly better.
+
+Let's see how well this is suited for monthly forecasting.
+```{r, eval = FALSE}
+# Do daily forecasts
+distr.mts <- msts(all.distr$pcs, start = 2013, seasonal.periods = c(7, 365.25)) # Redo series
+es <- c()
+for(i in seq(from = 730, to = length(distr.mts), by = 1)){
+  train <- window(distr.mts,
+                  start = c(decimal_date(as.Date("2013-01-01"))),
+                  end = c(decimal_date(as.Date("2013-01-01")), i))
+  test <- distr.mts[i + 1]
+  fit <- tbats(train)
+  fcast <- predict(fit, h = 1)
+  e <- test - fcast$'Point Forecast'
+  es <- c(es, e)
+}
+```
+
+```{r, eval = FALSE}
+# Sum up errors by month
+mons <- rep(c(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31), 4)
+
+moving_index <- 1
+mon.es <- c()
+for(i in mons){
+  mon.e <- sum(es[moving_index:(moving_index -1 + i)])
+  moving_index <- moving_index + i
+  mon.es <- c(mon.es, mon.e)
+  }
+```
+
