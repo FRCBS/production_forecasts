@@ -48,6 +48,13 @@ ketju <- arrange(ketju, time)
 usage <- aggregate(ketju$pcs, by = list(ketju$time), sum); colnames(usage) <- c("time", "pcs")
 ```
 
+## Ketju weekday analysis
+```{r, message = FALSE, warning = FALSE}
+freqs <- count(weekdays(ketju$time))
+freqs$x <- factor(freqs$x, levels = c("maanantai", "tiistai", "keskiviikko", "torstai", "perjantai", "lauantai", "sunnuntai"))
+ggplot(data = freqs, aes(x = x, y = freq)) + geom_histogram(stat = "identity", fill = "#DF013A") + theme_minimal()
+```
+
 ## Histograms of how fresh blood is used across hospitals
 ```{r freshness_per_hospital, warning=FALSE, echo=FALSE}
 # Histograms of used blood difference with expiration date per hospital

@@ -44,6 +44,16 @@ ketju <- arrange(ketju, time)
 usage <- aggregate(ketju$pcs, by = list(ketju$time), sum); colnames(usage) <- c("time", "pcs")
 ```
 
+## Ketju weekday analysis
+
+``` r
+freqs <- count(weekdays(ketju$time))
+freqs$x <- factor(freqs$x, levels = c("maanantai", "tiistai", "keskiviikko", "torstai", "perjantai", "lauantai", "sunnuntai"))
+ggplot(data = freqs, aes(x = x, y = freq)) + geom_histogram(stat = "identity", fill = "#DF013A") + theme_minimal()
+```
+
+![](ketju_usage_lab_files/figure-gfm/unnamed-chunk-1-1.png)<!-- -->
+
 ## Histograms of how fresh blood is used across hospitals
 
 ![](ketju_usage_lab_files/figure-gfm/freshness_per_hospital-1.png)<!-- -->
@@ -226,7 +236,7 @@ ggplot() +
   theme(legend.position = "bottom")
 ```
 
-![](ketju_usage_lab_files/figure-gfm/unnamed-chunk-1-1.png)<!-- -->
+![](ketju_usage_lab_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
 
 ``` r
 combined <- data.frame(usage = head(total.usage[total.usage$time >= "2018-01-01", ]$pcs, 521), deliveries = deliv[deliv$time >= "2018-01-01", ]$deliveries)

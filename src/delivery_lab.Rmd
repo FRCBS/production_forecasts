@@ -78,6 +78,11 @@ retrn$quantity <- as.numeric(retrn$quantity)
 
 ```{r create_datasets}
 all.distr <- aggregate(distr$quantity, by = list(distr$date), sum); colnames(all.distr) <- c("date", "pcs")
+all.retrn <- aggregate(retrn$quantity, by = list(retrn$date), sum); colnames(all.retrn) <- c("date", "pcs")
+
+# test
+test <- distr[distr$ABO != "   " & distr$ABO != "", ]
+test.distr <- aggregate(test$quantity, by = list(test$date), sum); colnames(test.distr) <- c("date", "pcs")
 
 # O minus
 Ominus <- distr[distr$ABO == "O -", ]
@@ -222,10 +227,90 @@ ggplot() +
        caption = "Note: Level correction of -4000 pcs applied to distributions data", 
        x = "", y = "blood bags") 
 ```
+## Considering removals
+Removals shouldn't make much of a difference, since removals contribute to under a percentage of the entirety of the data. To be thorough though, we should subtract removals from distributions and see if they then correspond better with the sales figures.
+
+```{r removal_adj}
+retrn.monthly <- aggregate(pcs ~ month(date) + year(date), data = all.retrn, FUN = sum)
+distr.new <- distr.monthly[distr.monthly$`year(date)` >= 2014 & distr.monthly$`year(date)` <= 2018, ]$pcs
+retrn.new <- retrn.monthly[retrn.monthly$`year(date)` >= 2014 & retrn.monthly$`year(date)` <= 2018, ]$pcs
+tot <- distr.new - retrn.new
+data.new <- data.frame(date = seq(from = as.Date("2014-01-01"), to = as.Date("2018-12-01"), by = "month"),
+                       distr = distr.new,
+                       retrn = retrn.new,
+                       tot = tot,
+                       sales = sales[sales$date >= "2014-01-01" & sales$date <= "2018-12-01", ]$Punasoluvalmisteet)
+```
+
+Plots
+```{r removal_adj_plots}
+ggplot() + 
+  geom_line(data = data.new, aes(x = date, y = tot, colour = "distribution"), size = 1) + 
+  geom_point(data = data.new, aes(x = date, y = tot, colour = "distribution")) +
+  geom_line(data = data.new, aes(x = date, y = sales, colour = "sales"), size = 1) + 
+  geom_point(data = data.new, aes(x = date, y = sales, colour = "sales")) +
+  scale_color_manual(values = c("#DF013A", "#298A08")) +
+  theme(legend.position = "bottom", legend.margin = margin(t = -20, b = 20)) +
+  labs(title = "Distribution minus Returns vs. Sales",
+       subtitle = "Distribution does not correspond with sales. Why?",
+       caption = "Note: Possibly some missing data points in the distribution series", 
+       x = "", y = "blood bags")
+
+# Plot with level correction (-4000 to distributions)
+ggplot() + 
+  geom_line(data = data.new, aes(x = date, y = tot -4000, colour = "distribution"), size = 1) + 
+  geom_point(data = data.new, aes(x = date, y = tot -4000, colour = "distribution")) +
+  geom_line(data = data.new, aes(x = date, y = sales, colour = "sales"), size = 1) + 
+  geom_point(data = data.new, aes(x = date, y = sales, colour = "sales")) +
+  scale_color_manual(values = c("#DF013A", "#298A08")) +
+  theme(legend.position = "bottom", legend.margin = margin(t = -20, b = 20)) +
+  labs(title = "Distribution minus Returns vs. Sales",
+       subtitle = "Distribution does not correspond with sales. Why?",
+       caption = "Note: Level correction of -4000 pcs applied to distributions data", 
+       x = "", y = "blood bags") 
+```
+
+## Considering missing ABO values
+```{r removal_adj}
+test.monthly <- aggregate(pcs ~ month(date) + year(date), data = test.distr, FUN = sum)
+distr.test <- test.monthly[distr.monthly$`year(date)` >= 2014 & test.monthly$`year(date)` <= 2018, ]$pcs
+data.test <- data.frame(date = seq(from = as.Date("2014-01-01"), to = as.Date("2018-12-01"), by = "month"),
+                       distr = distr.test,
+                       sales = sales[sales$date >= "2014-01-01" & sales$date <= "2018-12-01", ]$Punasoluvalmisteet)
+```
+
+Plots
+```{r removal_adj_plots}
+ggplot() + 
+  geom_line(data = data.test, aes(x = date, y = distr.test, colour = "distribution"), size = 1) + 
+  geom_point(data = data.test, aes(x = date, y = distr.test, colour = "distribution")) +
+  geom_line(data = data.test, aes(x = date, y = sales, colour = "sales"), size = 1) + 
+  geom_point(data = data.test, aes(x = date, y = sales, colour = "sales")) +
+  scale_color_manual(values = c("#DF013A", "#298A08")) +
+  theme(legend.position = "bottom", legend.margin = margin(t = -20, b = 20)) +
+  labs(title = "Distribution minus Returns vs. Sales",
+       subtitle = "Distribution does not correspond with sales. Why?",
+       caption = "Note: Possibly some missing data points in the distribution series", 
+       x = "", y = "blood bags")
+
+# Plot with level correction (-4000 to distributions)
+ggplot() + 
+  geom_line(data = data.test, aes(x = date, y = distr.test -4000, colour = "distribution"), size = 1) + 
+  geom_point(data = data.test, aes(x = date, y = distr.test -4000, colour = "distribution")) +
+  geom_line(data = data.test, aes(x = date, y = sales, colour = "sales"), size = 1) + 
+  geom_point(data = data.test, aes(x = date, y = sales, colour = "sales")) +
+  scale_color_manual(values = c("#DF013A", "#298A08")) +
+  theme(legend.position = "bottom", legend.margin = margin(t = -20, b = 20)) +
+  labs(title = "Distribution minus Returns vs. Sales",
+       subtitle = "Distribution does not correspond with sales. Why?",
+       caption = "Note: Level correction of -4000 pcs applied to distributions data", 
+       x = "", y = "blood bags") 
+```
+
 
 ## Forecasting deliveries
 ```{r}
-distr.mts <- msts(all.distr$pcs, start = 2013, seasonal.periods = c(7, 365.25))
+distr.mts <- msts(all.distr$pcs, start = decimal_date(as.Date("2013-12-05")), seasonal.periods = c(7, 365.25))
 distr.mts <- window(distr.mts, start = 2014)
 fit <- tbats(distr.mts)
 ```
@@ -347,18 +432,19 @@ TBATS performs slightly better.
 Let's see how well this is suited for monthly forecasting.
 ```{r, eval = FALSE}
 # Do daily forecasts
-distr.mts <- msts(all.distr$pcs, start = 2013, seasonal.periods = c(7, 365.25)) # Redo series
 es <- c()
-for(i in seq(from = 730, to = length(distr.mts), by = 1)){
+for(i in seq(from = 730, to = (length(distr.mts) - 1), by = 1)){
   train <- window(distr.mts,
-                  start = c(decimal_date(as.Date("2013-01-01"))),
-                  end = c(decimal_date(as.Date("2013-01-01")), i))
+                  start = c(decimal_date(as.Date("2014-01-01"))),
+                  end = c(decimal_date(as.Date("2014-01-01")), i))
   test <- distr.mts[i + 1]
   fit <- tbats(train)
   fcast <- predict(fit, h = 1)
-  e <- test - fcast$'Point Forecast'
+  e <- test - fcast$mean
   es <- c(es, e)
 }
+
+fwrite(list(es), file = "results/tbats_test_errors.txt")
 ```
 
 ```{r, eval = FALSE}
@@ -371,6 +457,7 @@ for(i in mons){
   mon.e <- sum(es[moving_index:(moving_index -1 + i)])
   moving_index <- moving_index + i
   mon.es <- c(mon.es, mon.e)
-  }
+}
+fwrite(list(mon.es), file = "results/tbats_test_monthly_errors.txt")
 ```
 
