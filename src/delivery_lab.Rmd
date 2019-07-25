@@ -383,12 +383,12 @@ Let's see how well this is suited for monthly forecasting.
 # Do daily LM forecasts
 es <- c()
 # create progress bar
-pb <- txtProgressBar(min = 730, max = (length(distr.mts) - 1), style= 3)
-for(i in seq(from = 730, to = (length(distr.mts) - 1), by = 1)){
+pb <- txtProgressBar(min = 730, max = (length(distr.ts) - 1), style= 3)
+for(i in seq(from = 730, to = (length(distr.ts) - 1), by = 1)){
   train <- window(distr.mts,
                   start = c(decimal_date(as.Date("2014-01-01"))),
                   end = c(decimal_date(as.Date("2014-01-01")), i))
-  test <- distr.mts[i + 1]
+  test <- distr.ts[i + 1]
   
   trainlm <- tslm(train ~ trend + season)
   trainlmf <- forecast(trainlm, h = 1)
@@ -461,3 +461,10 @@ for(i in mons){
 }
 fwrite(list(tbats_mon.es), file = "results/tbats_test_monthly_errors.txt")
 ```
+
+## TODO
+Smoothed series
+Rolling windows
+All types
+All products (platelets and plasma also)
+

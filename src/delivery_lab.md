@@ -11,6 +11,7 @@ library(plyr)
 library(lubridate)
 library(numbers)
 library(data.table)
+library(R.utils)
 source("src/evalhelp.R")
 ```
 
@@ -50,9 +51,9 @@ P <- d[d$V1 == "P", ]
 R <- d[d$V1 == "R", ]
 
 # For distributions, we'll keep Distribution date, Quantity, ABO type, Volume, Exp date
-keep <- c("V12", "V18", "V20", "V22", "V24")
+keep <- c("V12", "V14", "V18", "V20", "V22", "V24")
 distr <- P[keep]
-colnames(distr) <- c("date", "quantity", "ABO", "volume", "exp")
+colnames(distr) <- c("date", "product", "quantity", "ABO", "volume", "exp")
 
 # For returns we keep the return date
 keep <- c("V4", "V7")
@@ -69,7 +70,21 @@ retrn$quantity <- as.numeric(retrn$quantity)
 ```
 
 ``` r
+# budKpl    # Blood product sale amendment code
+
+# Product codes for red cell products
+codes <- c("budTR001", "A0071V00", "A0074V00", "A0092VA0", "A0092VB0", 
+           "E3844V00", "E3845V00", "E3846VA0", "E3846VB0", "E3846VC0",
+           "E3846V00", "E3847VA0", "E3847VB0", "E3847VC0", "E3847V00", 
+           "E3936VA0", "E3936VB0", "E3939V00", "E3940V00", "E4683V00",
+           "E7668V00", "E7673V00", "E4999V00", "E5000V00")
+
+distr <- distr[distr$product %in% codes, ]
+```
+
+``` r
 all.distr <- aggregate(distr$quantity, by = list(distr$date), sum); colnames(all.distr) <- c("date", "pcs")
+all.retrn <- aggregate(retrn$quantity, by = list(retrn$date), sum); colnames(all.retrn) <- c("date", "pcs")
 
 # O minus
 Ominus <- distr[distr$ABO == "O -", ]
@@ -113,7 +128,9 @@ we have the problem where the smaller ABO series don’t add up to
 
 ``` r
 alldates <- seq(from = as.Date("2014-01-01"), to = as.Date("2019-07-07"), by = "day")
-typedates <- list(all.distr$date, Ominus.distr$date, Oplus.distr$date, Aminus.distr$date, Aplus.distr$date, Bminus.distr$date, Bplus.distr$date, ABminus.distr$date, ABplus.distr$date)
+typedates <- list(all.distr$date, Ominus.distr$date, Oplus.distr$date, 
+                  Aminus.distr$date, Aplus.distr$date, Bminus.distr$date, 
+                  Bplus.distr$date, ABminus.distr$date, ABplus.distr$date)
 types <- list("All", "O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+")
 for(i in seq(9)){
   cat("Missing observations in ", types[[i]], ": ", length(alldates[!alldates %in% typedates[[i]]]), "\n")
@@ -121,14 +138,14 @@ for(i in seq(9)){
 ```
 
     ## Missing observations in  All :  0 
-    ## Missing observations in  O- :  7 
-    ## Missing observations in  O+ :  0 
-    ## Missing observations in  A- :  32 
-    ## Missing observations in  A+ :  0 
-    ## Missing observations in  B- :  129 
-    ## Missing observations in  B+ :  33 
-    ## Missing observations in  AB- :  353 
-    ## Missing observations in  AB+ :  140
+    ## Missing observations in  O- :  77 
+    ## Missing observations in  O+ :  33 
+    ## Missing observations in  A- :  210 
+    ## Missing observations in  A+ :  37 
+    ## Missing observations in  B- :  342 
+    ## Missing observations in  B+ :  161 
+    ## Missing observations in  AB- :  538 
+    ## Missing observations in  AB+ :  350
 
 Some blood types seem to have quite a lot of missing days. Let’s look at
 the series more closely to get an estimate of the ratio between zeros
@@ -147,7 +164,7 @@ ggplot(data = all.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) +
 ``` r
 ggplot(data = Ominus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
   labs(title = "O-",
-       subtitle = "All 7 missing values could be zeroes",
+       subtitle = "Missing days: 77",
        caption = "", 
        x = "pcs", y = "count")
 ```
@@ -157,7 +174,7 @@ ggplot(data = Ominus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) +
 ``` r
 ggplot(data = Oplus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
   labs(title = "O+",
-       subtitle = "Smallest value found: 4",
+       subtitle = "Missing days: 33",
        caption = "", 
        x = "pcs", y = "count")
 ```
@@ -167,7 +184,7 @@ ggplot(data = Oplus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) +
 ``` r
 ggplot(data = Aminus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
   labs(title = "A-",
-       subtitle = "All 32 missing values could be zeroes",
+       subtitle = "Missing days: 210",
        caption = "", 
        x = "pcs", y = "count")
 ```
@@ -177,7 +194,7 @@ ggplot(data = Aminus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) +
 ``` r
 ggplot(data = Aplus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
   labs(title = "A+",
-       subtitle = "Smallest value found: 1",
+       subtitle = "Missing days: 37",
        caption = "", 
        x = "pcs", y = "count")
 ```
@@ -187,7 +204,7 @@ ggplot(data = Aplus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) +
 ``` r
 ggplot(data = Bminus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
   labs(title = "B-",
-       subtitle = "129 zeroes would be a lot, possibly missing data?",
+       subtitle = "Missing days: 342",
        caption = "", 
        x = "pcs", y = "count")
 ```
@@ -197,7 +214,7 @@ ggplot(data = Bminus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) +
 ``` r
 ggplot(data = Bplus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
   labs(title = "B+",
-       subtitle = "All 33 missing values could be zeroes",
+       subtitle = "Missing days: 161",
        caption = "", 
        x = "pcs", y = "count")
 ```
@@ -207,7 +224,7 @@ ggplot(data = Bplus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) +
 ``` r
 ggplot(data = ABminus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
   labs(title = "AB-",
-       subtitle = "353 zeroes would be a lot, possibly missing data?",
+       subtitle = "Missing days: 538",
        caption = "", 
        x = "pcs", y = "count")
 ```
@@ -217,7 +234,7 @@ ggplot(data = ABminus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) +
 ``` r
 ggplot(data = ABplus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
   labs(title = "AB+",
-       subtitle = "140 zeroes would be a lot, possibly missing data?",
+       subtitle = "Missing days: 350",
        caption = "", 
        x = "pcs", y = "count")
 ```
@@ -244,39 +261,55 @@ ggplot() +
   scale_color_manual(values = c("#DF013A", "#298A08")) +
   theme(legend.position = "bottom", legend.margin = margin(t = -20, b = 20)) +
   labs(title = "Distribution vs. Sales",
-       subtitle = "Distribution does not correspond with sales. Why?",
-       caption = "Note: Possibly some missing data points in the distribution series", 
+       subtitle = "Distribution largely agrees with sales?",
+       caption = "Note: Only red cell products here", 
        x = "", y = "blood bags") 
 ```
 
 ![](delivery_lab_files/figure-gfm/plot-1.png)<!-- -->
 
-The distributions data is not comparable with the sales data. The
-overall shape of the series is very similar, but the level is wholly
-different. The similarity might not be enough though, let’s do a level
-correction and see how well our series match then.
+## Considering removals
+
+Removals shouldn’t make much of a difference, since removals contribute
+to under a percentage of the entirety of the data. To be thorough
+though, we should subtract removals from distributions and see if they
+then correspond better with the sales
+figures.
 
 ``` r
-# Plot with level correction (-4000 to distributions)
-ggplot() + 
-  geom_line(data = data, aes(x = date, y = distr -4000, colour = "distribution"), size = 1) + 
-  geom_point(data = data, aes(x = date, y = distr -4000, colour = "distribution")) +
-  geom_line(data = data, aes(x = date, y = sales, colour = "sales"), size = 1) + 
-  geom_point(data = data, aes(x = date, y = sales, colour = "sales")) +
-  scale_color_manual(values = c("#DF013A", "#298A08")) +
-  theme(legend.position = "bottom", legend.margin = margin(t = -20, b = 20)) +
-  labs(title = "Distribution vs. Sales",
-       subtitle = "Distribution does not correspond with sales. Why?",
-       caption = "Note: Level correction of -4000 pcs applied to distributions data", 
-       x = "", y = "blood bags") 
+retrn.monthly <- aggregate(pcs ~ month(date) + year(date), data = all.retrn, FUN = sum)
+distr.new <- distr.monthly[distr.monthly$`year(date)` >= 2014 & distr.monthly$`year(date)` <= 2018, ]$pcs
+retrn.new <- retrn.monthly[retrn.monthly$`year(date)` >= 2014 & retrn.monthly$`year(date)` <= 2018, ]$pcs
+tot <- distr.new - retrn.new
+data.new <- data.frame(date = seq(from = as.Date("2014-01-01"), to = as.Date("2018-12-01"), by = "month"),
+                       distr = distr.new,
+                       retrn = retrn.new,
+                       tot = tot,
+                       sales = sales[sales$date >= "2014-01-01" & sales$date <= "2018-12-01", ]$Punasoluvalmisteet)
 ```
 
-![](delivery_lab_files/figure-gfm/level_correction-1.png)<!-- -->
+Plots
+
+``` r
+ggplot() + 
+  geom_line(data = data.new, aes(x = date, y = tot, colour = "distribution"), size = 1) + 
+  geom_point(data = data.new, aes(x = date, y = tot, colour = "distribution")) +
+  geom_line(data = data.new, aes(x = date, y = sales, colour = "sales"), size = 1) + 
+  geom_point(data = data.new, aes(x = date, y = sales, colour = "sales")) +
+  scale_color_manual(values = c("#DF013A", "#298A08")) +
+  theme(legend.position = "bottom", legend.margin = margin(t = -20, b = 20)) +
+  labs(title = "Distribution minus Returns vs. Sales",
+       subtitle = "Distribution still largely corresponds to sales",
+       caption = "Note: Might be that some returns have been invoiced regardless", 
+       x = "", y = "blood bags")
+```
+
+![](delivery_lab_files/figure-gfm/removal_adj_plots-1.png)<!-- -->
 
 ## Forecasting deliveries
 
 ``` r
-distr.mts <- msts(all.distr$pcs, start = 2013, seasonal.periods = c(7, 365.25))
+distr.mts <- msts(all.distr$pcs, start = decimal_date(as.Date("2013-12-05")), seasonal.periods = c(7, 365.25))
 distr.mts <- window(distr.mts, start = 2014)
 fit <- tbats(distr.mts)
 ```
@@ -286,7 +319,7 @@ fc <- predict(fit, h = 21)
 autoplot(fc, main = "3 week prediction with TBATS", include = 21)
 ```
 
-![](delivery_lab_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
+![](delivery_lab_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
 
 The model clearly seems to have an idea about the weekly pattern. Let’s
 run a rolling partition test (a kind of CV) and average out the MAPEs to
@@ -369,10 +402,10 @@ cat("
     ##     ===========================
     ##     
     ##     MAPE
-    ##     AVG:  59.92 
-    ##     SD:  77.19 
-    ##     MAX:  246.36 
-    ##     MIN:  6.96
+    ##     AVG:  115.21 
+    ##     SD:  114.18 
+    ##     MAX:  349.2 
+    ##     MIN:  22.28
 
 Let’s try linear regression with refitted residuals (to deal with
 multiseasonality).
@@ -400,7 +433,7 @@ fcast <- data.frame(date = seq(from = as.Date("2019-01-01"), to = as.Date("2019-
 ggplot() + geom_line(data = fcast, aes(x = date, y = preds))
 ```
 
-![](delivery_lab_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+![](delivery_lab_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
 
 The produced forecast seems be similar with the TBATS forecast. Let’s
 run a similar partitioning check.
@@ -489,33 +522,48 @@ cat("
     ##     ===========================
     ##     
     ##     MAPE
-    ##     AVG:  64.56 
-    ##     SD:  78.52 
-    ##     MAX:  263.22 
-    ##     MIN:  10.46
+    ##     AVG:  96.67 
+    ##     SD:  124.36 
+    ##     MAX:  356.35 
+    ##     MIN:  11.32
 
-TBATS performs slightly better.
+Double linear performs slightly better.
 
 Let’s see how well this is suited for monthly forecasting.
 
 ``` r
-# Do daily forecasts
-distr.mts <- msts(all.distr$pcs, start = 2013, seasonal.periods = c(7, 365.25)) # Redo series
+# Do daily LM forecasts
 es <- c()
-for(i in seq(from = 730, to = length(distr.mts), by = 1)){
+# create progress bar
+pb <- txtProgressBar(min = 730, max = (length(distr.ts) - 1), style= 3)
+for(i in seq(from = 730, to = (length(distr.ts) - 1), by = 1)){
   train <- window(distr.mts,
-                  start = c(decimal_date(as.Date("2013-01-01"))),
-                  end = c(decimal_date(as.Date("2013-01-01")), i))
-  test <- distr.mts[i + 1]
-  fit <- tbats(train)
-  fcast <- predict(fit, h = 1)
-  e <- test - fcast$'Point Forecast'
+                  start = c(decimal_date(as.Date("2014-01-01"))),
+                  end = c(decimal_date(as.Date("2014-01-01")), i))
+  test <- distr.ts[i + 1]
+  
+  trainlm <- tslm(train ~ trend + season)
+  trainlmf <- forecast(trainlm, h = 1)
+ 
+  residauto <- auto.arima(trainlm$residuals)
+  residf <- forecast(residauto, h = 1)
+  
+  y <- as.numeric(trainlmf$mean)
+  x <- as.numeric(residf$mean)
+  
+  fcast <- x + y
+  
+  e <- test - fcast
   es <- c(es, e)
+  setTxtProgressBar(pb, i) # update progress bar
 }
+close(pb) # close progress bar
+
+fwrite(list(es), file = "results/lm_test_errors.txt")
 ```
 
 ``` r
-# Sum up errors by month
+# Sum up LM errors by month
 mons <- rep(c(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31), 4)
 
 moving_index <- 1
@@ -524,5 +572,50 @@ for(i in mons){
   mon.e <- sum(es[moving_index:(moving_index -1 + i)])
   moving_index <- moving_index + i
   mon.es <- c(mon.es, mon.e)
-  }
+}
+fwrite(list(mon.es), file = "results/lm_test_monthly_errors.txt")
 ```
+
+Next, TBATS for comparision
+
+``` r
+# Do daily TBATS forecasts
+tbats_es <- c()
+# create progress bar
+pb <- txtProgressBar(min = 730, max = (length(distr.mts) - 1), style= 3)
+for(i in seq(from = 730, to = (length(distr.mts) - 1), by = 1)){
+  train <- window(distr.mts,
+                  start = c(decimal_date(as.Date("2014-01-01"))),
+                  end = c(decimal_date(as.Date("2014-01-01")), i))
+  test <- distr.mts[i + 1]
+  fit <- tbats(train)
+  fcast <- predict(fit, h = 1)
+  
+  e <- test - fcast$mean
+  tbats_es <- c(tbats_es, e)
+  setTxtProgressBar(pb, i) # update progress bar
+}
+close(pb) # close progress bar
+
+fwrite(list(tbats_es), file = "results/tbats_test_errors.txt")
+```
+
+``` r
+# Sum up TBATS errors by month
+mons <- rep(c(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31), 4)
+
+moving_index <- 1
+tbats_mon.es <- c()
+
+for(i in mons){
+  mon.e <- sum(es[moving_index:(moving_index -1 + i)])
+  moving_index <- moving_index + i
+  tbats_mon.es <- c(tbats_mon.es, mon.e)
+}
+fwrite(list(tbats_mon.es), file = "results/tbats_test_monthly_errors.txt")
+```
+
+## TODO
+
+Smoothed series Rolling windows All types All products (platelets and
+plasma also)
