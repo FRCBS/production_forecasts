@@ -53,6 +53,10 @@ usage <- aggregate(ketju$pcs, by = list(ketju$time), sum); colnames(usage) <- c(
 freqs <- count(weekdays(ketju$time))
 freqs$x <- factor(freqs$x, levels = c("maanantai", "tiistai", "keskiviikko", "torstai", "perjantai", "lauantai", "sunnuntai"))
 ggplot(data = freqs, aes(x = x, y = freq)) + geom_histogram(stat = "identity", fill = "#DF013A") + theme_minimal()
+
+expfreqs <- count(weekdays(ketju$exp))
+expfreqs$x <- factor(expfreqs$x, levels = c("maanantai", "tiistai", "keskiviikko", "torstai", "perjantai", "lauantai", "sunnuntai"))
+ggplot(data = expfreqs, aes(x = x, y = freq)) + geom_histogram(stat = "identity", fill = "#DF013A") + theme_minimal() + ggtitle("Expiration weekday histogram")
 ```
 
 ## Histograms of how fresh blood is used across hospitals
