@@ -19,6 +19,7 @@ library(plyr)
 library(lubridate)
 library(numbers)
 library(data.table)
+library(R.utils)
 source("src/evalhelp.R")
 ```
 
@@ -58,9 +59,9 @@ P <- d[d$V1 == "P", ]
 R <- d[d$V1 == "R", ]
 
 # For distributions, we'll keep Distribution date, Quantity, ABO type, Volume, Exp date
-keep <- c("V12", "V18", "V20", "V22", "V24")
+keep <- c("V12", "V14", "V18", "V20", "V22", "V24")
 distr <- P[keep]
-colnames(distr) <- c("date", "quantity", "ABO", "volume", "exp")
+colnames(distr) <- c("date", "product", "quantity", "ABO", "volume", "exp")
 
 # For returns we keep the return date
 keep <- c("V4", "V7")
@@ -76,13 +77,24 @@ distr$quantity <- as.numeric(distr$quantity); distr$volume <- as.numeric(distr$v
 retrn$quantity <- as.numeric(retrn$quantity)
 ```
 
+```{r}
+
+# budKpl    # Blood product sale amendment code
+
+# Product codes for red cell products
+codes <- c("budTR001", "A0071V00", "A0074V00", "A0092VA0", "A0092VB0", 
+           "E3844V00", "E3845V00", "E3846VA0", "E3846VB0", "E3846VC0",
+           "E3846V00", "E3847VA0", "E3847VB0", "E3847VC0", "E3847V00", 
+           "E3936VA0", "E3936VB0", "E3939V00", "E3940V00", "E4683V00",
+           "E7668V00", "E7673V00", "E4999V00", "E5000V00")
+
+distr <- distr[distr$product %in% codes, ]
+```
+
+
 ```{r create_datasets}
 all.distr <- aggregate(distr$quantity, by = list(distr$date), sum); colnames(all.distr) <- c("date", "pcs")
 all.retrn <- aggregate(retrn$quantity, by = list(retrn$date), sum); colnames(all.retrn) <- c("date", "pcs")
-
-# test
-test <- distr[distr$ABO != "   " & distr$ABO != "", ]
-test.distr <- aggregate(test$quantity, by = list(test$date), sum); colnames(test.distr) <- c("date", "pcs")
 
 # O minus
 Ominus <- distr[distr$ABO == "O -", ]
@@ -119,10 +131,13 @@ ABplus.distr <- aggregate(ABplus$quantity, by = list(ABplus$date), sum); colname
 
 *Notes for development phase: 4% of the data is missing "ABO" and "volume" information. 4% is too much to be outright omitted, but now we have the problem where the smaller ABO series don't add up to "all.distr".*
 
+
 ## Data goodness checks
 ```{r}
 alldates <- seq(from = as.Date("2014-01-01"), to = as.Date("2019-07-07"), by = "day")
-typedates <- list(all.distr$date, Ominus.distr$date, Oplus.distr$date, Aminus.distr$date, Aplus.distr$date, Bminus.distr$date, Bplus.distr$date, ABminus.distr$date, ABplus.distr$date)
+typedates <- list(all.distr$date, Ominus.distr$date, Oplus.distr$date, 
+                  Aminus.distr$date, Aplus.distr$date, Bminus.distr$date, 
+                  Bplus.distr$date, ABminus.distr$date, ABplus.distr$date)
 types <- list("All", "O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+")
 for(i in seq(9)){
   cat("Missing observations in ", types[[i]], ": ", length(alldates[!alldates %in% typedates[[i]]]), "\n")
@@ -140,49 +155,49 @@ ggplot(data = all.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) +
 
 ggplot(data = Ominus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
   labs(title = "O-",
-       subtitle = "All 7 missing values could be zeroes",
+       subtitle = "Missing days: 77",
        caption = "", 
        x = "pcs", y = "count")
 
 ggplot(data = Oplus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
   labs(title = "O+",
-       subtitle = "Smallest value found: 4",
+       subtitle = "Missing days: 33",
        caption = "", 
        x = "pcs", y = "count")
 
 ggplot(data = Aminus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
   labs(title = "A-",
-       subtitle = "All 32 missing values could be zeroes",
+       subtitle = "Missing days: 210",
        caption = "", 
        x = "pcs", y = "count")
 
 ggplot(data = Aplus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
   labs(title = "A+",
-       subtitle = "Smallest value found: 1",
+       subtitle = "Missing days: 37",
        caption = "", 
        x = "pcs", y = "count")
 
 ggplot(data = Bminus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
   labs(title = "B-",
-       subtitle = "129 zeroes would be a lot, possibly missing data?",
+       subtitle = "Missing days: 342",
        caption = "", 
        x = "pcs", y = "count")
 
 ggplot(data = Bplus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
   labs(title = "B+",
-       subtitle = "All 33 missing values could be zeroes",
+       subtitle = "Missing days: 161",
        caption = "", 
        x = "pcs", y = "count")
 
 ggplot(data = ABminus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
   labs(title = "AB-",
-       subtitle = "353 zeroes would be a lot, possibly missing data?",
+       subtitle = "Missing days: 538",
        caption = "", 
        x = "pcs", y = "count")
 
 ggplot(data = ABplus.distr, aes(x = pcs)) + geom_histogram(binwidth = 1) + 
   labs(title = "AB+",
-       subtitle = "140 zeroes would be a lot, possibly missing data?",
+       subtitle = "Missing days: 350",
        caption = "", 
        x = "pcs", y = "count")
 ```
@@ -206,27 +221,11 @@ ggplot() +
   scale_color_manual(values = c("#DF013A", "#298A08")) +
   theme(legend.position = "bottom", legend.margin = margin(t = -20, b = 20)) +
   labs(title = "Distribution vs. Sales",
-       subtitle = "Distribution does not correspond with sales. Why?",
-       caption = "Note: Possibly some missing data points in the distribution series", 
+       subtitle = "Distribution largely agrees with sales?",
+       caption = "Note: Only red cell products here", 
        x = "", y = "blood bags") 
 ```
 
-The distributions data is not comparable with the sales data. The overall shape of the series is very similar, but the level is wholly different. The similarity might not be enough though, let's do a level correction and see how well our series match then.
-
-```{r level_correction}
-# Plot with level correction (-4000 to distributions)
-ggplot() + 
-  geom_line(data = data, aes(x = date, y = distr -4000, colour = "distribution"), size = 1) + 
-  geom_point(data = data, aes(x = date, y = distr -4000, colour = "distribution")) +
-  geom_line(data = data, aes(x = date, y = sales, colour = "sales"), size = 1) + 
-  geom_point(data = data, aes(x = date, y = sales, colour = "sales")) +
-  scale_color_manual(values = c("#DF013A", "#298A08")) +
-  theme(legend.position = "bottom", legend.margin = margin(t = -20, b = 20)) +
-  labs(title = "Distribution vs. Sales",
-       subtitle = "Distribution does not correspond with sales. Why?",
-       caption = "Note: Level correction of -4000 pcs applied to distributions data", 
-       x = "", y = "blood bags") 
-```
 ## Considering removals
 Removals shouldn't make much of a difference, since removals contribute to under a percentage of the entirety of the data. To be thorough though, we should subtract removals from distributions and see if they then correspond better with the sales figures.
 
@@ -252,61 +251,11 @@ ggplot() +
   scale_color_manual(values = c("#DF013A", "#298A08")) +
   theme(legend.position = "bottom", legend.margin = margin(t = -20, b = 20)) +
   labs(title = "Distribution minus Returns vs. Sales",
-       subtitle = "Distribution does not correspond with sales. Why?",
-       caption = "Note: Possibly some missing data points in the distribution series", 
+       subtitle = "Distribution still largely corresponds to sales",
+       caption = "Note: Might be that some returns have been invoiced regardless", 
        x = "", y = "blood bags")
 
-# Plot with level correction (-4000 to distributions)
-ggplot() + 
-  geom_line(data = data.new, aes(x = date, y = tot -4000, colour = "distribution"), size = 1) + 
-  geom_point(data = data.new, aes(x = date, y = tot -4000, colour = "distribution")) +
-  geom_line(data = data.new, aes(x = date, y = sales, colour = "sales"), size = 1) + 
-  geom_point(data = data.new, aes(x = date, y = sales, colour = "sales")) +
-  scale_color_manual(values = c("#DF013A", "#298A08")) +
-  theme(legend.position = "bottom", legend.margin = margin(t = -20, b = 20)) +
-  labs(title = "Distribution minus Returns vs. Sales",
-       subtitle = "Distribution does not correspond with sales. Why?",
-       caption = "Note: Level correction of -4000 pcs applied to distributions data", 
-       x = "", y = "blood bags") 
 ```
-
-## Considering missing ABO values
-```{r removal_adj}
-test.monthly <- aggregate(pcs ~ month(date) + year(date), data = test.distr, FUN = sum)
-distr.test <- test.monthly[distr.monthly$`year(date)` >= 2014 & test.monthly$`year(date)` <= 2018, ]$pcs
-data.test <- data.frame(date = seq(from = as.Date("2014-01-01"), to = as.Date("2018-12-01"), by = "month"),
-                       distr = distr.test,
-                       sales = sales[sales$date >= "2014-01-01" & sales$date <= "2018-12-01", ]$Punasoluvalmisteet)
-```
-
-Plots
-```{r removal_adj_plots}
-ggplot() + 
-  geom_line(data = data.test, aes(x = date, y = distr.test, colour = "distribution"), size = 1) + 
-  geom_point(data = data.test, aes(x = date, y = distr.test, colour = "distribution")) +
-  geom_line(data = data.test, aes(x = date, y = sales, colour = "sales"), size = 1) + 
-  geom_point(data = data.test, aes(x = date, y = sales, colour = "sales")) +
-  scale_color_manual(values = c("#DF013A", "#298A08")) +
-  theme(legend.position = "bottom", legend.margin = margin(t = -20, b = 20)) +
-  labs(title = "Distribution minus Returns vs. Sales",
-       subtitle = "Distribution does not correspond with sales. Why?",
-       caption = "Note: Possibly some missing data points in the distribution series", 
-       x = "", y = "blood bags")
-
-# Plot with level correction (-4000 to distributions)
-ggplot() + 
-  geom_line(data = data.test, aes(x = date, y = distr.test -4000, colour = "distribution"), size = 1) + 
-  geom_point(data = data.test, aes(x = date, y = distr.test -4000, colour = "distribution")) +
-  geom_line(data = data.test, aes(x = date, y = sales, colour = "sales"), size = 1) + 
-  geom_point(data = data.test, aes(x = date, y = sales, colour = "sales")) +
-  scale_color_manual(values = c("#DF013A", "#298A08")) +
-  theme(legend.position = "bottom", legend.margin = margin(t = -20, b = 20)) +
-  labs(title = "Distribution minus Returns vs. Sales",
-       subtitle = "Distribution does not correspond with sales. Why?",
-       caption = "Note: Level correction of -4000 pcs applied to distributions data", 
-       x = "", y = "blood bags") 
-```
-
 
 ## Forecasting deliveries
 ```{r}
@@ -427,28 +376,42 @@ cat("
     MIN: ", round(min(lm.mapes), digits = 2))
 ```
 
-TBATS performs slightly better.
+Double linear performs slightly better.
 
 Let's see how well this is suited for monthly forecasting.
-```{r, eval = FALSE}
-# Do daily forecasts
+```{r lm_forecasts, eval = FALSE}
+# Do daily LM forecasts
 es <- c()
+# create progress bar
+pb <- txtProgressBar(min = 730, max = (length(distr.mts) - 1), style= 3)
 for(i in seq(from = 730, to = (length(distr.mts) - 1), by = 1)){
   train <- window(distr.mts,
                   start = c(decimal_date(as.Date("2014-01-01"))),
                   end = c(decimal_date(as.Date("2014-01-01")), i))
   test <- distr.mts[i + 1]
-  fit <- tbats(train)
-  fcast <- predict(fit, h = 1)
-  e <- test - fcast$mean
+  
+  trainlm <- tslm(train ~ trend + season)
+  trainlmf <- forecast(trainlm, h = 1)
+ 
+  residauto <- auto.arima(trainlm$residuals)
+  residf <- forecast(residauto, h = 1)
+  
+  y <- as.numeric(trainlmf$mean)
+  x <- as.numeric(residf$mean)
+  
+  fcast <- x + y
+  
+  e <- test - fcast
   es <- c(es, e)
+  setTxtProgressBar(pb, i) # update progress bar
 }
+close(pb) # close progress bar
 
-fwrite(list(es), file = "results/tbats_test_errors.txt")
+fwrite(list(es), file = "results/lm_test_errors.txt")
 ```
 
-```{r, eval = FALSE}
-# Sum up errors by month
+```{r lm_errors, eval = FALSE}
+# Sum up LM errors by month
 mons <- rep(c(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31), 4)
 
 moving_index <- 1
@@ -458,6 +421,43 @@ for(i in mons){
   moving_index <- moving_index + i
   mon.es <- c(mon.es, mon.e)
 }
-fwrite(list(mon.es), file = "results/tbats_test_monthly_errors.txt")
+fwrite(list(mon.es), file = "results/lm_test_monthly_errors.txt")
 ```
 
+Next, TBATS for comparision
+```{r tbats_forecasts, eval = FALSE}
+# Do daily TBATS forecasts
+tbats_es <- c()
+# create progress bar
+pb <- txtProgressBar(min = 730, max = (length(distr.mts) - 1), style= 3)
+for(i in seq(from = 730, to = (length(distr.mts) - 1), by = 1)){
+  train <- window(distr.mts,
+                  start = c(decimal_date(as.Date("2014-01-01"))),
+                  end = c(decimal_date(as.Date("2014-01-01")), i))
+  test <- distr.mts[i + 1]
+  fit <- tbats(train)
+  fcast <- predict(fit, h = 1)
+  
+  e <- test - fcast$mean
+  tbats_es <- c(tbats_es, e)
+  setTxtProgressBar(pb, i) # update progress bar
+}
+close(pb) # close progress bar
+
+fwrite(list(tbats_es), file = "results/tbats_test_errors.txt")
+```
+
+```{r tbats_errors, eval = FALSE}
+# Sum up TBATS errors by month
+mons <- rep(c(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31), 4)
+
+moving_index <- 1
+tbats_mon.es <- c()
+
+for(i in mons){
+  mon.e <- sum(es[moving_index:(moving_index -1 + i)])
+  moving_index <- moving_index + i
+  tbats_mon.es <- c(tbats_mon.es, mon.e)
+}
+fwrite(list(tbats_mon.es), file = "results/tbats_test_monthly_errors.txt")
+```
