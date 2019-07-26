@@ -211,6 +211,7 @@ data <- data.frame(date = seq(from = as.Date("2014-01-01"), to = as.Date("2018-1
                    sales = sales[sales$date >= "2014-01-01" & sales$date <= "2018-12-01", ]$Punasoluvalmisteet)
 ```
 
+
 ```{r plot}
 # Plot
 ggplot() + 
@@ -256,6 +257,20 @@ ggplot() +
        x = "", y = "blood bags")
 
 ```
+
+
+```{r weekly}
+distr.weekly <- aggregate(pcs ~ week(date)+ year(date), data = all.distr, FUN = sum)
+distr.weekly <- data.frame(date = seq(from = as.Date("2014-01-01"), 
+                                      to = as.Date("2019-06-30"), 
+                                      by = "week"), 
+                           pcs = distr.weekly[4:343, ]$pcs) # TODO: FIX
+```
+
+```{r}
+ggplot(data = tail(distr.weekly, 104), aes(x = seq(1, 104), y = pcs)) + geom_line()
+```
+
 
 ## Forecasting deliveries
 ```{r}
@@ -364,7 +379,7 @@ for (i in 1:15){
 cat("
     ==========================
     FINISHED
-    ===========================
+    ==========================
     
     MAPE
     AVG: ", round(mean(lm.mapes), digits = 2),
@@ -383,18 +398,18 @@ Let's see how well this is suited for monthly forecasting.
 # Do daily LM forecasts
 es <- c()
 # create progress bar
-pb <- txtProgressBar(min = 730, max = (length(distr.ts) - 1), style= 3)
-for(i in seq(from = 730, to = (length(distr.ts) - 1), by = 1)){
-  train <- window(distr.mts,
+pb <- txtProgressBar(min = 1095, max = (length(distr.ts) - 1), style= 3)
+for(i in seq(from = 1095, to = (length(distr.ts) - 1), by = 30)){
+  train <- window(distr.ts,
                   start = c(decimal_date(as.Date("2014-01-01"))),
                   end = c(decimal_date(as.Date("2014-01-01")), i))
-  test <- distr.ts[i + 1]
+  test <- distr.ts[i + 30]
   
   trainlm <- tslm(train ~ trend + season)
-  trainlmf <- forecast(trainlm, h = 1)
+  trainlmf <- forecast(trainlm, h = 30)
  
   residauto <- auto.arima(trainlm$residuals)
-  residf <- forecast(residauto, h = 1)
+  residf <- forecast(residauto, h = 30)
   
   y <- as.numeric(trainlmf$mean)
   x <- as.numeric(residf$mean)
@@ -407,12 +422,15 @@ for(i in seq(from = 730, to = (length(distr.ts) - 1), by = 1)){
 }
 close(pb) # close progress bar
 
-fwrite(list(es), file = "results/lm_test_errors.txt")
+fwrite(list(es), file = "results/lm_test_errors_30.txt")
+```
+```{r}
+sum(head(tail(es, 91), 30))/head(tail(distr.monthly, 2), 1)$pcs
 ```
 
 ```{r lm_errors, eval = FALSE}
 # Sum up LM errors by month
-mons <- rep(c(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31), 4)
+mons <- rep(c(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31), 3)
 
 moving_index <- 1
 mon.es <- c()
@@ -424,13 +442,30 @@ for(i in mons){
 fwrite(list(mon.es), file = "results/lm_test_monthly_errors.txt")
 ```
 
+```{r}
+scaled <- es/distr.ts[1096:2024]
+
+moving_index <- 1
+monerrs <- c()
+for(i in mons){
+  monerr <- sum(scaled[moving_index:(moving_index - 1 + i)])
+  moving_index <- moving_index + i
+  monerrs <- c(monerrs, monerr)
+}
+```
+
+```{r}
+monerrs
+```
+
+
 Next, TBATS for comparision
 ```{r tbats_forecasts, eval = FALSE}
 # Do daily TBATS forecasts
 tbats_es <- c()
 # create progress bar
-pb <- txtProgressBar(min = 730, max = (length(distr.mts) - 1), style= 3)
-for(i in seq(from = 730, to = (length(distr.mts) - 1), by = 1)){
+pb <- txtProgressBar(min = 1095, max = (length(distr.mts) - 1), style= 3)
+for(i in seq(from = 1095, to = (length(distr.mts) - 1), by = 1)){
   train <- window(distr.mts,
                   start = c(decimal_date(as.Date("2014-01-01"))),
                   end = c(decimal_date(as.Date("2014-01-01")), i))
@@ -449,7 +484,7 @@ fwrite(list(tbats_es), file = "results/tbats_test_errors.txt")
 
 ```{r tbats_errors, eval = FALSE}
 # Sum up TBATS errors by month
-mons <- rep(c(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31), 4)
+mons <- rep(c(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31), 3)
 
 moving_index <- 1
 tbats_mon.es <- c()
