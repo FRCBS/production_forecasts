@@ -408,9 +408,6 @@ close(pb) # Close progress bar
 
 stlf.capes <- capes
 ```
-```{r, warning=FALSE, message=FALSE}
-plot.stlf
-```
 
 
 ```{r model_selection, warning=FALSE, echo=FALSE}
@@ -1116,7 +1113,7 @@ kable(m, "markdown")
 ## Model selection history
 ```{r}
 errors <- c()
-for(i in seq(to = length(m[,1]) - 52)){
+for(i in seq(to = length(m[,1]) - 53)){
   name <- names(which.min(colMeans(m[i:(i+52), ])))
   colnum <- which.min(colMeans(m[i:(i+52), ]))[[1]]
   e <- m[(i+53), colnum]
