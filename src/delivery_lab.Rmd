@@ -78,9 +78,6 @@ retrn$quantity <- as.numeric(retrn$quantity)
 ```
 
 ```{r}
-
-# budKpl    # Blood product sale amendment code
-
 # Product codes for red cell products
 codes <- c("budTR001", "A0071V00", "A0074V00", "A0092VA0", "A0092VB0", 
            "E3844V00", "E3845V00", "E3846VA0", "E3846VB0", "E3846VC0",
@@ -130,7 +127,6 @@ ABplus.distr <- aggregate(ABplus$quantity, by = list(ABplus$date), sum); colname
 ```
 
 *Notes for development phase: 4% of the data is missing "ABO" and "volume" information. 4% is too much to be outright omitted, but now we have the problem where the smaller ABO series don't add up to "all.distr".*
-
 
 ## Data goodness checks
 ```{r}
@@ -262,20 +258,20 @@ ggplot() +
 ```{r weekly}
 # remember that this won't work if there are missing days
 # cut to first monday
-conct.distr <- tail(all.distr, -15)
+#conct.distr <- tail(all.distr, -15)
 
 pcslist <- list()
 weeklist <- list()
 datelist <- list()
 j <- 0
 k <- 0
-for(i in seq(to = length(conct.distr$date), by = 7)){
+for(i in seq(to = length(all.distr$date), by = 7)){
   if(j == 52){j <- 0}
   j <- j + 1
   k <- k + 1
-  pcslist[[k]] <- sum(conct.distr$pcs[i : (i + 6)])
+  pcslist[[k]] <- sum(all.distr$pcs[i : (i + 6)])
   weeklist[[k]] <- j
-  datelist[[k]] <- conct.distr$date[i]
+  datelist[[k]] <- all.distr$date[i]
 }
 
 distr.weekly <- data.frame(week = unlist(weeklist), 
@@ -304,10 +300,6 @@ autoplot(fit.weekly) +
        subtitle = "Forecast appears much more certain about the shape of the seasons",
        x = "", y = "blood bags") +
   theme_bw()
-```
-```{r}
-weekly.fc <- predict(fit.weekly, h = 104)
-autoplot(weekly.fc, main = "2 yr prediction with STLF", include = 104)
 ```
 
 The model clearly seems to have an idea about the pattern. Let's run a rolling partition test (a kind of CV) and average out the MAPEs to see what kind of errors we are talking about here.
@@ -375,12 +367,16 @@ distr.weekly.mts <- msts(distr.weekly$pcs, start = decimal_date(as.Date("2014-01
 #distr.weekly.mts <- window(distr.weekly.mts, start = 2017)
 
 ############################
-# STLF
+# TBATS
 ############################
-plot.stlf <- ggplot()
+fcasts <- c()
+upper95 <- c()
+upper80 <- c()
+lower95 <- c()
+lower80 <- c()
 capes <- c()
 # Create progress bar
-cat("\nRUNNING STLF\n")
+cat("\nRUNNING TBATS\n")
 pb <- txtProgressBar(min = 1, max = length(distr.weekly.mts) - 105, style = 3)
 for(i in seq(length(distr.weekly.mts) - 105)){
   # Define training and testing set as ROLLING WINDOW
@@ -391,8 +387,12 @@ for(i in seq(length(distr.weekly.mts) - 105)){
   # Forecast 1 step (week) ahead
   fcast <- forecast(fit, h = 1)
   
-  # Build the plot piece by piece
-  plot.stlf <- plot.stlf + autolayer(fcast) + autolayer(test, colour=FALSE)
+  # Save data for plotting
+  fcasts <- c(fcasts, as.numeric(fcast$mean))
+  upper95 <- c(upper95, fcast$upper[2])
+  upper80 <- c(upper80, fcast$upper[1])
+  lower95 <- c(lower95, fcast$lower[2])
+  lower80 <- c(lower80, fcast$lower[1])
   
   
   # Calculate errors
@@ -406,9 +406,26 @@ for(i in seq(length(distr.weekly.mts) - 105)){
 }
 close(pb) # Close progress bar
 
-stlf.capes <- capes
+tbats.capes <- capes
 ```
 
+```{r}
+plot.data <- data.frame(date = seq(from = as.Date("2016-01-18"), 
+                                   to = as.Date("2019-07-15")-1, 
+                                   by = "week"),
+                        real = distr.weekly.mts[106:287],
+                        fcast = fcasts,
+                        upper95 = upper95,
+                        upper80 = upper80,
+                        lower95 = lower95,
+                        lower80 = lower80)
+
+ggplot(data = plot.data, aes(x = date, y = fcast)) +
+  geom_line(data = plot.data, aes(x = date, y = real), color = "black") +
+  geom_line(color = "blue") +
+  geom_ribbon(data = plot.data, aes(ymin = lower80, ymax = upper80), alpha = 0.3) +
+  geom_ribbon(data = plot.data, aes(ymin = lower95, ymax = upper95), alpha = 0.2, fill = "blue")
+```
 
 ```{r model_selection, warning=FALSE, echo=FALSE}
 # Define the series to be used
@@ -1110,6 +1127,47 @@ colnames(m) <- c("TBATS", "STLF", "LMx2", "NAIVE", "SNAIVE", "RWF", "MEANF",
 kable(m, "markdown")
 ```
 
+## Explore errors
+```{r}
+mdf <- as.data.frame(m)
+ggplot() + 
+  geom_line(data = mdf, aes(x = seq(182), y = STLF), color = "red") +
+  #geom_line(data = mdf, aes(x = seq(182), y = TBATS), color = "blue") +
+  geom_line(data = mdf, aes(x = seq(182), y = RWF), color = "green") +
+  geom_line(data = mdf, aes(x = seq(182), y = LMx2), color = "blue")
+```
+
+## Gamed version
+```{r}
+# Use TBATS except if RWF[i-9] > 28 && < 40
+minerr <- c()
+for(i in seq(to = length(m[, 1])-1)){
+  if(i > 50){
+    if(m[(i-8), 6] > 28){
+      minerr <- c(minerr, m[i+1, 2])
+    }
+    else{
+      minerr <- c(minerr, m[i+1, 1])
+    }
+  }
+  else{
+    minerr <- c(minerr, m[i+1, 1])
+  }
+}
+mean(minerr)
+```
+
+
+## Best scenario
+```{r}
+minerrors <- c()
+for(i in seq(to = length(m[, 1]))){
+  minerrors <- c(minerrors, min(m[i, ]))
+}
+mean(minerrors)
+```
+
+
 ## Model selection history
 ```{r}
 errors <- c()
@@ -1117,9 +1175,36 @@ for(i in seq(to = length(m[,1]) - 53)){
   name <- names(which.min(colMeans(m[i:(i+52), ])))
   colnum <- which.min(colMeans(m[i:(i+52), ]))[[1]]
   e <- m[(i+53), colnum]
+  if(i >= 53){
+    if(e > min(m[(i-52), ])){
+    name <- names(which.min(m[(i-52), ]))
+    colnum <- which.min(m[(i-52), ])[[1]]
+    errors <- c(errors, m[(i+53), colnum])
+  }
+  else{
+    errors <- c(errors, e)
+  }
+  }
+  
+  
+  cat("\n
+Best model on 2 year rolling window:", name,
+      "
+Next week's forecast error: ", m[(i+53), colnum])
+}
+
+```
+
+
+```{r}
+errors <- c()
+for(i in seq(to = length(m[,1]) - 53)){
+  name <- names(which.min(colMeans(m[i:(i+52), ])))
+  colnum <- which.min(colMeans(m[i:(i+52), ]))[[1]]
+  e <- m[(i+53), colnum]
   if(e > min(colMeans(m[1:(i+52),]))){
-    name <- names(which.min(colMeans(m[1:(i+52),])))
-    colnum <- which.min(colMeans(m[1:(i+52),]))[[1]]
+    name <- names(which.min(colMeans(m[1:(i+52), ])))
+    colnum <- which.min(colMeans(m[1:(i+52), ]))[[1]]
     errors <- c(errors, m[(i+53), colnum])
   }
   else{
@@ -1134,5 +1219,21 @@ Next week's forecast error: ", m[(i+53), colnum])
 
 ```
 
+## Model selection performance if new shape persists
+```{r}
+weeks <- c()
+k <- 27
+for(j in seq(104)){
+  if(k == 52){k <- 0}
+  k <- k + 1
+  weeks <- c(weeks, k)
+}
+newdata <- data.frame(week = weeks,
+                      startdate = seq(from = as.Date("2019-07-08"), to = as.Date("2021-06-28"), by = "week"),
+                      pcs = fit.weekly$mean)
+fake.weekly <- rbind(distr.weekly, newdata)
 
+ggplot(data = fake.weekly, aes(x = startdate, y = pcs)) + 
+  geom_line()
+```
 
