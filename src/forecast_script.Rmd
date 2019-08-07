@@ -1,9 +1,9 @@
 ---
 title: "Forecast script"
-output: github_document
+output: html_document
 ---
 
-```{r imports, message = FALSE}
+```{r imports, message = FALSE, echo = FALSE}
 library(tidyverse)
 library(data.table)
 library(lubridate)
@@ -90,8 +90,8 @@ plat.distr <- distr[distr$product %in% plat.codes, ]
 
 ```{r create_datasets, include = FALSE}
 # Create a full sequence of dates for imputation purposes
-all.dates <- (seq.Date(min(all.red$date),
-                       max(all.red$date),
+all.dates <- (seq.Date(min(red.distr$date),
+                       max(red.distr$date),
                        "day"))
 ###           ###
 #   RED CELLS   #
@@ -389,17 +389,17 @@ weekly <- data.frame(week = red.weekly$week,
                      plat = plat.weekly$pcs)
 ```
 
-## Monthly demand of the past year {.tabset .tabset-fade .tabset-pills}
+## Historical demand {.tabset .tabset-fade .tabset-pills}
 
 ### All red
-```{r}
+```{r, echo = FALSE}
 year.segment <- monthly[(length(monthly$red)-12):(length(monthly$red)-1), ]
 obj = TRUE
 ggplot(data = head(monthly, -1), aes(x = date, y = red)) + 
   geom_line() +
   geom_smooth(data = year.segment, aes(x = date, y = red), method = "lm", inherit.aes = FALSE) +
-  labs(title = "red",
-       subtitle = "for a year",
+  labs(title = "All red cell products",
+       subtitle = "Historical demand plus a trend line for the past year",
        caption = paste0("Past year's trend has been ", ifelse(test = lm(year.segment$red ~ seq_along(year.segment$red))$coefficients[2] >= 0, 
                                                               yes = "upward.", no = "downward.")),
        x = "Date",
@@ -408,13 +408,105 @@ ggplot(data = head(monthly, -1), aes(x = date, y = red)) +
 
 
 ### By blood type
-content
+```{r, echo = FALSE}
+year.segment <- monthly[(length(monthly$Ominus)-12):(length(monthly$Ominus)-1), ]
+
+ggplot(data = head(monthly, -1), aes(x = date, y = Ominus)) + 
+  geom_line() +
+  geom_smooth(data = year.segment, aes(x = date, y = Ominus), method = "lm", inherit.aes = FALSE) +
+  labs(title = "O-",
+       subtitle = "Historical demand plus a trend line for the past year",
+       caption = paste0("Past year's trend has been ", ifelse(test = lm(year.segment$Ominus ~ seq_along(year.segment$Ominus))$coefficients[2] >= 0, 
+                                                              yes = "upward.", no = "downward.")),
+       x = "Date",
+       y = "Blood bags")
+
+ggplot(data = head(monthly, -1), aes(x = date, y = Oplus)) + 
+  geom_line() +
+  geom_smooth(data = year.segment, aes(x = date, y = Oplus), method = "lm", inherit.aes = FALSE) +
+  labs(title = "O+",
+       subtitle = "Historical demand plus a trend line for the past year",
+       caption = paste0("Past year's trend has been ", ifelse(test = lm(year.segment$Oplus ~ seq_along(year.segment$Oplus))$coefficients[2] >= 0, 
+                                                              yes = "upward.", no = "downward.")),
+       x = "Date",
+       y = "Blood bags")
+
+ggplot(data = head(monthly, -1), aes(x = date, y = Aminus)) + 
+  geom_line() +
+  geom_smooth(data = year.segment, aes(x = date, y = Aminus), method = "lm", inherit.aes = FALSE) +
+  labs(title = "A-",
+       subtitle = "Historical demand plus a trend line for the past year",
+       caption = paste0("Past year's trend has been ", ifelse(test = lm(year.segment$Aminus ~ seq_along(year.segment$Aminus))$coefficients[2] >= 0, 
+                                                              yes = "upward.", no = "downward.")),
+       x = "Date",
+       y = "Blood bags")
+
+ggplot(data = head(monthly, -1), aes(x = date, y = Aplus)) + 
+  geom_line() +
+  geom_smooth(data = year.segment, aes(x = date, y = Aplus), method = "lm", inherit.aes = FALSE) +
+  labs(title = "A+",
+       subtitle = "Historical demand plus a trend line for the past year",
+       caption = paste0("Past year's trend has been ", ifelse(test = lm(year.segment$Aplus ~ seq_along(year.segment$Aplus))$coefficients[2] >= 0, 
+                                                              yes = "upward.", no = "downward.")),
+       x = "Date",
+       y = "Blood bags")
+
+ggplot(data = head(monthly, -1), aes(x = date, y = Bminus)) + 
+  geom_line() +
+  geom_smooth(data = year.segment, aes(x = date, y = Bminus), method = "lm", inherit.aes = FALSE) +
+  labs(title = "B-",
+       subtitle = "Historical demand plus a trend line for the past year",
+       caption = paste0("Past year's trend has been ", ifelse(test = lm(year.segment$Bminus ~ seq_along(year.segment$Bminus))$coefficients[2] >= 0, 
+                                                              yes = "upward.", no = "downward.")),
+       x = "Date",
+       y = "Blood bags")
+
+ggplot(data = head(monthly, -1), aes(x = date, y = Bplus)) + 
+  geom_line() +
+  geom_smooth(data = year.segment, aes(x = date, y = Bplus), method = "lm", inherit.aes = FALSE) +
+  labs(title = "B+",
+       subtitle = "Historical demand plus a trend line for the past year",
+       caption = paste0("Past year's trend has been ", ifelse(test = lm(year.segment$Bplus ~ seq_along(year.segment$Bplus))$coefficients[2] >= 0, 
+                                                              yes = "upward.", no = "downward.")),
+       x = "Date",
+       y = "Blood bags")
+
+ggplot(data = head(monthly, -1), aes(x = date, y = ABminus)) + 
+  geom_line() +
+  geom_smooth(data = year.segment, aes(x = date, y = ABminus), method = "lm", inherit.aes = FALSE) +
+  labs(title = "AB-",
+       subtitle = "Historical demand plus a trend line for the past year",
+       caption = paste0("Past year's trend has been ", ifelse(test = lm(year.segment$ABminus ~ seq_along(year.segment$ABminus))$coefficients[2] >= 0, 
+                                                              yes = "upward.", no = "downward.")),
+       x = "Date",
+       y = "Blood bags")
+
+ggplot(data = head(monthly, -1), aes(x = date, y = ABplus)) + 
+  geom_line() +
+  geom_smooth(data = year.segment, aes(x = date, y = ABplus), method = "lm", inherit.aes = FALSE) +
+  labs(title = "AB+",
+       subtitle = "Historical demand plus a trend line for the past year",
+       caption = paste0("Past year's trend has been ", ifelse(test = lm(year.segment$ABplus ~ seq_along(year.segment$ABplus))$coefficients[2] >= 0, 
+                                                              yes = "upward.", no = "downward.")),
+       x = "Date",
+       y = "Blood bags")
+```
 
 ### Platelets
-content
+```{r, echo = FALSE}
+year.segment <- monthly[(length(monthly$plat)-12):(length(monthly$plat)-1), ]
+obj = TRUE
+ggplot(data = head(monthly, -1), aes(x = date, y = plat)) + 
+  geom_line() +
+  geom_smooth(data = year.segment, aes(x = date, y = plat), method = "lm", inherit.aes = FALSE) +
+  labs(title = "All platelet products",
+       subtitle = "Historical demand plus a trend line for the past year",
+       caption = paste0("Past year's trend has been ", ifelse(test = lm(year.segment$plat ~ seq_along(year.segment$plat))$coefficients[2] >= 0, 
+                                                              yes = "upward.", no = "downward.")),
+       x = "Date",
+       y = "Blood bags")
+```
 
 ### Plasma
-```{r}
-
-```
+TO BE IMPLEMENTED
 
