@@ -2,12 +2,12 @@
 title: "Forecast script"
 output: html_document
 ---
-
-
-```{r imports, message = FALSE, echo = FALSE}
+```{r setup, echo = FALSE}
 # Set working directory
 knitr::opts_knit$set(root.dir = "/home/esa/production_forecasts") # Working on Ubuntu
-#knitr::opts_knit$set(root.dir = "V:/production_forecasts") # Working home
+```
+
+```{r imports, message = FALSE, echo = FALSE}
 library(forecast)
 library(ggplot2)
 library(gridExtra)
@@ -18,7 +18,7 @@ library(lubridate)
 library(numbers)
 library(data.table)
 library(R.utils)
-#source("src/evalhelp.R")
+source("src/evalhelp.R")
 ```
 
 ```{r read_files, include = FALSE}
@@ -116,7 +116,7 @@ all.red <- merge(x = data.frame(date = all.dates),
 # Replace with zeroes
 all.red[is.na(all.red)] <- 0
 # Cut to time after 2014
-all.red <- all.red[all.red$date >= as.Date("2014-01-01"), ]
+all.red <- all.red[all.red$date >= as.Date("2014-01-06"), ]
 
 
 # O minus
@@ -129,7 +129,7 @@ Ominus.distr <- merge(x = data.frame(date = all.dates),
 # Replace with zeroes
 Ominus.distr[is.na(Ominus.distr)] <- 0
 # Cut to time after 2014
-Ominus.distr <- Ominus.distr[Ominus.distr$date >= as.Date("2014-01-01"), ]
+Ominus.distr <- Ominus.distr[Ominus.distr$date >= as.Date("2014-01-06"), ]
 
 # O plus
 Oplus <- red.distr[red.distr$ABO == "O +", ]
@@ -141,7 +141,7 @@ Oplus.distr <- merge(x = data.frame(date = all.dates),
 # Replace with zeroes
 Oplus.distr[is.na(Oplus.distr)] <- 0
 # Cut to time after 2014
-Oplus.distr <- Oplus.distr[Oplus.distr$date >= as.Date("2014-01-01"), ]
+Oplus.distr <- Oplus.distr[Oplus.distr$date >= as.Date("2014-01-06"), ]
 
 # A minus
 Aminus <- red.distr[red.distr$ABO == "A -", ]
@@ -153,7 +153,7 @@ Aminus.distr <- merge(x = data.frame(date = all.dates),
 # Replace with zeroes
 Aminus.distr[is.na(Aminus.distr)] <- 0
 # Cut to time after 2014
-Aminus.distr <- Aminus.distr[Aminus.distr$date >= as.Date("2014-01-01"), ]
+Aminus.distr <- Aminus.distr[Aminus.distr$date >= as.Date("2014-01-06"), ]
 
 # A plus
 Aplus <- red.distr[red.distr$ABO == "A +", ]
@@ -165,7 +165,7 @@ Aplus.distr <- merge(x = data.frame(date = all.dates),
 # Replace with zeroes
 Aplus.distr[is.na(Aplus.distr)] <- 0
 # Cut to time after 2014
-Aplus.distr <- Aplus.distr[Aplus.distr$date >= as.Date("2014-01-01"), ]
+Aplus.distr <- Aplus.distr[Aplus.distr$date >= as.Date("2014-01-06"), ]
 
 # B minus
 Bminus <- red.distr[red.distr$ABO == "B -", ]
@@ -177,7 +177,7 @@ Bminus.distr <- merge(x = data.frame(date = all.dates),
 # Replace with zeroes
 Bminus.distr[is.na(Bminus.distr)] <- 0
 # Cut to time after 2014
-Bminus.distr <- Bminus.distr[Bminus.distr$date >= as.Date("2014-01-01"), ]
+Bminus.distr <- Bminus.distr[Bminus.distr$date >= as.Date("2014-01-06"), ]
 
 # B plus
 Bplus <- red.distr[red.distr$ABO == "B +", ]
@@ -189,7 +189,7 @@ Bplus.distr <- merge(x = data.frame(date = all.dates),
 # Replace with zeroes
 Bplus.distr[is.na(Bplus.distr)] <- 0
 # Cut to time after 2014
-Bplus.distr <- Bplus.distr[Bplus.distr$date >= as.Date("2014-01-01"), ]
+Bplus.distr <- Bplus.distr[Bplus.distr$date >= as.Date("2014-01-06"), ]
 
 # AB minus
 ABminus <- red.distr[red.distr$ABO == "AB-", ]
@@ -201,7 +201,7 @@ ABminus.distr <- merge(x = data.frame(date = all.dates),
 # Replace with zeroes
 ABminus.distr[is.na(ABminus.distr)] <- 0
 # Cut to time after 2014
-ABminus.distr <- ABminus.distr[ABminus.distr$date >= as.Date("2014-01-01"), ]
+ABminus.distr <- ABminus.distr[ABminus.distr$date >= as.Date("2014-01-06"), ]
 
 # AB plus
 ABplus <- red.distr[red.distr$ABO == "AB+", ]
@@ -213,7 +213,7 @@ ABplus.distr <- merge(x = data.frame(date = all.dates),
 # Replace with zeroes
 ABplus.distr[is.na(ABplus.distr)] <- 0
 # Cut to time after 2014
-ABplus.distr <- ABplus.distr[ABplus.distr$date >= as.Date("2014-01-01"), ]
+ABplus.distr <- ABplus.distr[ABplus.distr$date >= as.Date("2014-01-06"), ]
 
 
 ###           ###
@@ -227,10 +227,11 @@ all.plat <- merge(x = data.frame(date = all.dates),
 # Replace with zeroes
 all.plat[is.na(all.plat)] <- 0
 # Cut to time after 2014
-all.plat <- all.plat[all.plat$date >= as.Date("2014-01-01"), ]
+all.plat <- all.plat[all.plat$date >= as.Date("2014-01-06"), ]
 ```
 
 ```{r datasets_monthly, include = FALSE}
+# Aggregate all by months
 red.monthly <- aggregate(pcs ~ month(date) + year(date), data = all.red, FUN = sum)
 Ominus.monthly <- aggregate(pcs ~ month(date) + year(date), data = Ominus.distr, FUN = sum)
 Oplus.monthly <- aggregate(pcs ~ month(date) + year(date), data = Oplus.distr, FUN = sum)
@@ -242,6 +243,7 @@ ABminus.monthly <- aggregate(pcs ~ month(date) + year(date), data = ABminus.dist
 ABplus.monthly <- aggregate(pcs ~ month(date) + year(date), data = ABplus.distr, FUN = sum)
 plat.monthly <- aggregate(pcs ~ month(date) + year(date), data = all.plat, FUN = sum)
 
+# Create a master frame
 monthly <- data.frame(date = seq(from = as.Date("2014-01-01"), to = max(distr$date), by = "month"),
                       red = red.monthly$pcs,
                       Ominus = Ominus.monthly$pcs,
@@ -256,10 +258,11 @@ monthly <- data.frame(date = seq(from = as.Date("2014-01-01"), to = max(distr$da
 ```
 
 ```{r datasets_weekly, include = FALSE}
+# Weekly aggregation is a bit more tricky operation as weekly aggregate gives incorrect results
 
 # ALL.RED
-pcslist <- list(); weeklist <- list(); datelist <- list()
-j <- 0; k <- 0
+pcslist <- list(); weeklist <- list(); datelist <- list()  # Create storage lists
+j <- 0; k <- 0  # j is for resetting week counter, k is for gathering dates
 for(i in seq(to = length(all.red$date), by = 7)){
   if(j == 52){j <- 0}
   j <- j + 1
@@ -387,6 +390,7 @@ for(i in seq(to = length(all.plat$date), by = 7)){
 }
 plat.weekly <- data.frame(week = unlist(weeklist), startdate = as.Date.numeric(unlist(datelist), origin = "1970-01-01"), pcs = unlist(pcslist))
 
+# Create a master frame
 weekly <- data.frame(week = red.weekly$week,
                      startdate = red.weekly$startdate,
                      red = red.weekly$pcs,
@@ -401,20 +405,22 @@ weekly <- data.frame(week = red.weekly$week,
                      plat = plat.weekly$pcs)
 ```
 
-
-## Historical demand {.tabset .tabset-fade .tabset-pills}
+## Historical monthly demand {.tabset .tabset-fade .tabset-pills}
 
 ### All red
 ```{r, echo = FALSE}
+# We need to extract the past year for determining the trend line
 year.segment <- monthly[(length(monthly$red)-12):(length(monthly$red)-1), ]
-obj = TRUE
+
+# Remember to omit the last month, as it is not whole
 ggplot(data = head(monthly, -1), aes(x = date, y = red)) + 
   geom_line() +
-  geom_smooth(data = year.segment, aes(x = date, y = red), method = "lm", inherit.aes = FALSE) +
+  geom_smooth(data = year.segment, aes(x = date, y = red), method = "lm", inherit.aes = FALSE) +  # This plots the trend line
   labs(title = "All red cell products",
        subtitle = "Historical demand plus a trend line for the past year",
-       caption = paste0("Past year's trend has been ", ifelse(test = lm(year.segment$red ~ seq_along(year.segment$red))$coefficients[2] >= 0, 
-                                                              yes = "upward.", no = "downward.")),
+       caption = paste0("Past year's trend has been ", ifelse(test = lm(year.segment$red ~ seq_along(year.segment$red))$coefficients[2] >= 0,  # Upward or downward? Check the slope!
+                                                              yes = "upward.", 
+                                                              no = "downward.")),
        x = "Date",
        y = "Blood bags")
 ```
@@ -508,7 +514,6 @@ ggplot(data = head(monthly, -1), aes(x = date, y = ABplus)) +
 ### Platelets
 ```{r, echo = FALSE}
 year.segment <- monthly[(length(monthly$plat)-12):(length(monthly$plat)-1), ]
-obj = TRUE
 ggplot(data = head(monthly, -1), aes(x = date, y = plat)) + 
   geom_line() +
   geom_smooth(data = year.segment, aes(x = date, y = plat), method = "lm", inherit.aes = FALSE) +
@@ -523,12 +528,130 @@ ggplot(data = head(monthly, -1), aes(x = date, y = plat)) +
 ### Plasma
 TO BE IMPLEMENTED
 
-## Weekly forecast {.tabset .tabset-fade .tabset-pills}
+## Historical weekly demand {.tabset .tabset-fade .tabset-pills}
 
 ### All red
-```{r historical_errors, echo = FALSE}
+```{r, echo = FALSE}
+year.segment <- weekly[(length(weekly$red)-52):(length(weekly$red)-1), ]
+ggplot(data = head(weekly, -1), aes(x = startdate, y = red)) + 
+  geom_line() +
+  geom_smooth(data = year.segment, aes(x = startdate, y = red), method = "lm", inherit.aes = FALSE) +
+  labs(title = "All red cell products",
+       subtitle = "Historical demand plus a trend line for the past year",
+       caption = paste0("Past year's trend has been ", ifelse(test = lm(year.segment$red ~ seq_along(year.segment$red))$coefficients[2] >= 0, 
+                                                              yes = "upward.", 
+                                                              no = "downward.")),
+       x = "Date",
+       y = "Blood bags")
+```
+
+
+### By blood type
+```{r, echo = FALSE}
+ggplot(data = head(weekly, -1), aes(x = startdate, y = Ominus)) + 
+  geom_line() +
+  geom_smooth(data = year.segment, aes(x = startdate, y = Ominus), method = "lm", inherit.aes = FALSE) +
+  labs(title = "O-",
+       subtitle = "Historical demand plus a trend line for the past year",
+       caption = paste0("Past year's trend has been ", ifelse(test = lm(year.segment$Ominus ~ seq_along(year.segment$Ominus))$coefficients[2] >= 0, 
+                                                              yes = "upward.", no = "downward.")),
+       x = "Date",
+       y = "Blood bags")
+
+ggplot(data = head(weekly, -1), aes(x = startdate, y = Oplus)) + 
+  geom_line() +
+  geom_smooth(data = year.segment, aes(x = startdate, y = Oplus), method = "lm", inherit.aes = FALSE) +
+  labs(title = "O+",
+       subtitle = "Historical demand plus a trend line for the past year",
+       caption = paste0("Past year's trend has been ", ifelse(test = lm(year.segment$Oplus ~ seq_along(year.segment$Oplus))$coefficients[2] >= 0, 
+                                                              yes = "upward.", no = "downward.")),
+       x = "Date",
+       y = "Blood bags")
+
+ggplot(data = head(weekly, -1), aes(x = startdate, y = Aminus)) + 
+  geom_line() +
+  geom_smooth(data = year.segment, aes(x = startdate, y = Aminus), method = "lm", inherit.aes = FALSE) +
+  labs(title = "A-",
+       subtitle = "Historical demand plus a trend line for the past year",
+       caption = paste0("Past year's trend has been ", ifelse(test = lm(year.segment$Aminus ~ seq_along(year.segment$Aminus))$coefficients[2] >= 0, 
+                                                              yes = "upward.", no = "downward.")),
+       x = "Date",
+       y = "Blood bags")
+
+ggplot(data = head(weekly, -1), aes(x = startdate, y = Aplus)) + 
+  geom_line() +
+  geom_smooth(data = year.segment, aes(x = startdate, y = Aplus), method = "lm", inherit.aes = FALSE) +
+  labs(title = "A+",
+       subtitle = "Historical demand plus a trend line for the past year",
+       caption = paste0("Past year's trend has been ", ifelse(test = lm(year.segment$Aplus ~ seq_along(year.segment$Aplus))$coefficients[2] >= 0, 
+                                                              yes = "upward.", no = "downward.")),
+       x = "Date",
+       y = "Blood bags")
+
+ggplot(data = head(weekly, -1), aes(x = startdate, y = Bminus)) + 
+  geom_line() +
+  geom_smooth(data = year.segment, aes(x = startdate, y = Bminus), method = "lm", inherit.aes = FALSE) +
+  labs(title = "B-",
+       subtitle = "Historical demand plus a trend line for the past year",
+       caption = paste0("Past year's trend has been ", ifelse(test = lm(year.segment$Bminus ~ seq_along(year.segment$Bminus))$coefficients[2] >= 0, 
+                                                              yes = "upward.", no = "downward.")),
+       x = "Date",
+       y = "Blood bags")
+
+ggplot(data = head(weekly, -1), aes(x = startdate, y = Bplus)) + 
+  geom_line() +
+  geom_smooth(data = year.segment, aes(x = startdate, y = Bplus), method = "lm", inherit.aes = FALSE) +
+  labs(title = "B+",
+       subtitle = "Historical demand plus a trend line for the past year",
+       caption = paste0("Past year's trend has been ", ifelse(test = lm(year.segment$Bplus ~ seq_along(year.segment$Bplus))$coefficients[2] >= 0, 
+                                                              yes = "upward.", no = "downward.")),
+       x = "Date",
+       y = "Blood bags")
+
+ggplot(data = head(weekly, -1), aes(x = startdate, y = ABminus)) + 
+  geom_line() +
+  geom_smooth(data = year.segment, aes(x = startdate, y = ABminus), method = "lm", inherit.aes = FALSE) +
+  labs(title = "AB-",
+       subtitle = "Historical demand plus a trend line for the past year",
+       caption = paste0("Past year's trend has been ", ifelse(test = lm(year.segment$ABminus ~ seq_along(year.segment$ABminus))$coefficients[2] >= 0, 
+                                                              yes = "upward.", no = "downward.")),
+       x = "Date",
+       y = "Blood bags")
+
+ggplot(data = head(weekly, -1), aes(x = startdate, y = ABplus)) + 
+  geom_line() +
+  geom_smooth(data = year.segment, aes(x = startdate, y = ABplus), method = "lm", inherit.aes = FALSE) +
+  labs(title = "AB+",
+       subtitle = "Historical demand plus a trend line for the past year",
+       caption = paste0("Past year's trend has been ", ifelse(test = lm(year.segment$ABplus ~ seq_along(year.segment$ABplus))$coefficients[2] >= 0, 
+                                                              yes = "upward.", no = "downward.")),
+       x = "Date",
+       y = "Blood bags")
+```
+
+### Platelets
+```{r, echo = FALSE}
+ggplot(data = head(weekly, -1), aes(x = startdate, y = plat)) + 
+  geom_line() +
+  geom_smooth(data = year.segment, aes(x = startdate, y = plat), method = "lm", inherit.aes = FALSE) +
+  labs(title = "All platelet products",
+       subtitle = "Historical demand plus a trend line for the past year",
+       caption = paste0("Past year's trend has been ", ifelse(test = lm(year.segment$plat ~ seq_along(year.segment$plat))$coefficients[2] >= 0, 
+                                                              yes = "upward.", no = "downward.")),
+       x = "Date",
+       y = "Blood bags")
+```
+
+### Plasma
+TO BE IMPLEMENTED
+
+
+## Monthly forecast {.tabset .tabset-fade .tabset-pills}
+
+### All red
+```{r historical_errors, echo = FALSE, eval = FALSE}
 # Define the series to be used
-red.mts <- msts(weekly$red, start = decimal_date(as.Date("2014-01-01")), seasonal.periods = c(12, 52))
+red.ts <- ts(monthly$red, start = decimal_date(as.Date("2014-01-06")), frequency = 12)
 
 ############################
 # TBATS
@@ -536,11 +659,11 @@ red.mts <- msts(weekly$red, start = decimal_date(as.Date("2014-01-01")), seasona
 capes <- c()
 # Create progress bar
 cat("\nRUNNING TBATS\n")
-pb <- txtProgressBar(min = 1, max = length(red.mts) - 105, style = 3)
-for(i in seq(length(red.mts) - 105)){
+pb <- txtProgressBar(min = 1, max = length(red.ts) - 25, style = 3)
+for(i in seq(length(red.ts) - 25)){
   # Define training and testing set as ROLLING WINDOW
-  train <- msts(red.mts[(1 + i):(104 + i)], start = decimal_date(as.Date("2014-01-01") + i), seasonal.periods = c(12, 52))
-  test <- msts(red.mts[(105 + i)], start = decimal_date(as.Date("2014-01-01") + 105 + i), seasonal.periods = c(12, 52))
+  train <- ts(red.ts[(1 + i):(24 + i)], start = decimal_date(as.Date("2014-01-06") + i), frequency = 12)
+  test <- ts(red.ts[(25 + i)], start = decimal_date(as.Date("2014-01-06") + 25 + i), frequency = 12)
   # Fit
   fit <- tbats(train)
   # Forecast 1 step (week) ahead
@@ -1218,7 +1341,7 @@ colnames(m) <- c("TBATS", "STLF", "LMx2", "NAIVE", "SNAIVE", "RWF", "MEANF",
 mdf <- as.data.frame(m)
 ```
 
-```{r}
+```{r, eval = FALSE}
 errors <- c()
 for(i in seq(to = length(m[,1]) - 53)){
   name <- names(which.min(colMeans(m[i:(i+52), ])))

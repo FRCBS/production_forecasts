@@ -90,7 +90,22 @@ distr <- distr[distr$product %in% codes, ]
 
 
 ```{r create_datasets}
+# Create a full sequence of dates for imputation purposes
+all.dates <- (seq.Date(min(distr$date),
+                       max(distr$date),
+                       "day"))
+
 all.distr <- aggregate(distr$quantity, by = list(distr$date), sum); colnames(all.distr) <- c("date", "pcs")
+# Merge into a whole set with NAs
+# all.distr.other <- merge(x = data.frame(date = all.dates),
+#                  y = all.distr,
+#                  all.x = TRUE)
+# # Replace with zeroes
+# all.distr.other[is.na(all.distr.other)] <- 0
+# # Cut to time after 2014
+# all.distr.other <- all.distr.other[all.distr.other$date >= as.Date("2014-01-01"), ]
+all.distr <- all.distr[all.distr$date >= as.Date("2014-01-06"), ]
+#all.distr <- aggregate(distr$quantity, by = list(distr$date), sum); colnames(all.distr) <- c("date", "pcs")
 all.retrn <- aggregate(retrn$quantity, by = list(retrn$date), sum); colnames(all.retrn) <- c("date", "pcs")
 
 # O minus
@@ -128,9 +143,17 @@ ABplus.distr <- aggregate(ABplus$quantity, by = list(ABplus$date), sum); colname
 
 *Notes for development phase: 4% of the data is missing "ABO" and "volume" information. 4% is too much to be outright omitted, but now we have the problem where the smaller ABO series don't add up to "all.distr".*
 
+```{r}
+require(arsenal)
+comparedf(all.distr, all.distr.other)
+```
+
+
 ## Data goodness checks
 ```{r}
-alldates <- seq(from = as.Date("2014-01-01"), to = as.Date("2019-07-07"), by = "day")
+alldates <- (seq.Date(min(distr$date),
+                       max(distr$date),
+                       "day"))
 typedates <- list(all.distr$date, Ominus.distr$date, Oplus.distr$date, 
                   Aminus.distr$date, Aplus.distr$date, Bminus.distr$date, 
                   Bplus.distr$date, ABminus.distr$date, ABplus.distr$date)
@@ -258,7 +281,7 @@ ggplot() +
 ```{r weekly}
 # remember that this won't work if there are missing days
 # cut to first monday
-#conct.distr <- tail(all.distr, -15)
+#conct.distr <- tail(all.distr, -5)
 
 pcslist <- list()
 weeklist <- list()
@@ -1119,7 +1142,7 @@ m <- matrix(c(tbats.capes, stlf.capes, lmx2.capes, naive.capes, snaive.capes, rw
               smth10tbats.capes, smth10stlf.capes, smth10lmx2.capes, smth10naive.capes, smth10snaive.capes, smth10rwf.capes,
               smth10meanf.capes),
             ncol = 21,
-            byrow = TRUE)
+            byrow = FALSE)
 colnames(m) <- c("TBATS", "STLF", "LMx2", "NAIVE", "SNAIVE", "RWF", "MEANF",
                  "TBATS .25", "STLF .25", "LMx2 .25", "NAIVE .25", "SNAIVE .25", "RWF .25", "MEANF .25",
                  "TBATS .10", "STLF .10", "LMx2 .10", "NAIVE .10", "SNAIVE .10", "RWF .10", "MEANF .10")
@@ -1131,7 +1154,7 @@ kable(m, "markdown")
 ```{r}
 mdf <- as.data.frame(m)
 ggplot() + 
-  geom_line(data = mdf, aes(x = seq(182), y = STLF), color = "red") +
+  geom_line(data = mdf, aes(x = seq(182), y = SNAIVE), color = "red") +
   #geom_line(data = mdf, aes(x = seq(182), y = TBATS), color = "blue") +
   geom_line(data = mdf, aes(x = seq(182), y = RWF), color = "green") +
   geom_line(data = mdf, aes(x = seq(182), y = LMx2), color = "blue")
