@@ -655,11 +655,11 @@ TO BE IMPLEMENTED
 ## Monthly forecast {.tabset .tabset-fade .tabset-pills}
 
 ### All red
-```{r historical_errors, message = FALSE, warning = FALSE, echo = FALSE}
+```{r historical_errors, message = FALSE, warning = FALSE, echo = FALSE, results = FALSE}
 # Define the series to be used
 # We want to use 4 years of data. 3 years for the width of the rolling window and we'll let that run for a year.
-segment <- tail(monthly$date, 48)
-beginning <- head(segment, 1)
+segment <- head(tail(monthly$red, 49), 48)
+beginning <- head(tail(monthly$date, 49), 1)
 red.ts <- ts(segment, start = decimal_date(beginning), frequency = 12)
 
 ############################
@@ -969,7 +969,7 @@ close(pb) # Close progress bar
 smthets.capes <- capes
 
 ############################
-# Smooth .25 TBATS
+# Smooth .25 STL
 ############################
 capes <- c()
 cat("\nRUNNING SMOOTH STL\n")
@@ -1266,7 +1266,7 @@ smth10ets.capes <- capes
 # Smooth .10 STL
 ############################
 capes <- c()
-cat("\nRUNNING SMOOTH .10 TBATS\n")
+cat("\nRUNNING SMOOTH .10 STL\n")
 # Create progress bar
 pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
 for(i in seq(length(red.ts) - 37)){
@@ -1544,8 +1544,8 @@ chosen.model <- which.min(colMeans(mdf))[[1]]
 
 # Actual forecasts if this model chosen
 train <- ts(tail(red.ts, 36), start = decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)
-train25 <- ts(itsmr::smooth.fft(tail(red.ts, 36), .25), start =  decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)
-train10 <- ts(itsmr::smooth.fft(tail(red.ts, 36), .10), start =  decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)
+train25 <- ts(itsmr::smooth.fft(tail(red.ts, 36), .25), start = decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)
+train10 <- ts(itsmr::smooth.fft(tail(red.ts, 36), .10), start = decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)
 
 if(chosen.model == 1){fit <- ets(train)}
 if(chosen.model == 2){fit <- stl(train, s.window = "periodic", t.window = 7)}
@@ -1617,45 +1617,43 @@ if(chosen.model == 25){fit <- snaive(train10)}
 if(chosen.model == 26){fit <- rwf(train10, drift = TRUE)}
 if(chosen.model == 27){fit <- meanf(train10)}
 
-fcast <- forecast(fit, 6)
+fcast <- forecast(fit, h = 6)
 forecasts <- as.numeric(fcast$mean)
-upper80s <- fcast$upper[[1]]
-upper95s <- fcast$upper[[2]]
-lower80s <- fcast$lower[[1]]
-lower95s <- fcast$lower[[2]]
+upper80s <- as.numeric(fcast$upper[, 1])
+upper95s <- as.numeric(fcast$upper[, 2])
+lower80s <- as.numeric(fcast$lower[, 1])
+lower95s <- as.numeric(fcast$lower[, 2])
 
-
+fdf <- data.frame(fcast = forecasts,
+                  upper80 = upper80s,
+                  upper95 = upper95s,
+                  lower80 = lower80s,
+                  lower95 = lower95s)
 
 ```
+
+```{r, fig.align="center", echo = FALSE}
+ggplot(data = fdf, aes(x = seq.Date(from = tail(monthly$date, 1), to = tail(monthly$date, 1) + months(5), by = "month"), y = fcast)) + 
+  geom_line() + 
+  geom_line(data = head(monthly, -1), aes(x = date, y = red)) +
+  geom_ribbon(data = fdf, aes(ymin = lower80, ymax = upper80), alpha = 0.3) +
+  geom_ribbon(data = fdf, aes(ymin = lower95, ymax = upper95), alpha = 0.2, fill = "blue") +
+  geom_segment(x = tail(monthly$date, 2)[1], y = tail(monthly$red, 2)[1], xend = tail(monthly$date, 1), yend = head(fdf$fcast, 1), color = "black", linetype = "dashed") +
+  labs(title = "6 month forecast",
+       subtitle = paste0("Best performing model of the previous year: ", modelnames[chosen.model]),
+       x = "Time",
+       y = "Units per day") +
+  theme_minimal()
+```
+
+<style>
+div.red { background-color:#DF013A; border-radius: 5px; padding: 20px;}
+</style>
+<div class = "red">
 
 ```{r}
-class(which.min(colMeans(mdf))[1])
-```
-```{r}
-m
+paste0("FORECASTED DEMAND FOR NEXT MONTH: ", fdf$fcast[1])
 ```
 
 
-```{r, eval = FALSE}
-
-
-
-errors <- c()
-for(i in seq(to = length(m[,1])-1)){
-  name <- names(which.min(m[i, ]))
-  colnum <- which.min(m[i, ])[[1]]
-  e <- m[i+1, colnum]
-  errors <- c(errors, e)
-}
-
-```
-
-
-### By blood type
-content
-
-### Platelets
-content
-
-### Plasma
-TO BE IMPLEMENTED
+</div>
