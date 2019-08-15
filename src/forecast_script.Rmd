@@ -1411,7 +1411,7 @@ save.this <- data.frame(time = tail(monthly$date, 1),
                         lower95 = fdf$lower95[1])
 
 # Save to file for historical review
-write.table(save.this, file = "histories/monthly_red.csv", sep = ",", row.names = FALSE, col.names = FALSE)
+#write.table(save.this, file = "results/histories/monthly_red.csv", sep = ",", row.names = FALSE, col.names = FALSE)
 
 ```
 
@@ -2452,7 +2452,7 @@ Next month: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND disp
 ### All red
 ```{r red_history, echo = FALSE}
 # Load history
-history <- read.csv("histories/monthly_red.csv", header = TRUE)
+history <- read.csv("results/histories/monthly_red.csv", header = TRUE)
 
 ggplot(data = history, aes(x = as.Date(time), y = forecast), label = model) +
   geom_line(color = "red") +
