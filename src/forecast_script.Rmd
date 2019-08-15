@@ -1,5 +1,5 @@
 ---
-title: "Forecast script"
+title: "Production Forecasts"
 output: html_document
 ---
 ```{r setup, echo = FALSE}
@@ -18,6 +18,7 @@ library(lubridate)
 library(numbers)
 library(data.table)
 library(R.utils)
+library(ggrepel)
 source("src/evalhelp.R")
 ```
 
@@ -98,7 +99,6 @@ plat.codes <- c("budTR002", "trEnnApu", "A0004V00", "A0005V00", "A0006V00", "A00
 
 plat.distr <- distr[distr$product %in% plat.codes, ]
 ```
-
 
 ```{r create_datasets, include = FALSE}
 # Create a full sequence of dates for imputation purposes
@@ -230,7 +230,7 @@ all.plat[is.na(all.plat)] <- 0
 all.plat <- all.plat[all.plat$date >= as.Date("2014-01-06"), ]
 ```
 
-```{r datasets_monthly, include = FALSE}
+```{r datasets_monthly, include = FALSE, warning = FALSE}
 # Aggregate all by months
 red.monthly <- aggregate(pcs ~ month(date) + year(date), data = all.red, FUN = sum)
 Ominus.monthly <- aggregate(pcs ~ month(date) + year(date), data = Ominus.distr, FUN = sum)
@@ -248,6 +248,7 @@ months <- seq(from = as.Date("2014-01-06"), to = max(distr$date), by = "month")
 
 # Adjustment series
 adj <- as.numeric(bizdays(ts(months, start = decimal_date(as.Date("2014-01-06")), frequency = 12), FinCenter = "Zurich"))
+reverse_adj <- as.numeric(bizdays(ts(seq(6), start = decimal_date(as.Date(tail(months, 1))), frequency = 12), FinCenter = "Zurich"))
 
 # Create a master frame
 monthly <- data.frame(date = months,
@@ -261,6 +262,18 @@ monthly <- data.frame(date = months,
                       ABminus = ABminus.monthly$pcs/adj,
                       ABplus = ABplus.monthly$pcs/adj,
                       plat = plat.monthly$pcs/adj)
+
+monthly_real <- data.frame(date = months,
+                           red = red.monthly$pcs,
+                           Ominus = Ominus.monthly$pcs,
+                           Oplus = Oplus.monthly$pcs,
+                           Aminus = Aminus.monthly$pcs,
+                           Aplus = Aplus.monthly$pcs,
+                           Bminus = Bminus.monthly$pcs,
+                           Bplus = Bplus.monthly$pcs,
+                           ABminus = ABminus.monthly$pcs,
+                           ABplus = ABplus.monthly$pcs,
+                           plat = plat.monthly$pcs)
 ```
 
 ```{r datasets_weekly, include = FALSE}
@@ -411,26 +424,2050 @@ weekly <- data.frame(week = red.weekly$week,
                      plat = plat.weekly$pcs)
 ```
 
-## Historical monthly demand {.tabset .tabset-fade .tabset-pills}
+## 6 month forecast {.tabset .tabset-fade .tabset-pills}
 
 ### All red
-```{r, echo = FALSE}
-# We need to extract the past year for determining the trend line
-year.segment <- monthly[(length(monthly$red)-12):(length(monthly$red)-1), ]
+```{r monthly_historical_errors_red, message = FALSE, warning = FALSE, echo = FALSE, results = FALSE}
+# Define the series to be used
+# We want to use 4 years of data. 3 years for the width of the rolling window and we'll let that run for a year.
+segment <- head(tail(monthly$red, 49), 48)
+beginning <- head(tail(monthly$date, 49), 1)
+series.ts <- ts(segment, start = decimal_date(beginning), frequency = 12)
 
-# Remember to omit the last month, as it is not whole
-ggplot(data = head(monthly, -1), aes(x = date, y = red)) + 
-  geom_line() +
-  geom_smooth(data = year.segment, aes(x = date, y = red), method = "lm", inherit.aes = FALSE) +  # This plots the trend line
-  labs(title = "All red cell products",
-       subtitle = "Historical demand plus a trend line for the past year",
-       caption = paste0("Past year's trend has been ", ifelse(test = lm(year.segment$red ~ seq_along(year.segment$red))$coefficients[2] >= 0,  # Upward or downward? Check the slope!
-                                                              yes = "upward.", 
-                                                              no = "downward.")),
-       x = "Date",
-       y = "Blood bags")
+############################
+# ETS
+############################
+capes <- c()
+# Create progress bar
+cat("\nRUNNING ETS\n")
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(series.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+  # Fit
+  fit <- ets(train)
+  
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+ets.capes <- capes
+
+############################
+# STL
+############################
+capes <- c()
+# Create progress bar
+cat("\nRUNNING STL\n")
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(series.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+  # Fit
+  fit <- stl(train, s.window = "periodic", t.window = 7)
+  
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+stl.capes <- capes
+
+############################
+# TBATS
+############################
+capes <- c()
+# Create progress bar
+cat("\nRUNNING TBATS\n")
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(series.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+  # Fit
+  fit <- tbats(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+tbats.capes <- capes
+
+############################
+# STLF
+############################
+capes <- c()
+# Create progress bar
+cat("\nRUNNING STLF\n")
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(series.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+  # Fit
+  fit <- stlf(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+stlf.capes <- capes
+
+############################
+# LMx2
+############################
+capes <- c()
+cat("\nRUNNING LMx2\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(series.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+  
+  # Fit & Forecast
+  fit1 <- tslm(train ~ trend + season)
+  fcast1 <- forecast(fit1, h = 1)
+ 
+  fit2 <- auto.arima(fit1$residuals)
+  fcast2 <- forecast(fit2, h = 1)
+  
+  y <- as.numeric(fcast1$mean)
+  x <- as.numeric(fcast2$mean)
+  fcast <- x + y
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+lmx2.capes <- capes
+
+############################
+# NAIVE
+############################
+capes <- c()
+cat("\nRUNNING NAIVE\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(series.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+  
+  # Fit
+  fit <- naive(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+naive.capes <- capes
+
+############################
+# SNAIVE
+############################
+capes <- c()
+cat("\nRUNNING SNAIVE\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(series.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- snaive(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+snaive.capes <- capes
+
+############################
+# RWF
+############################
+capes <- c()
+cat("\nRUNNING RWF\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(series.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- rwf(train, drift = TRUE)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+rwf.capes <- capes
+
+############################
+# MEANF
+############################
+capes <- c()
+cat("\nRUNNING MEANF\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(series.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- meanf(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+meanf.capes <- capes
+
+############################
+# Smooth .25 ETS
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH ETS\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .25), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- ets(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smthets.capes <- capes
+
+############################
+# Smooth .25 STL
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH STL\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .25), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- stl(train, s.window = "periodic", t.window = 7)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smthstl.capes <- capes
+
+############################
+# Smooth .25 TBATS
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH TBATS\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .25), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- tbats(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smthtbats.capes <- capes
+
+############################
+# Smooth .25 STLF
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH STLF\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .25), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- stlf(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smthstlf.capes <- capes
+
+############################
+# Smooth .25 LMx2
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH LMx2\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .25), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit & Forecast
+  fit1 <- tslm(train ~ trend + season)
+  fcast1 <- forecast(fit1, h = 1)
+ 
+  fit2 <- auto.arima(fit1$residuals)
+  fcast2 <- forecast(fit2, h = 1)
+  
+  y <- as.numeric(fcast1$mean)
+  x <- as.numeric(fcast2$mean)
+  fcast <- x + y
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smthlmx2.capes <- capes
+
+############################
+# Smooth .25 NAIVE
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH NAIVE\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .25), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+  
+  # Fit
+  fit <- naive(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smthnaive.capes <- capes
+
+############################
+# Smooth .25 SNAIVE
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH SNAIVE\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .25), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- snaive(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smthsnaive.capes <- capes
+
+############################
+# Smooth .25 RWF
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH RWF\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .25), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- rwf(train, drift = TRUE)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smthrwf.capes <- capes
+
+############################
+# Smooth .25 MEANF
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH MEANF\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .25), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- meanf(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smthmeanf.capes <- capes
+
+############################
+# Smooth .10 ETS
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH .10 ETS\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .10), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- ets(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smth10ets.capes <- capes
+
+############################
+# Smooth .10 STL
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH .10 STL\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .10), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- stl(train, s.window = "periodic", t.window = 7)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smth10stl.capes <- capes
+
+############################
+# Smooth .10 TBATS
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH .10 TBATS\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .10), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- tbats(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smth10tbats.capes <- capes
+
+############################
+# Smooth .10 STLF
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH .10 STLF\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .10), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- stlf(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smth10stlf.capes <- capes
+
+############################
+# Smooth .10 LMx2
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH .10 LMx2\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .10), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit & Forecast
+  fit1 <- tslm(train ~ trend + season)
+  fcast1 <- forecast(fit1, h = 1)
+ 
+  fit2 <- auto.arima(fit1$residuals)
+  fcast2 <- forecast(fit2, h = 1)
+  
+  y <- as.numeric(fcast1$mean)
+  x <- as.numeric(fcast2$mean)
+  fcast <- x + y
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smth10lmx2.capes <- capes
+
+############################
+# Smooth .10 NAIVE
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH .10 NAIVE\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .10), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+  
+  # Fit
+  fit <- naive(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smth10naive.capes <- capes
+
+############################
+# Smooth .10 SNAIVE
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH .10 SNAIVE\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .10), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- snaive(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smth10snaive.capes <- capes
+
+############################
+# Smooth .10 RWF
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH .10 RWF\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .10), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- rwf(train, drift = TRUE)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smth10rwf.capes <- capes
+
+############################
+# Smooth .10 MEANF
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH .10 MEANF\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .10), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- meanf(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smth10meanf.capes <- capes
+
+m <- matrix(c(ets.capes, stl.capes, tbats.capes, stlf.capes, lmx2.capes, 
+              naive.capes, snaive.capes, rwf.capes, meanf.capes,
+              smthets.capes, smthstl.capes, smthtbats.capes, smthstlf.capes, 
+              smthlmx2.capes, smthnaive.capes, smthsnaive.capes, smthrwf.capes, smthmeanf.capes,
+              smth10ets.capes, smth10stl.capes, smth10tbats.capes, smth10stlf.capes, 
+              smth10lmx2.capes, smth10naive.capes, smth10snaive.capes, smth10rwf.capes, smth10meanf.capes),
+            ncol = 27,
+            byrow = TRUE)
+
+modelnames <- c("ETS", "STL", "TBATS", "STLF", "LMx2", "NAIVE", "SNAIVE", "RWF", "MEANF",
+                "ETS.25", "STL.25", "TBATS.25", "STLF.25", "LMx2.25", "NAIVE.25", "SNAIVE.25", "RWF.25", "MEANF.25",
+                "ETS.10", "STL.10", "TBATS.10", "STLF.10", "LMx2.10", "NAIVE.10", "SNAIVE.10", "RWF.10", "MEANF.10")
+colnames(m) <- modelnames
+
+mdf <- as.data.frame(m)
+
+chosen.model <- which.min(colMeans(mdf))[[1]]
+
+# Actual forecasts if this model chosen
+train <- ts(tail(series.ts, 36), start = decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)
+train25 <- ts(itsmr::smooth.fft(tail(series.ts, 36), .25), start = decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)
+train10 <- ts(itsmr::smooth.fft(tail(series.ts, 36), .10), start = decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)
+
+if(chosen.model == 1){fit <- ets(train)}
+if(chosen.model == 2){fit <- stl(train, s.window = "periodic", t.window = 7)}
+if(chosen.model == 3){fit <- tbats(train)}
+if(chosen.model == 4){fit <- stlf(train)}
+if(chosen.model == 5){
+  fit1 <- tslm(train ~ trend + season)
+  fcast1 <- forecast(fit1, h = 6)
+ 
+  fit2 <- auto.arima(fit1$residuals)
+  fcast2 <- forecast(fit2, h = 6)
+  
+  y <- as.numeric(fcast1$mean)
+  x <- as.numeric(fcast2$mean)
+  fcast <- x + y
+  upper80s <- fcast1$upper[[1]]
+  upper95s <- fcast1$upper[[2]]
+  lower80s <- fcast1$lower[[1]]
+  lower95s <- fcast1$lower[[2]]
+  }
+if(chosen.model == 6){fit <- naive(train)}
+if(chosen.model == 7){fit <- snaive(train)}
+if(chosen.model == 8){fit <- rwf(train, drift = TRUE)}
+if(chosen.model == 9){fit <- meanf(train)}
+if(chosen.model == 10){fit <- ets(train25)}
+if(chosen.model == 11){fit <- stl(train25, s.window = "periodic", t.window = 7)}
+if(chosen.model == 12){fit <- tbats(train25)}
+if(chosen.model == 13){fit <- stlf(train25)}
+if(chosen.model == 14){
+  fit1 <- tslm(train25 ~ trend + season)
+  fcast1 <- forecast(fit1, h = 6)
+ 
+  fit2 <- auto.arima(fit1$residuals)
+  fcast2 <- forecast(fit2, h = 6)
+  
+  y <- as.numeric(fcast1$mean)
+  x <- as.numeric(fcast2$mean)
+  fcast <- x + y
+  upper80s <- fcast1$upper[[1]]
+  upper95s <- fcast1$upper[[2]]
+  lower80s <- fcast1$lower[[1]]
+  lower95s <- fcast1$lower[[2]]
+  }
+if(chosen.model == 15){fit <- naive(train25)}
+if(chosen.model == 16){fit <- snaive(train25)}
+if(chosen.model == 17){fit <- rwf(train25, drift = TRUE)}
+if(chosen.model == 18){fit <- meanf(train25)}
+if(chosen.model == 19){fit <- ets(train10)}
+if(chosen.model == 20){fit <- stl(train10, s.window = "periodic", t.window = 7)}
+if(chosen.model == 21){fit <- tbats(train10)}
+if(chosen.model == 22){fit <- stlf(train10)}
+if(chosen.model == 23){
+  fit1 <- tslm(train10 ~ trend + season)
+  fcast1 <- forecast(fit1, h = 6)
+ 
+  fit2 <- auto.arima(fit1$residuals)
+  fcast2 <- forecast(fit2, h = 6)
+  
+  y <- as.numeric(fcast1$mean)
+  x <- as.numeric(fcast2$mean)
+  fcast <- x + y
+  upper80s <- fcast1$upper[[1]]
+  upper95s <- fcast1$upper[[2]]
+  lower80s <- fcast1$lower[[1]]
+  lower95s <- fcast1$lower[[2]]
+  }
+if(chosen.model == 24){fit <- naive(train10)}
+if(chosen.model == 25){fit <- snaive(train10)}
+if(chosen.model == 26){fit <- rwf(train10, drift = TRUE)}
+if(chosen.model == 27){fit <- meanf(train10)}
+
+fcast <- forecast(fit, h = 6)
+forecasts <- as.numeric(fcast$mean) * reverse_adj
+upper80s <- as.numeric(fcast$upper[, 1]) * reverse_adj
+upper95s <- as.numeric(fcast$upper[, 2]) * reverse_adj
+lower80s <- as.numeric(fcast$lower[, 1]) * reverse_adj
+lower95s <- as.numeric(fcast$lower[, 2]) * reverse_adj
+
+fdf <- data.frame(fcast = forecasts,
+                  upper80 = upper80s,
+                  upper95 = upper95s,
+                  lower80 = lower80s,
+                  lower95 = lower95s)
+
+save.this <- data.frame(time = tail(monthly$date, 1), 
+                        model = modelnames[chosen.model], 
+                        forecast = fdf$fcast[1],
+                        upper80 = fdf$upper80[1],
+                        upper95 = fdf$upper95[1],
+                        lower80 = fdf$lower80[1],
+                        lower95 = fdf$lower95[1])
+
+# Save to file for historical review
+write.table(save.this, file = "histories/monthly_red.csv", sep = ",", row.names = FALSE, col.names = FALSE)
+
 ```
 
+```{r monthly_red_fig, fig.align="center", echo = FALSE}
+ggplot(data = fdf, aes(x = seq.Date(from = tail(monthly_real$date, 1), to = tail(monthly_real$date, 1) + months(5), by = "month"), y = fcast)) + 
+  geom_line() + 
+  geom_line(data = head(monthly_real, -1), aes(x = date, y = red)) +
+  geom_ribbon(data = fdf, aes(ymin = lower80, ymax = upper80), alpha = 0.3) +
+  geom_ribbon(data = fdf, aes(ymin = lower95, ymax = upper95), alpha = 0.2, fill = "blue") +
+  geom_segment(x = tail(monthly_real$date, 2)[1], y = tail(monthly_real$red, 2)[1], xend = tail(monthly_real$date, 1), yend = head(fdf$fcast, 1), color = "black", linetype = "dashed") +
+  labs(title = "All red cell products",
+       subtitle = paste0("Best performing model of the previous year: ", modelnames[chosen.model]),
+       x = "Time",
+       y = "Units per month") +
+  theme_minimal()
+```
+
+<style>
+div.summary { background-color:#e6f0ff; border-radius: 5px; padding: 20px; font-size: 25px;}
+</style>
+<div class = "summary">
+
+Next month: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.`
+
+</div>
+
+### By type
+```{r monthly_historical_errors_Ominus, message = FALSE, warning = FALSE, echo = FALSE, results = FALSE}
+# Define the series to be used
+# We want to use 4 years of data. 3 years for the width of the rolling window and we'll let that run for a year.
+segment <- head(tail(monthly$Ominus, 49), 48)
+beginning <- head(tail(monthly$date, 49), 1)
+series.ts <- ts(segment, start = decimal_date(beginning), frequency = 12)
+
+############################
+# ETS
+############################
+capes <- c()
+# Create progress bar
+cat("\nRUNNING ETS\n")
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(series.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+  # Fit
+  fit <- ets(train)
+  
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+ets.capes <- capes
+
+############################
+# STL
+############################
+capes <- c()
+# Create progress bar
+cat("\nRUNNING STL\n")
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(series.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+  # Fit
+  fit <- stl(train, s.window = "periodic", t.window = 7)
+  
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+stl.capes <- capes
+
+############################
+# TBATS
+############################
+capes <- c()
+# Create progress bar
+cat("\nRUNNING TBATS\n")
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(series.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+  # Fit
+  fit <- tbats(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+tbats.capes <- capes
+
+############################
+# STLF
+############################
+capes <- c()
+# Create progress bar
+cat("\nRUNNING STLF\n")
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(series.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+  # Fit
+  fit <- stlf(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+stlf.capes <- capes
+
+############################
+# LMx2
+############################
+capes <- c()
+cat("\nRUNNING LMx2\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(series.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+  
+  # Fit & Forecast
+  fit1 <- tslm(train ~ trend + season)
+  fcast1 <- forecast(fit1, h = 1)
+ 
+  fit2 <- auto.arima(fit1$residuals)
+  fcast2 <- forecast(fit2, h = 1)
+  
+  y <- as.numeric(fcast1$mean)
+  x <- as.numeric(fcast2$mean)
+  fcast <- x + y
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+lmx2.capes <- capes
+
+############################
+# NAIVE
+############################
+capes <- c()
+cat("\nRUNNING NAIVE\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(series.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+  
+  # Fit
+  fit <- naive(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+naive.capes <- capes
+
+############################
+# SNAIVE
+############################
+capes <- c()
+cat("\nRUNNING SNAIVE\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(series.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- snaive(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+snaive.capes <- capes
+
+############################
+# RWF
+############################
+capes <- c()
+cat("\nRUNNING RWF\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(series.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- rwf(train, drift = TRUE)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+rwf.capes <- capes
+
+############################
+# MEANF
+############################
+capes <- c()
+cat("\nRUNNING MEANF\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(series.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- meanf(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+meanf.capes <- capes
+
+############################
+# Smooth .25 ETS
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH ETS\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .25), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- ets(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smthets.capes <- capes
+
+############################
+# Smooth .25 STL
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH STL\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .25), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- stl(train, s.window = "periodic", t.window = 7)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smthstl.capes <- capes
+
+############################
+# Smooth .25 TBATS
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH TBATS\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .25), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- tbats(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smthtbats.capes <- capes
+
+############################
+# Smooth .25 STLF
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH STLF\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .25), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- stlf(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smthstlf.capes <- capes
+
+############################
+# Smooth .25 LMx2
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH LMx2\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .25), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit & Forecast
+  fit1 <- tslm(train ~ trend + season)
+  fcast1 <- forecast(fit1, h = 1)
+ 
+  fit2 <- auto.arima(fit1$residuals)
+  fcast2 <- forecast(fit2, h = 1)
+  
+  y <- as.numeric(fcast1$mean)
+  x <- as.numeric(fcast2$mean)
+  fcast <- x + y
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smthlmx2.capes <- capes
+
+############################
+# Smooth .25 NAIVE
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH NAIVE\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .25), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+  
+  # Fit
+  fit <- naive(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smthnaive.capes <- capes
+
+############################
+# Smooth .25 SNAIVE
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH SNAIVE\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .25), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- snaive(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smthsnaive.capes <- capes
+
+############################
+# Smooth .25 RWF
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH RWF\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .25), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- rwf(train, drift = TRUE)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smthrwf.capes <- capes
+
+############################
+# Smooth .25 MEANF
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH MEANF\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .25), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- meanf(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smthmeanf.capes <- capes
+
+############################
+# Smooth .10 ETS
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH .10 ETS\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .10), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- ets(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smth10ets.capes <- capes
+
+############################
+# Smooth .10 STL
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH .10 STL\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .10), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- stl(train, s.window = "periodic", t.window = 7)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smth10stl.capes <- capes
+
+############################
+# Smooth .10 TBATS
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH .10 TBATS\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .10), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- tbats(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smth10tbats.capes <- capes
+
+############################
+# Smooth .10 STLF
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH .10 STLF\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .10), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- stlf(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smth10stlf.capes <- capes
+
+############################
+# Smooth .10 LMx2
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH .10 LMx2\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .10), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit & Forecast
+  fit1 <- tslm(train ~ trend + season)
+  fcast1 <- forecast(fit1, h = 1)
+ 
+  fit2 <- auto.arima(fit1$residuals)
+  fcast2 <- forecast(fit2, h = 1)
+  
+  y <- as.numeric(fcast1$mean)
+  x <- as.numeric(fcast2$mean)
+  fcast <- x + y
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smth10lmx2.capes <- capes
+
+############################
+# Smooth .10 NAIVE
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH .10 NAIVE\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .10), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+  
+  # Fit
+  fit <- naive(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smth10naive.capes <- capes
+
+############################
+# Smooth .10 SNAIVE
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH .10 SNAIVE\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .10), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- snaive(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smth10snaive.capes <- capes
+
+############################
+# Smooth .10 RWF
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH .10 RWF\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .10), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- rwf(train, drift = TRUE)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smth10rwf.capes <- capes
+
+############################
+# Smooth .10 MEANF
+############################
+capes <- c()
+cat("\nRUNNING SMOOTH .10 MEANF\n")
+# Create progress bar
+pb <- txtProgressBar(min = 1, max = length(series.ts) - 37, style = 3)
+for(i in seq(length(series.ts) - 37)){
+  # Define training and testing set as ROLLING WINDOW
+  train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .10), 
+              start = decimal_date(beginning), 
+              frequency = 12)
+  test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+  # Fit
+  fit <- meanf(train)
+  # Forecast 1 step (week) ahead
+  fcast <- forecast(fit, h = 1)
+  
+  # Calculate errors
+  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+  
+  # Save errors
+  capes <- c(capes, cape)
+  
+  setTxtProgressBar(pb, i) # Update progress bar
+}
+close(pb) # Close progress bar
+
+smth10meanf.capes <- capes
+
+m <- matrix(c(ets.capes, stl.capes, tbats.capes, stlf.capes, lmx2.capes, 
+              naive.capes, snaive.capes, rwf.capes, meanf.capes,
+              smthets.capes, smthstl.capes, smthtbats.capes, smthstlf.capes, 
+              smthlmx2.capes, smthnaive.capes, smthsnaive.capes, smthrwf.capes, smthmeanf.capes,
+              smth10ets.capes, smth10stl.capes, smth10tbats.capes, smth10stlf.capes, 
+              smth10lmx2.capes, smth10naive.capes, smth10snaive.capes, smth10rwf.capes, smth10meanf.capes),
+            ncol = 27,
+            byrow = TRUE)
+
+modelnames <- c("ETS", "STL", "TBATS", "STLF", "LMx2", "NAIVE", "SNAIVE", "RWF", "MEANF",
+                "ETS.25", "STL.25", "TBATS.25", "STLF.25", "LMx2.25", "NAIVE.25", "SNAIVE.25", "RWF.25", "MEANF.25",
+                "ETS.10", "STL.10", "TBATS.10", "STLF.10", "LMx2.10", "NAIVE.10", "SNAIVE.10", "RWF.10", "MEANF.10")
+colnames(m) <- modelnames
+
+mdf <- as.data.frame(m)
+
+chosen.model <- which.min(colMeans(mdf))[[1]]
+
+# Actual forecasts if this model chosen
+train <- ts(tail(series.ts, 36), start = decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)
+train25 <- ts(itsmr::smooth.fft(tail(series.ts, 36), .25), start = decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)
+train10 <- ts(itsmr::smooth.fft(tail(series.ts, 36), .10), start = decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)
+
+if(chosen.model == 1){fit <- ets(train)}
+if(chosen.model == 2){fit <- stl(train, s.window = "periodic", t.window = 7)}
+if(chosen.model == 3){fit <- tbats(train)}
+if(chosen.model == 4){fit <- stlf(train)}
+if(chosen.model == 5){
+  fit1 <- tslm(train ~ trend + season)
+  fcast1 <- forecast(fit1, h = 6)
+ 
+  fit2 <- auto.arima(fit1$residuals)
+  fcast2 <- forecast(fit2, h = 6)
+  
+  y <- as.numeric(fcast1$mean)
+  x <- as.numeric(fcast2$mean)
+  fcast <- x + y
+  upper80s <- fcast1$upper[[1]]
+  upper95s <- fcast1$upper[[2]]
+  lower80s <- fcast1$lower[[1]]
+  lower95s <- fcast1$lower[[2]]
+  }
+if(chosen.model == 6){fit <- naive(train)}
+if(chosen.model == 7){fit <- snaive(train)}
+if(chosen.model == 8){fit <- rwf(train, drift = TRUE)}
+if(chosen.model == 9){fit <- meanf(train)}
+if(chosen.model == 10){fit <- ets(train25)}
+if(chosen.model == 11){fit <- stl(train25, s.window = "periodic", t.window = 7)}
+if(chosen.model == 12){fit <- tbats(train25)}
+if(chosen.model == 13){fit <- stlf(train25)}
+if(chosen.model == 14){
+  fit1 <- tslm(train25 ~ trend + season)
+  fcast1 <- forecast(fit1, h = 6)
+ 
+  fit2 <- auto.arima(fit1$residuals)
+  fcast2 <- forecast(fit2, h = 6)
+  
+  y <- as.numeric(fcast1$mean)
+  x <- as.numeric(fcast2$mean)
+  fcast <- x + y
+  upper80s <- fcast1$upper[[1]]
+  upper95s <- fcast1$upper[[2]]
+  lower80s <- fcast1$lower[[1]]
+  lower95s <- fcast1$lower[[2]]
+  }
+if(chosen.model == 15){fit <- naive(train25)}
+if(chosen.model == 16){fit <- snaive(train25)}
+if(chosen.model == 17){fit <- rwf(train25, drift = TRUE)}
+if(chosen.model == 18){fit <- meanf(train25)}
+if(chosen.model == 19){fit <- ets(train10)}
+if(chosen.model == 20){fit <- stl(train10, s.window = "periodic", t.window = 7)}
+if(chosen.model == 21){fit <- tbats(train10)}
+if(chosen.model == 22){fit <- stlf(train10)}
+if(chosen.model == 23){
+  fit1 <- tslm(train10 ~ trend + season)
+  fcast1 <- forecast(fit1, h = 6)
+ 
+  fit2 <- auto.arima(fit1$residuals)
+  fcast2 <- forecast(fit2, h = 6)
+  
+  y <- as.numeric(fcast1$mean)
+  x <- as.numeric(fcast2$mean)
+  fcast <- x + y
+  upper80s <- fcast1$upper[[1]]
+  upper95s <- fcast1$upper[[2]]
+  lower80s <- fcast1$lower[[1]]
+  lower95s <- fcast1$lower[[2]]
+  }
+if(chosen.model == 24){fit <- naive(train10)}
+if(chosen.model == 25){fit <- snaive(train10)}
+if(chosen.model == 26){fit <- rwf(train10, drift = TRUE)}
+if(chosen.model == 27){fit <- meanf(train10)}
+
+fcast <- forecast(fit, h = 6)
+forecasts <- as.numeric(fcast$mean) * reverse_adj
+upper80s <- as.numeric(fcast$upper[, 1]) * reverse_adj
+upper95s <- as.numeric(fcast$upper[, 2]) * reverse_adj
+lower80s <- as.numeric(fcast$lower[, 1]) * reverse_adj
+lower95s <- as.numeric(fcast$lower[, 2]) * reverse_adj
+
+fdf <- data.frame(fcast = forecasts,
+                  upper80 = upper80s,
+                  upper95 = upper95s,
+                  lower80 = lower80s,
+                  lower95 = lower95s)
+
+```
+
+```{r monthly_Ominus_fig, fig.align="center", echo = FALSE}
+ggplot(data = fdf, aes(x = seq.Date(from = tail(monthly_real$date, 1), to = tail(monthly_real$date, 1) + months(5), by = "month"), y = fcast)) + 
+  geom_line() + 
+  geom_line(data = head(monthly_real, -1), aes(x = date, y = Ominus)) +
+  geom_ribbon(data = fdf, aes(ymin = lower80, ymax = upper80), alpha = 0.3) +
+  geom_ribbon(data = fdf, aes(ymin = lower95, ymax = upper95), alpha = 0.2, fill = "blue") +
+  geom_segment(x = tail(monthly_real$date, 2)[1], y = tail(monthly_real$Ominus, 2)[1], xend = tail(monthly_real$date, 1), yend = head(fdf$fcast, 1), color = "black", linetype = "dashed") +
+  labs(title = "O-",
+       subtitle = paste0("Best performing model of the previous year: ", modelnames[chosen.model]),
+       x = "Time",
+       y = "Units per day") +
+  theme_minimal()
+```
+
+<style>
+div.summary { background-color:#e6f0ff; border-radius: 5px; padding: 20px; font-size: 25px;}
+</style>
+<div class = "summary">
+
+Next month: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.`
+
+</div>
+
+### Platelets
+
+
+
+
+
+
+
+## Model history {.tabset .tabset-fade .tabset-pills}
+
+### All red
+```{r red_history, echo = FALSE}
+# Load history
+history <- read.csv("histories/monthly_red.csv", header = TRUE)
+
+ggplot(data = history, aes(x = as.Date(time), y = forecast), label = model) +
+  geom_line(color = "red") +
+  geom_line(data = head(monthly_real, -1), aes(x = date, y = red)) +
+  theme_minimal() +
+  labs(title = "Entire forecast history",
+       subtitle = paste0("Mean error: ", 
+                         round(100*abs(mean((head(tail(monthly_real$red, 19), 18) - history$forecast) / head(tail(monthly_real$red, 19), 18))), 2), 
+                         "%"),
+       x = "Time",
+       y = "Units per month") +
+  annotate(geom = "text", x = as.Date(history$time), y = 14300, label = history$model, size = 2.5, angle = 90)
+  
+
+```
 
 ### By blood type
 ```{r, echo = FALSE}
@@ -531,9 +2568,6 @@ ggplot(data = head(monthly, -1), aes(x = date, y = plat)) +
        y = "Blood bags")
 ```
 
-### Plasma
-TO BE IMPLEMENTED
-
 ## Historical weekly demand {.tabset .tabset-fade .tabset-pills}
 
 ### All red
@@ -550,7 +2584,6 @@ ggplot(data = head(weekly, -1), aes(x = startdate, y = red)) +
        x = "Date",
        y = "Blood bags")
 ```
-
 
 ### By blood type
 ```{r, echo = FALSE}
@@ -648,1012 +2681,4 @@ ggplot(data = head(weekly, -1), aes(x = startdate, y = plat)) +
        y = "Blood bags")
 ```
 
-### Plasma
-TO BE IMPLEMENTED
 
-
-## Monthly forecast {.tabset .tabset-fade .tabset-pills}
-
-### All red
-```{r historical_errors, message = FALSE, warning = FALSE, echo = FALSE, results = FALSE}
-# Define the series to be used
-# We want to use 4 years of data. 3 years for the width of the rolling window and we'll let that run for a year.
-segment <- head(tail(monthly$red, 49), 48)
-beginning <- head(tail(monthly$date, 49), 1)
-red.ts <- ts(segment, start = decimal_date(beginning), frequency = 12)
-
-############################
-# ETS
-############################
-capes <- c()
-# Create progress bar
-cat("\nRUNNING ETS\n")
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(red.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-  # Fit
-  fit <- ets(train)
-  
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-ets.capes <- capes
-
-############################
-# STL
-############################
-capes <- c()
-# Create progress bar
-cat("\nRUNNING STL\n")
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(red.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-  # Fit
-  fit <- stl(train, s.window = "periodic", t.window = 7)
-  
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-stl.capes <- capes
-
-############################
-# TBATS
-############################
-capes <- c()
-# Create progress bar
-cat("\nRUNNING TBATS\n")
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(red.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-  # Fit
-  fit <- tbats(train)
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-tbats.capes <- capes
-
-############################
-# STLF
-############################
-capes <- c()
-# Create progress bar
-cat("\nRUNNING STLF\n")
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(red.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-  # Fit
-  fit <- stlf(train)
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-stlf.capes <- capes
-
-############################
-# LMx2
-############################
-capes <- c()
-cat("\nRUNNING LMx2\n")
-# Create progress bar
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(red.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-  
-  # Fit & Forecast
-  fit1 <- tslm(train ~ trend + season)
-  fcast1 <- forecast(fit1, h = 1)
- 
-  fit2 <- auto.arima(fit1$residuals)
-  fcast2 <- forecast(fit2, h = 1)
-  
-  y <- as.numeric(fcast1$mean)
-  x <- as.numeric(fcast2$mean)
-  fcast <- x + y
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-lmx2.capes <- capes
-
-############################
-# NAIVE
-############################
-capes <- c()
-cat("\nRUNNING NAIVE\n")
-# Create progress bar
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(red.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-  
-  # Fit
-  fit <- naive(train)
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-naive.capes <- capes
-
-############################
-# SNAIVE
-############################
-capes <- c()
-cat("\nRUNNING SNAIVE\n")
-# Create progress bar
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(red.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-
-  # Fit
-  fit <- snaive(train)
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-snaive.capes <- capes
-
-############################
-# RWF
-############################
-capes <- c()
-cat("\nRUNNING RWF\n")
-# Create progress bar
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(red.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-
-  # Fit
-  fit <- rwf(train, drift = TRUE)
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-rwf.capes <- capes
-
-############################
-# MEANF
-############################
-capes <- c()
-cat("\nRUNNING MEANF\n")
-# Create progress bar
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(red.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-
-  # Fit
-  fit <- meanf(train)
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-meanf.capes <- capes
-
-############################
-# Smooth .25 ETS
-############################
-capes <- c()
-cat("\nRUNNING SMOOTH ETS\n")
-# Create progress bar
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(itsmr::smooth.fft(red.ts[(1 + i):(36 + i)], .25), 
-              start = decimal_date(beginning), 
-              frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-
-  # Fit
-  fit <- ets(train)
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-smthets.capes <- capes
-
-############################
-# Smooth .25 STL
-############################
-capes <- c()
-cat("\nRUNNING SMOOTH STL\n")
-# Create progress bar
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(itsmr::smooth.fft(red.ts[(1 + i):(36 + i)], .25), 
-              start = decimal_date(beginning), 
-              frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-
-  # Fit
-  fit <- stl(train, s.window = "periodic", t.window = 7)
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-smthstl.capes <- capes
-
-############################
-# Smooth .25 TBATS
-############################
-capes <- c()
-cat("\nRUNNING SMOOTH TBATS\n")
-# Create progress bar
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(itsmr::smooth.fft(red.ts[(1 + i):(36 + i)], .25), 
-              start = decimal_date(beginning), 
-              frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-
-  # Fit
-  fit <- tbats(train)
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-smthtbats.capes <- capes
-
-############################
-# Smooth .25 STLF
-############################
-capes <- c()
-cat("\nRUNNING SMOOTH STLF\n")
-# Create progress bar
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(itsmr::smooth.fft(red.ts[(1 + i):(36 + i)], .25), 
-              start = decimal_date(beginning), 
-              frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-
-  # Fit
-  fit <- stlf(train)
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-smthstlf.capes <- capes
-
-############################
-# Smooth .25 LMx2
-############################
-capes <- c()
-cat("\nRUNNING SMOOTH LMx2\n")
-# Create progress bar
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(itsmr::smooth.fft(red.ts[(1 + i):(36 + i)], .25), 
-              start = decimal_date(beginning), 
-              frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-
-  # Fit & Forecast
-  fit1 <- tslm(train ~ trend + season)
-  fcast1 <- forecast(fit1, h = 1)
- 
-  fit2 <- auto.arima(fit1$residuals)
-  fcast2 <- forecast(fit2, h = 1)
-  
-  y <- as.numeric(fcast1$mean)
-  x <- as.numeric(fcast2$mean)
-  fcast <- x + y
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-smthlmx2.capes <- capes
-
-############################
-# Smooth .25 NAIVE
-############################
-capes <- c()
-cat("\nRUNNING SMOOTH NAIVE\n")
-# Create progress bar
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(itsmr::smooth.fft(red.ts[(1 + i):(36 + i)], .25), 
-              start = decimal_date(beginning), 
-              frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-  
-  # Fit
-  fit <- naive(train)
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-smthnaive.capes <- capes
-
-############################
-# Smooth .25 SNAIVE
-############################
-capes <- c()
-cat("\nRUNNING SMOOTH SNAIVE\n")
-# Create progress bar
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(itsmr::smooth.fft(red.ts[(1 + i):(36 + i)], .25), 
-              start = decimal_date(beginning), 
-              frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-
-  # Fit
-  fit <- snaive(train)
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-smthsnaive.capes <- capes
-
-############################
-# Smooth .25 RWF
-############################
-capes <- c()
-cat("\nRUNNING SMOOTH RWF\n")
-# Create progress bar
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(itsmr::smooth.fft(red.ts[(1 + i):(36 + i)], .25), 
-              start = decimal_date(beginning), 
-              frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-
-  # Fit
-  fit <- rwf(train, drift = TRUE)
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-smthrwf.capes <- capes
-
-############################
-# Smooth .25 MEANF
-############################
-capes <- c()
-cat("\nRUNNING SMOOTH MEANF\n")
-# Create progress bar
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(itsmr::smooth.fft(red.ts[(1 + i):(36 + i)], .25), 
-              start = decimal_date(beginning), 
-              frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-
-  # Fit
-  fit <- meanf(train)
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-smthmeanf.capes <- capes
-
-############################
-# Smooth .10 ETS
-############################
-capes <- c()
-cat("\nRUNNING SMOOTH .10 ETS\n")
-# Create progress bar
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(itsmr::smooth.fft(red.ts[(1 + i):(36 + i)], .10), 
-              start = decimal_date(beginning), 
-              frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-
-  # Fit
-  fit <- ets(train)
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-smth10ets.capes <- capes
-
-############################
-# Smooth .10 STL
-############################
-capes <- c()
-cat("\nRUNNING SMOOTH .10 STL\n")
-# Create progress bar
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(itsmr::smooth.fft(red.ts[(1 + i):(36 + i)], .10), 
-              start = decimal_date(beginning), 
-              frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-
-  # Fit
-  fit <- stl(train, s.window = "periodic", t.window = 7)
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-smth10stl.capes <- capes
-
-############################
-# Smooth .10 TBATS
-############################
-capes <- c()
-cat("\nRUNNING SMOOTH .10 TBATS\n")
-# Create progress bar
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(itsmr::smooth.fft(red.ts[(1 + i):(36 + i)], .10), 
-              start = decimal_date(beginning), 
-              frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-
-  # Fit
-  fit <- tbats(train)
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-smth10tbats.capes <- capes
-
-############################
-# Smooth .10 STLF
-############################
-capes <- c()
-cat("\nRUNNING SMOOTH .10 STLF\n")
-# Create progress bar
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(itsmr::smooth.fft(red.ts[(1 + i):(36 + i)], .10), 
-              start = decimal_date(beginning), 
-              frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-
-  # Fit
-  fit <- stlf(train)
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-smth10stlf.capes <- capes
-
-############################
-# Smooth .10 LMx2
-############################
-capes <- c()
-cat("\nRUNNING SMOOTH .10 LMx2\n")
-# Create progress bar
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(itsmr::smooth.fft(red.ts[(1 + i):(36 + i)], .10), 
-              start = decimal_date(beginning), 
-              frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-
-  # Fit & Forecast
-  fit1 <- tslm(train ~ trend + season)
-  fcast1 <- forecast(fit1, h = 1)
- 
-  fit2 <- auto.arima(fit1$residuals)
-  fcast2 <- forecast(fit2, h = 1)
-  
-  y <- as.numeric(fcast1$mean)
-  x <- as.numeric(fcast2$mean)
-  fcast <- x + y
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-smth10lmx2.capes <- capes
-
-############################
-# Smooth .10 NAIVE
-############################
-capes <- c()
-cat("\nRUNNING SMOOTH .10 NAIVE\n")
-# Create progress bar
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(itsmr::smooth.fft(red.ts[(1 + i):(36 + i)], .10), 
-              start = decimal_date(beginning), 
-              frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-  
-  # Fit
-  fit <- naive(train)
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-smth10naive.capes <- capes
-
-############################
-# Smooth .10 SNAIVE
-############################
-capes <- c()
-cat("\nRUNNING SMOOTH .10 SNAIVE\n")
-# Create progress bar
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(itsmr::smooth.fft(red.ts[(1 + i):(36 + i)], .10), 
-              start = decimal_date(beginning), 
-              frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-
-  # Fit
-  fit <- snaive(train)
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-smth10snaive.capes <- capes
-
-############################
-# Smooth .10 RWF
-############################
-capes <- c()
-cat("\nRUNNING SMOOTH .10 RWF\n")
-# Create progress bar
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(itsmr::smooth.fft(red.ts[(1 + i):(36 + i)], .10), 
-              start = decimal_date(beginning), 
-              frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-
-  # Fit
-  fit <- rwf(train, drift = TRUE)
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-smth10rwf.capes <- capes
-
-############################
-# Smooth .10 MEANF
-############################
-capes <- c()
-cat("\nRUNNING SMOOTH .10 MEANF\n")
-# Create progress bar
-pb <- txtProgressBar(min = 1, max = length(red.ts) - 37, style = 3)
-for(i in seq(length(red.ts) - 37)){
-  # Define training and testing set as ROLLING WINDOW
-  train <- ts(itsmr::smooth.fft(red.ts[(1 + i):(36 + i)], .10), 
-              start = decimal_date(beginning), 
-              frequency = 12)
-  test <- ts(red.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-
-  # Fit
-  fit <- meanf(train)
-  # Forecast 1 step (week) ahead
-  fcast <- forecast(fit, h = 1)
-  
-  # Calculate errors
-  e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
-  cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
-  
-  # Save errors
-  capes <- c(capes, cape)
-  
-  setTxtProgressBar(pb, i) # Update progress bar
-}
-close(pb) # Close progress bar
-
-smth10meanf.capes <- capes
-
-m <- matrix(c(ets.capes, stl.capes, tbats.capes, stlf.capes, lmx2.capes, 
-              naive.capes, snaive.capes, rwf.capes, meanf.capes,
-              smthets.capes, smthstl.capes, smthtbats.capes, smthstlf.capes, 
-              smthlmx2.capes, smthnaive.capes, smthsnaive.capes, smthrwf.capes, smthmeanf.capes,
-              smth10ets.capes, smth10stl.capes, smth10tbats.capes, smth10stlf.capes, 
-              smth10lmx2.capes, smth10naive.capes, smth10snaive.capes, smth10rwf.capes, smth10meanf.capes),
-            ncol = 27,
-            byrow = TRUE)
-
-modelnames <- c("ETS", "STL", "TBATS", "STLF", "LMx2", "NAIVE", "SNAIVE", "RWF", "MEANF",
-                "ETS.25", "STL.25", "TBATS.25", "STLF.25", "LMx2.25", "NAIVE.25", "SNAIVE.25", "RWF.25", "MEANF.25",
-                "ETS.10", "STL.10", "TBATS.10", "STLF.10", "LMx2.10", "NAIVE.10", "SNAIVE.10", "RWF.10", "MEANF.10")
-colnames(m) <- modelnames
-
-mdf <- as.data.frame(m)
-
-chosen.model <- which.min(colMeans(mdf))[[1]]
-
-# Actual forecasts if this model chosen
-train <- ts(tail(red.ts, 36), start = decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)
-train25 <- ts(itsmr::smooth.fft(tail(red.ts, 36), .25), start = decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)
-train10 <- ts(itsmr::smooth.fft(tail(red.ts, 36), .10), start = decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)
-
-if(chosen.model == 1){fit <- ets(train)}
-if(chosen.model == 2){fit <- stl(train, s.window = "periodic", t.window = 7)}
-if(chosen.model == 3){fit <- tbats(train)}
-if(chosen.model == 4){fit <- stlf(train)}
-if(chosen.model == 5){
-  fit1 <- tslm(train ~ trend + season)
-  fcast1 <- forecast(fit1, h = 6)
- 
-  fit2 <- auto.arima(fit1$residuals)
-  fcast2 <- forecast(fit2, h = 6)
-  
-  y <- as.numeric(fcast1$mean)
-  x <- as.numeric(fcast2$mean)
-  fcast <- x + y
-  upper80s <- fcast1$upper[[1]]
-  upper95s <- fcast1$upper[[2]]
-  lower80s <- fcast1$lower[[1]]
-  lower95s <- fcast1$lower[[2]]
-  }
-if(chosen.model == 6){fit <- naive(train)}
-if(chosen.model == 7){fit <- snaive(train)}
-if(chosen.model == 8){fit <- rwf(train, drift = TRUE)}
-if(chosen.model == 9){fit <- meanf(train)}
-if(chosen.model == 10){fit <- ets(train25)}
-if(chosen.model == 11){fit <- stl(train25, s.window = "periodic", t.window = 7)}
-if(chosen.model == 12){fit <- tbats(train25)}
-if(chosen.model == 13){fit <- stlf(train25)}
-if(chosen.model == 14){
-  fit1 <- tslm(train25 ~ trend + season)
-  fcast1 <- forecast(fit1, h = 6)
- 
-  fit2 <- auto.arima(fit1$residuals)
-  fcast2 <- forecast(fit2, h = 6)
-  
-  y <- as.numeric(fcast1$mean)
-  x <- as.numeric(fcast2$mean)
-  fcast <- x + y
-  upper80s <- fcast1$upper[[1]]
-  upper95s <- fcast1$upper[[2]]
-  lower80s <- fcast1$lower[[1]]
-  lower95s <- fcast1$lower[[2]]
-  }
-if(chosen.model == 15){fit <- naive(train25)}
-if(chosen.model == 16){fit <- snaive(train25)}
-if(chosen.model == 17){fit <- rwf(train25, drift = TRUE)}
-if(chosen.model == 18){fit <- meanf(train25)}
-if(chosen.model == 19){fit <- ets(train10)}
-if(chosen.model == 20){fit <- stl(train10, s.window = "periodic", t.window = 7)}
-if(chosen.model == 21){fit <- tbats(train10)}
-if(chosen.model == 22){fit <- stlf(train10)}
-if(chosen.model == 23){
-  fit1 <- tslm(train10 ~ trend + season)
-  fcast1 <- forecast(fit1, h = 6)
- 
-  fit2 <- auto.arima(fit1$residuals)
-  fcast2 <- forecast(fit2, h = 6)
-  
-  y <- as.numeric(fcast1$mean)
-  x <- as.numeric(fcast2$mean)
-  fcast <- x + y
-  upper80s <- fcast1$upper[[1]]
-  upper95s <- fcast1$upper[[2]]
-  lower80s <- fcast1$lower[[1]]
-  lower95s <- fcast1$lower[[2]]
-  }
-if(chosen.model == 24){fit <- naive(train10)}
-if(chosen.model == 25){fit <- snaive(train10)}
-if(chosen.model == 26){fit <- rwf(train10, drift = TRUE)}
-if(chosen.model == 27){fit <- meanf(train10)}
-
-fcast <- forecast(fit, h = 6)
-forecasts <- as.numeric(fcast$mean)
-upper80s <- as.numeric(fcast$upper[, 1])
-upper95s <- as.numeric(fcast$upper[, 2])
-lower80s <- as.numeric(fcast$lower[, 1])
-lower95s <- as.numeric(fcast$lower[, 2])
-
-fdf <- data.frame(fcast = forecasts,
-                  upper80 = upper80s,
-                  upper95 = upper95s,
-                  lower80 = lower80s,
-                  lower95 = lower95s)
-
-```
-
-```{r, fig.align="center", echo = FALSE}
-ggplot(data = fdf, aes(x = seq.Date(from = tail(monthly$date, 1), to = tail(monthly$date, 1) + months(5), by = "month"), y = fcast)) + 
-  geom_line() + 
-  geom_line(data = head(monthly, -1), aes(x = date, y = red)) +
-  geom_ribbon(data = fdf, aes(ymin = lower80, ymax = upper80), alpha = 0.3) +
-  geom_ribbon(data = fdf, aes(ymin = lower95, ymax = upper95), alpha = 0.2, fill = "blue") +
-  geom_segment(x = tail(monthly$date, 2)[1], y = tail(monthly$red, 2)[1], xend = tail(monthly$date, 1), yend = head(fdf$fcast, 1), color = "black", linetype = "dashed") +
-  labs(title = "6 month forecast",
-       subtitle = paste0("Best performing model of the previous year: ", modelnames[chosen.model]),
-       x = "Time",
-       y = "Units per day") +
-  theme_minimal()
-```
-
-<style>
-div.red { background-color:#DF013A; border-radius: 5px; padding: 20px;}
-</style>
-<div class = "red">
-
-```{r}
-paste0("FORECASTED DEMAND FOR NEXT MONTH: ", fdf$fcast[1])
-```
-
-
-</div>
