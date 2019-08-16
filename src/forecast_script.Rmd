@@ -5,6 +5,18 @@ output: html_document
 ```{r setup, echo = FALSE}
 # Set working directory
 knitr::opts_knit$set(root.dir = "/home/esa/production_forecasts") # Working on Ubuntu
+
+# Colorblind palette
+# black, orange, sky blue, green,
+# yellow, blue, vermilion, purple
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", 
+                "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+# To use for fills, add
+# scale_fill_manual(values=cbbPalette)
+
+# To use for line and point colors, add
+# scale_colour_manual(values=cbbPalette)
 ```
 
 ```{r imports, message = FALSE, echo = FALSE}
@@ -18,7 +30,7 @@ library(lubridate)
 library(numbers)
 library(data.table)
 library(R.utils)
-library(ggrepel)
+library(DT)
 source("src/evalhelp.R")
 ```
 
@@ -1411,22 +1423,23 @@ save.this <- data.frame(time = tail(monthly$date, 1),
                         lower95 = fdf$lower95[1])
 
 # Save to file for historical review
-#write.table(save.this, file = "results/histories/monthly_red.csv", sep = ",", row.names = FALSE, col.names = FALSE)
+#write.table(save.this, file = "histories/monthly_red.csv", sep = ",", append = TRUE, row.names = FALSE, col.names = FALSE)
 
 ```
 
 ```{r monthly_red_fig, fig.align="center", echo = FALSE}
 ggplot(data = fdf, aes(x = seq.Date(from = tail(monthly_real$date, 1), to = tail(monthly_real$date, 1) + months(5), by = "month"), y = fcast)) + 
-  geom_line() + 
-  geom_line(data = head(monthly_real, -1), aes(x = date, y = red)) +
+  geom_line(aes(colour = "Forecast"), size = 0.8) + 
+  geom_line(data = head(monthly_real, -1), aes(x = date, y = red, colour = "Data"), size = 0.8, alpha = 0.7) +
   geom_ribbon(data = fdf, aes(ymin = lower80, ymax = upper80), alpha = 0.3) +
   geom_ribbon(data = fdf, aes(ymin = lower95, ymax = upper95), alpha = 0.2, fill = "blue") +
-  geom_segment(x = tail(monthly_real$date, 2)[1], y = tail(monthly_real$red, 2)[1], xend = tail(monthly_real$date, 1), yend = head(fdf$fcast, 1), color = "black", linetype = "dashed") +
+  geom_segment(x = tail(monthly_real$date, 2)[1], y = tail(monthly_real$red, 2)[1], xend = tail(monthly_real$date, 1), yend = head(fdf$fcast, 1), color = "#D55E00", linetype = "dashed", alpha = 0.7) +
   labs(title = "All red cell products",
        subtitle = paste0("Best performing model of the previous year: ", modelnames[chosen.model]),
-       x = "Time",
-       y = "Units per month") +
-  theme_minimal()
+       x = "",
+       y = "Units per month",
+       colour = "Series: ") +
+  theme_minimal() + theme(legend.position = "bottom", legend.margin = margin(t = -20, b = 0)) + scale_colour_manual(values = c("#D55E00", "#0072B2"))
 ```
 
 <style>
@@ -2450,24 +2463,41 @@ Next month: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND disp
 ## Model history {.tabset .tabset-fade .tabset-pills}
 
 ### All red
-```{r red_history, echo = FALSE}
+```{r red_history, fig.align = "center", echo = FALSE}
 # Load history
-history <- read.csv("results/histories/monthly_red.csv", header = TRUE)
+history <- read.csv("histories/monthly_red.csv", header = TRUE)
 
-ggplot(data = history, aes(x = as.Date(time), y = forecast), label = model) +
-  geom_line(color = "red") +
-  geom_line(data = head(monthly_real, -1), aes(x = date, y = red)) +
-  theme_minimal() +
-  labs(title = "Entire forecast history",
-       subtitle = paste0("Mean error: ", 
-                         round(100*abs(mean((head(tail(monthly_real$red, 19), 18) - history$forecast) / head(tail(monthly_real$red, 19), 18))), 2), 
+ggplot(data = history, aes(x = as.Date(time), y = forecast, colour = "Forecast"), label = model) +
+  geom_line(aes(colour = "Forecast"), size = 0.9, alpha = 1) +
+  geom_line(data = head(monthly_real, -1), aes(x = date, y = red, colour = "Data"), size = 0.8, alpha = 0.7) +
+  labs(title = "Red cell forecast history",
+       subtitle = paste0("Mean error: ",
+                         round(100*abs(mean((head(tail(monthly_real$red, 19), 18) - history$forecast) / head(tail(monthly_real$red, 19), 18))), 2),
                          "%"),
-       x = "Time",
-       y = "Units per month") +
-  annotate(geom = "text", x = as.Date(history$time), y = 14300, label = history$model, size = 2.5, angle = 90)
+       x = "",
+       y = "Units per month",
+       colour = "Series: ") +
+  #annotate(geom = "text", x = as.Date(history$time), y = 14300, label = history$model, size = 2.5, angle = 90) +
+  theme_minimal() + theme(legend.position = "bottom", legend.margin = margin(t = -20, b = 0)) + scale_colour_manual(values = c("#D55E00", "#0072B2"))
   
 
 ```
+```{r red_monthly_freqtable, echo = FALSE}
+model.freq <- as.data.frame(count(history$model), stringsAsFactors = FALSE); colnames(model.freq) <- c("model", "frequency")
+model.freq$model <- as.character(model.freq$model)
+
+for(name in modelnames){
+  if(!(name %in% model.freq$model)){
+    model.freq <- rbind(model.freq, list(name, 0))
+  }
+}
+
+model.freq$frequency <- round(model.freq$frequency / sum(model.freq$frequency) * 100, 2)
+model.freq <- data.frame(model.freq, row.names = 1)
+
+datatable(model.freq, rownames = TRUE, filter="top", options = list(pageLength = 9))
+```
+
 
 ### By blood type
 ```{r, echo = FALSE}
