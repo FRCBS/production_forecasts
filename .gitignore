@@ -31,3 +31,4 @@
 # Data and results
 /data/*
 /results/*
+/histories/*
