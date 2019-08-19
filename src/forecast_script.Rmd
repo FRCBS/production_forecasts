@@ -2482,18 +2482,23 @@ ggplot(data = history, aes(x = as.Date(time), y = forecast, colour = "Forecast")
   
 
 ```
+
 ```{r red_monthly_freqtable, echo = FALSE}
+# history$err <- abs((tail(head(monthly_real$red, -1), length(history$forecast)) - history$forecast) / tail(head(monthly_real$red, -1), length(history$forecast))) * 100
 model.freq <- as.data.frame(count(history$model), stringsAsFactors = FALSE); colnames(model.freq) <- c("model", "frequency")
 model.freq$model <- as.character(model.freq$model)
+# model.freq$error <- abs((tail(head(monthly_real$red, -1), length(history$forecast)) - history$forecast) / tail(head(monthly_real$red, -1), length(history$forecast))) * 100
 
 for(name in modelnames){
   if(!(name %in% model.freq$model)){
-    model.freq <- rbind(model.freq, list(name, 0))
+    model.freq <- rbind(model.freq, list(name, 0, 0))
   }
 }
 
 model.freq$frequency <- round(model.freq$frequency / sum(model.freq$frequency) * 100, 2)
 model.freq <- data.frame(model.freq, row.names = 1)
+
+
 
 datatable(model.freq, rownames = TRUE, filter="top", options = list(pageLength = 9))
 ```
