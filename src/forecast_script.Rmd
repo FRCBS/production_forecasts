@@ -2310,7 +2310,7 @@ if(file.exists("histories/weekly_ABplus.csv")){
 ```{r weekly_ABplus_fig, fig.align="center", echo = FALSE}
 ggplot(data = fdf, aes(x = seq.Date(from = tail(weekly$startdate, 1), to = tail(weekly$startdate, 1) + weeks(3), by = "week"), y = fcast)) + 
   geom_line(aes(colour = "Forecast"), size = 0.8) +
-  geom_line(data = tail(head(weekly, -1), 16), aes(x = startdate, y = Aplus, colour = "Data"), size = 0.8, alpha = 0.7) +
+  geom_line(data = tail(head(weekly, -1), 16), aes(x = startdate, y = ABplus, colour = "Data"), size = 0.8, alpha = 0.7) +
   geom_ribbon(data = fdf, aes(ymin = lower80, ymax = upper80), alpha = 0.3) +
   geom_ribbon(data = fdf, aes(ymin = lower95, ymax = upper95), alpha = 0.2, fill = "blue") +
   geom_segment(x = tail(weekly$startdate, 2)[1], y = tail(weekly$ABplus, 2)[1], xend = tail(weekly$startdate, 1), yend = head(fdf$fcast, 1), color = "#D55E00", linetype = "dashed", alpha = 0.7) +
