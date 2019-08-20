@@ -1439,7 +1439,7 @@ div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font
 </style>
 <div class = "summary">
 
-Forecast for week `r week(today() + weekss(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+Forecast for week `r week(today() + weeks(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
 
 </div>
 
@@ -1550,7 +1550,7 @@ div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font
 </style>
 <div class = "summary">
 
-Forecast for week `r week(today() + weekss(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+Forecast for week `r week(today() + weeks(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
 
 </div>
 
@@ -1661,7 +1661,7 @@ div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font
 </style>
 <div class = "summary">
 
-Forecast for week `r week(today() + weekss(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+Forecast for week `r week(today() + weeks(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
 
 </div>
 
@@ -1772,7 +1772,7 @@ div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font
 </style>
 <div class = "summary">
 
-Forecast for week `r week(today() + weekss(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+Forecast for week `r week(today() + weeks(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
 
 </div>
 
@@ -1883,7 +1883,7 @@ div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font
 </style>
 <div class = "summary">
 
-Forecast for week `r week(today() + weekss(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+Forecast for week `r week(today() + weeks(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
 
 </div>
 
@@ -1994,7 +1994,7 @@ div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font
 </style>
 <div class = "summary">
 
-Forecast for week `r week(today() + weekss(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+Forecast for week `r week(today() + weeks(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
 
 </div>
 
@@ -2105,7 +2105,7 @@ div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font
 </style>
 <div class = "summary">
 
-Forecast for week `r week(today() + weekss(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+Forecast for week `r week(today() + weeks(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
 
 </div>
 
@@ -2216,7 +2216,7 @@ div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font
 </style>
 <div class = "summary">
 
-Forecast for week `r week(today() + weekss(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+Forecast for week `r week(today() + weeks(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
 
 </div>
 
@@ -2327,7 +2327,7 @@ div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font
 </style>
 <div class = "summary">
 
-Forecast for week `r week(today() + weekss(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+Forecast for week `r week(today() + weeks(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
 
 </div>
 
@@ -2438,7 +2438,7 @@ div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font
 </style>
 <div class = "summary">
 
-Forecast for week `r week(today() + weekss(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` platelet products.
+Forecast for week `r week(today() + weeks(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` platelet products.
 
 </div>
 
