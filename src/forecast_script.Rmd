@@ -233,7 +233,7 @@ weekly <- data.frame(week = red.weekly$week,
 ```{r monthly_model_selection_red, message = FALSE, warning = FALSE, echo = FALSE, results = FALSE}
 # Define the series to be used
 # We want to use 4 years of data. 3 years for the width of the rolling window and we'll let that run for a year.
-segment <- head(tail(monthly$red, 49), 48)
+segment <- head(tail(monthly$red, 49), 48) # REMEMBER YOU CHANGED THIS FROM MONTHLY to MONTHLY_REAL
 beginning <- head(tail(monthly$date, 49), 1)
 series.ts <- ts(segment, start = decimal_date(beginning), frequency = 12)
 
@@ -299,7 +299,7 @@ save.this <- data.frame(time = tail(monthly$date, 1),
                         lower80 = fdf$lower80[1],
                         lower95 = fdf$lower95[1])
 
-# Save only if file already exists (some histories have not been initialized yet)
+#Save only if file already exists (some histories have not been initialized yet)
 if(file.exists("histories/monthly_red.csv")){
   # Do not save if forecast already exists in history
   existing.history <- read.csv("histories/monthly_red.csv")
@@ -1394,7 +1394,7 @@ chosen.model <- which.min(colMeans(mdf))[[1]]
 fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "weekly")
 
 # Prepare to save the new forecast into file
-save.this <- data.frame(time = tail(monthly$date, 1), 
+save.this <- data.frame(time = (tail(weekly$startdate, 1) + weeks(1)), 
                         model = modelnames[chosen.model], 
                         forecast = fdf$fcast[1],
                         upper80 = fdf$upper80[1],
@@ -1505,7 +1505,7 @@ chosen.model <- which.min(colMeans(mdf))[[1]]
 fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "weekly")
 
 # Prepare to save the new forecast into file
-save.this <- data.frame(time = tail(monthly$date, 1), 
+save.this <- data.frame(time = (tail(weekly$startdate, 1) + weeks(1)), 
                         model = modelnames[chosen.model], 
                         forecast = fdf$fcast[1],
                         upper80 = fdf$upper80[1],
@@ -1616,7 +1616,7 @@ chosen.model <- which.min(colMeans(mdf))[[1]]
 fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "weekly")
 
 # Prepare to save the new forecast into file
-save.this <- data.frame(time = tail(monthly$date, 1), 
+save.this <- data.frame(time = (tail(weekly$startdate, 1) + weeks(1)), 
                         model = modelnames[chosen.model], 
                         forecast = fdf$fcast[1],
                         upper80 = fdf$upper80[1],
@@ -1727,7 +1727,7 @@ chosen.model <- which.min(colMeans(mdf))[[1]]
 fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "weekly")
 
 # Prepare to save the new forecast into file
-save.this <- data.frame(time = tail(monthly$date, 1), 
+save.this <- data.frame(time = (tail(weekly$startdate, 1) + weeks(1)), 
                         model = modelnames[chosen.model], 
                         forecast = fdf$fcast[1],
                         upper80 = fdf$upper80[1],
@@ -1838,7 +1838,7 @@ chosen.model <- which.min(colMeans(mdf))[[1]]
 fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "weekly")
 
 # Prepare to save the new forecast into file
-save.this <- data.frame(time = tail(monthly$date, 1), 
+save.this <- data.frame(time = (tail(weekly$startdate, 1) + weeks(1)), 
                         model = modelnames[chosen.model], 
                         forecast = fdf$fcast[1],
                         upper80 = fdf$upper80[1],
@@ -1949,7 +1949,7 @@ chosen.model <- which.min(colMeans(mdf))[[1]]
 fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "weekly")
 
 # Prepare to save the new forecast into file
-save.this <- data.frame(time = tail(monthly$date, 1), 
+save.this <- data.frame(time = (tail(weekly$startdate, 1) + weeks(1)), 
                         model = modelnames[chosen.model], 
                         forecast = fdf$fcast[1],
                         upper80 = fdf$upper80[1],
@@ -2060,7 +2060,7 @@ chosen.model <- which.min(colMeans(mdf))[[1]]
 fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "weekly")
 
 # Prepare to save the new forecast into file
-save.this <- data.frame(time = tail(monthly$date, 1), 
+save.this <- data.frame(time = (tail(weekly$startdate, 1) + weeks(1)), 
                         model = modelnames[chosen.model], 
                         forecast = fdf$fcast[1],
                         upper80 = fdf$upper80[1],
@@ -2171,7 +2171,7 @@ chosen.model <- which.min(colMeans(mdf))[[1]]
 fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "weekly")
 
 # Prepare to save the new forecast into file
-save.this <- data.frame(time = tail(monthly$date, 1), 
+save.this <- data.frame(time = (tail(weekly$startdate, 1) + weeks(1)), 
                         model = modelnames[chosen.model], 
                         forecast = fdf$fcast[1],
                         upper80 = fdf$upper80[1],
@@ -2282,7 +2282,7 @@ chosen.model <- which.min(colMeans(mdf))[[1]]
 fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "weekly")
 
 # Prepare to save the new forecast into file
-save.this <- data.frame(time = tail(monthly$date, 1), 
+save.this <- data.frame(time = (tail(weekly$startdate, 1) + weeks(1)), 
                         model = modelnames[chosen.model], 
                         forecast = fdf$fcast[1],
                         upper80 = fdf$upper80[1],
@@ -2393,7 +2393,7 @@ chosen.model <- which.min(colMeans(mdf))[[1]]
 fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "weekly")
 
 # Prepare to save the new forecast into file
-save.this <- data.frame(time = tail(monthly$date, 1), 
+save.this <- data.frame(time = (tail(weekly$startdate, 1) + weeks(1)), 
                         model = modelnames[chosen.model], 
                         forecast = fdf$fcast[1],
                         upper80 = fdf$upper80[1],

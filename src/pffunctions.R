@@ -36,7 +36,7 @@ aggregate_weekly <- function(series){
   return(weekly)
 }
 
-find_errors <- function(segment, beginning, series.ts, method = "none", smooth = "none", freq = "monthly"){
+find_errors <- function(segment, beginning, series.ts, method = "none", smooth = "none", freq = "monthly", critical = TRUE){
   capes <- c()
   if(freq == "monthly"){
     for(i in seq(length(series.ts) - 37)){
@@ -105,7 +105,11 @@ find_errors <- function(segment, beginning, series.ts, method = "none", smooth =
         e <- as.numeric(test) - as.numeric(fcast)  # Raw error
       }
       
-      cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+      if(critical){
+        cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+      } else{
+        cape <- abs(e)/test * 100  # Non-critical APE
+      }
       
       # Save errors
       capes <- c(capes, cape)
