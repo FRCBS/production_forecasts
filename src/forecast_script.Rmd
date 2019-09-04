@@ -169,7 +169,7 @@ months <- seq(from = as.Date("2014-01-06"), to = max(distr$date), by = "month")
 
 # Adjustment series
 adj <- as.numeric(bizdays(ts(months, start = decimal_date(as.Date("2014-01-06")), frequency = 12), FinCenter = "Zurich"))
-reverse_adj <- as.numeric(bizdays(ts(seq(6), start = decimal_date(as.Date(tail(months, 1))), frequency = 12), FinCenter = "Zurich"))
+scaler <- as.numeric(bizdays(ts(1, start = decimal_date(months[length(months)]), frequency = 12), FinCenter = "Zurich"))
 
 # Create a master frame
 monthly <- data.frame(date = months,
@@ -288,16 +288,16 @@ mdf <- as.data.frame(m)
 chosen.model <- which.min(colMeans(mdf))[[1]]
 
 # Actual forecasts if this model chosen
-fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "monthly")
+fdf <- chosen_forecast(chosen.model, series.ts, freq = "monthly")
 
 # Prepare to save the new forecast into file
 save.this <- data.frame(time = tail(monthly$date, 1), 
                         model = modelnames[chosen.model], 
-                        forecast = fdf$fcast[1],
-                        upper80 = fdf$upper80[1],
-                        upper95 = fdf$upper95[1],
-                        lower80 = fdf$lower80[1],
-                        lower95 = fdf$lower95[1])
+                        forecast = fdf$fcast[1] * scaler,
+                        upper80 = fdf$upper80[1] * scaler,
+                        upper95 = fdf$upper95[1] * scaler,
+                        lower80 = fdf$lower80[1] * scaler,
+                        lower95 = fdf$lower95[1] * scaler)
 
 # Save only if file already exists (some histories have not been initialized yet)
 if(file.exists("histories/monthly_red.csv")){
@@ -399,16 +399,16 @@ mdf <- as.data.frame(m)
 chosen.model <- which.min(colMeans(mdf))[[1]]
 
 # Actual forecasts if this model chosen
-fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "monthly")
+fdf <- chosen_forecast(chosen.model, series.ts, freq = "monthly")
 
 # Prepare to save the new forecast into file
 save.this <- data.frame(time = tail(monthly$date, 1), 
                         model = modelnames[chosen.model], 
-                        forecast = fdf$fcast[1],
-                        upper80 = fdf$upper80[1],
-                        upper95 = fdf$upper95[1],
-                        lower80 = fdf$lower80[1],
-                        lower95 = fdf$lower95[1])
+                        forecast = fdf$fcast[1] * scaler,
+                        upper80 = fdf$upper80[1] * scaler,
+                        upper95 = fdf$upper95[1] * scaler,
+                        lower80 = fdf$lower80[1] * scaler,
+                        lower95 = fdf$lower95[1] * scaler)
 
 # Save only if file already exists (some histories have not been initialized yet)
 if(file.exists("histories/monthly_Ominus.csv")){
@@ -509,16 +509,16 @@ mdf <- as.data.frame(m)
 chosen.model <- which.min(colMeans(mdf))[[1]]
 
 # Actual forecasts if this model chosen
-fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "monthly")
+fdf <- chosen_forecast(chosen.model, series.ts, freq = "monthly")
 
 # Prepare to save the new forecast into file
 save.this <- data.frame(time = tail(monthly$date, 1), 
                         model = modelnames[chosen.model], 
-                        forecast = fdf$fcast[1],
-                        upper80 = fdf$upper80[1],
-                        upper95 = fdf$upper95[1],
-                        lower80 = fdf$lower80[1],
-                        lower95 = fdf$lower95[1])
+                        forecast = fdf$fcast[1] * scaler,
+                        upper80 = fdf$upper80[1] * scaler,
+                        upper95 = fdf$upper95[1] * scaler,
+                        lower80 = fdf$lower80[1] * scaler,
+                        lower95 = fdf$lower95[1] * scaler)
 
 # Save only if file already exists (some histories have not been initialized yet)
 if(file.exists("histories/monthly_Oplus.csv")){
@@ -619,16 +619,16 @@ mdf <- as.data.frame(m)
 chosen.model <- which.min(colMeans(mdf))[[1]]
 
 # Actual forecasts if this model chosen
-fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "monthly")
+fdf <- chosen_forecast(chosen.model, series.ts, freq = "monthly")
 
 # Prepare to save the new forecast into file
 save.this <- data.frame(time = tail(monthly$date, 1), 
                         model = modelnames[chosen.model], 
-                        forecast = fdf$fcast[1],
-                        upper80 = fdf$upper80[1],
-                        upper95 = fdf$upper95[1],
-                        lower80 = fdf$lower80[1],
-                        lower95 = fdf$lower95[1])
+                        forecast = fdf$fcast[1] * scaler,
+                        upper80 = fdf$upper80[1] * scaler,
+                        upper95 = fdf$upper95[1] * scaler,
+                        lower80 = fdf$lower80[1] * scaler,
+                        lower95 = fdf$lower95[1] * scaler)
 
 # Save only if file already exists (some histories have not been initialized yet)
 if(file.exists("histories/monthly_Aminus.csv")){
@@ -729,16 +729,16 @@ mdf <- as.data.frame(m)
 chosen.model <- which.min(colMeans(mdf))[[1]]
 
 # Actual forecasts if this model chosen
-fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "monthly")
+fdf <- chosen_forecast(chosen.model, series.ts, freq = "monthly")
 
 # Prepare to save the new forecast into file
 save.this <- data.frame(time = tail(monthly$date, 1), 
                         model = modelnames[chosen.model], 
-                        forecast = fdf$fcast[1],
-                        upper80 = fdf$upper80[1],
-                        upper95 = fdf$upper95[1],
-                        lower80 = fdf$lower80[1],
-                        lower95 = fdf$lower95[1])
+                        forecast = fdf$fcast[1] * scaler,
+                        upper80 = fdf$upper80[1] * scaler,
+                        upper95 = fdf$upper95[1] * scaler,
+                        lower80 = fdf$lower80[1] * scaler,
+                        lower95 = fdf$lower95[1] * scaler)
 
 # Save only if file already exists (some histories have not been initialized yet)
 if(file.exists("histories/monthly_Aplus.csv")){
@@ -839,16 +839,16 @@ mdf <- as.data.frame(m)
 chosen.model <- which.min(colMeans(mdf))[[1]]
 
 # Actual forecasts if this model chosen
-fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "monthly")
+fdf <- chosen_forecast(chosen.model, series.ts, freq = "monthly")
 
 # Prepare to save the new forecast into file
 save.this <- data.frame(time = tail(monthly$date, 1), 
                         model = modelnames[chosen.model], 
-                        forecast = fdf$fcast[1],
-                        upper80 = fdf$upper80[1],
-                        upper95 = fdf$upper95[1],
-                        lower80 = fdf$lower80[1],
-                        lower95 = fdf$lower95[1])
+                        forecast = fdf$fcast[1] * scaler,
+                        upper80 = fdf$upper80[1] * scaler,
+                        upper95 = fdf$upper95[1] * scaler,
+                        lower80 = fdf$lower80[1] * scaler,
+                        lower95 = fdf$lower95[1] * scaler)
 
 # Save only if file already exists (some histories have not been initialized yet)
 if(file.exists("histories/monthly_Bminus.csv")){
@@ -949,16 +949,16 @@ mdf <- as.data.frame(m)
 chosen.model <- which.min(colMeans(mdf))[[1]]
 
 # Actual forecasts if this model chosen
-fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "monthly")
+fdf <- chosen_forecast(chosen.model, series.ts, freq = "monthly")
 
 # Prepare to save the new forecast into file
 save.this <- data.frame(time = tail(monthly$date, 1), 
                         model = modelnames[chosen.model], 
-                        forecast = fdf$fcast[1],
-                        upper80 = fdf$upper80[1],
-                        upper95 = fdf$upper95[1],
-                        lower80 = fdf$lower80[1],
-                        lower95 = fdf$lower95[1])
+                        forecast = fdf$fcast[1] * scaler,
+                        upper80 = fdf$upper80[1] * scaler,
+                        upper95 = fdf$upper95[1] * scaler,
+                        lower80 = fdf$lower80[1] * scaler,
+                        lower95 = fdf$lower95[1] * scaler)
 
 # Save only if file already exists (some histories have not been initialized yet)
 if(file.exists("histories/monthly_Bplus.csv")){
@@ -1059,16 +1059,16 @@ mdf <- as.data.frame(m)
 chosen.model <- which.min(colMeans(mdf))[[1]]
 
 # Actual forecasts if this model chosen
-fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "monthly")
+fdf <- chosen_forecast(chosen.model, series.ts, freq = "monthly")
 
 # Prepare to save the new forecast into file
 save.this <- data.frame(time = tail(monthly$date, 1), 
                         model = modelnames[chosen.model], 
-                        forecast = fdf$fcast[1],
-                        upper80 = fdf$upper80[1],
-                        upper95 = fdf$upper95[1],
-                        lower80 = fdf$lower80[1],
-                        lower95 = fdf$lower95[1])
+                        forecast = fdf$fcast[1] * scaler,
+                        upper80 = fdf$upper80[1] * scaler,
+                        upper95 = fdf$upper95[1] * scaler,
+                        lower80 = fdf$lower80[1] * scaler,
+                        lower95 = fdf$lower95[1] * scaler)
 
 # Save only if file already exists (some histories have not been initialized yet)
 if(file.exists("histories/monthly_ABminus.csv")){
@@ -1169,16 +1169,16 @@ mdf <- as.data.frame(m)
 chosen.model <- which.min(colMeans(mdf))[[1]]
 
 # Actual forecasts if this model chosen
-fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "monthly")
+fdf <- chosen_forecast(chosen.model, series.ts, freq = "monthly")
 
 # Prepare to save the new forecast into file
 save.this <- data.frame(time = tail(monthly$date, 1), 
                         model = modelnames[chosen.model], 
-                        forecast = fdf$fcast[1],
-                        upper80 = fdf$upper80[1],
-                        upper95 = fdf$upper95[1],
-                        lower80 = fdf$lower80[1],
-                        lower95 = fdf$lower95[1])
+                        forecast = fdf$fcast[1] * scaler,
+                        upper80 = fdf$upper80[1] * scaler,
+                        upper95 = fdf$upper95[1] * scaler,
+                        lower80 = fdf$lower80[1] * scaler,
+                        lower95 = fdf$lower95[1] * scaler)
 
 # Save only if file already exists (some histories have not been initialized yet)
 if(file.exists("histories/monthly_ABplus.csv")){
@@ -1279,16 +1279,16 @@ mdf <- as.data.frame(m)
 chosen.model <- which.min(colMeans(mdf))[[1]]
 
 # Actual forecasts if this model chosen
-fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "monthly")
+fdf <- chosen_forecast(chosen.model, series.ts, freq = "monthly")
 
 # Prepare to save the new forecast into file
 save.this <- data.frame(time = tail(monthly$date, 1), 
                         model = modelnames[chosen.model], 
-                        forecast = fdf$fcast[1],
-                        upper80 = fdf$upper80[1],
-                        upper95 = fdf$upper95[1],
-                        lower80 = fdf$lower80[1],
-                        lower95 = fdf$lower95[1])
+                        forecast = fdf$fcast[1] * scaler,
+                        upper80 = fdf$upper80[1] * scaler,
+                        upper95 = fdf$upper95[1] * scaler,
+                        lower80 = fdf$lower80[1] * scaler,
+                        lower95 = fdf$lower95[1] * scaler)
 
 # Save only if file already exists (some histories have not been initialized yet)
 if(file.exists("histories/monthly_plat.csv")){
@@ -1391,7 +1391,7 @@ mdf <- as.data.frame(m)
 chosen.model <- which.min(colMeans(mdf))[[1]]
 
 # Actual forecasts if this model chosen
-fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "weekly")
+fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 
 # Prepare to save the new forecast into file
 save.this <- data.frame(time = tail(monthly$date, 1), 
@@ -1502,7 +1502,7 @@ mdf <- as.data.frame(m)
 chosen.model <- which.min(colMeans(mdf))[[1]]
 
 # Actual forecasts if this model chosen
-fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "weekly")
+fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 
 # Prepare to save the new forecast into file
 save.this <- data.frame(time = tail(monthly$date, 1), 
@@ -1613,7 +1613,7 @@ mdf <- as.data.frame(m)
 chosen.model <- which.min(colMeans(mdf))[[1]]
 
 # Actual forecasts if this model chosen
-fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "weekly")
+fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 
 # Prepare to save the new forecast into file
 save.this <- data.frame(time = tail(monthly$date, 1), 
@@ -1724,7 +1724,7 @@ mdf <- as.data.frame(m)
 chosen.model <- which.min(colMeans(mdf))[[1]]
 
 # Actual forecasts if this model chosen
-fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "weekly")
+fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 
 # Prepare to save the new forecast into file
 save.this <- data.frame(time = tail(monthly$date, 1), 
@@ -1835,7 +1835,7 @@ mdf <- as.data.frame(m)
 chosen.model <- which.min(colMeans(mdf))[[1]]
 
 # Actual forecasts if this model chosen
-fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "weekly")
+fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 
 # Prepare to save the new forecast into file
 save.this <- data.frame(time = tail(monthly$date, 1), 
@@ -1946,7 +1946,7 @@ mdf <- as.data.frame(m)
 chosen.model <- which.min(colMeans(mdf))[[1]]
 
 # Actual forecasts if this model chosen
-fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "weekly")
+fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 
 # Prepare to save the new forecast into file
 save.this <- data.frame(time = tail(monthly$date, 1), 
@@ -2057,7 +2057,7 @@ mdf <- as.data.frame(m)
 chosen.model <- which.min(colMeans(mdf))[[1]]
 
 # Actual forecasts if this model chosen
-fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "weekly")
+fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 
 # Prepare to save the new forecast into file
 save.this <- data.frame(time = tail(monthly$date, 1), 
@@ -2168,7 +2168,7 @@ mdf <- as.data.frame(m)
 chosen.model <- which.min(colMeans(mdf))[[1]]
 
 # Actual forecasts if this model chosen
-fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "weekly")
+fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 
 # Prepare to save the new forecast into file
 save.this <- data.frame(time = tail(monthly$date, 1), 
@@ -2279,7 +2279,7 @@ mdf <- as.data.frame(m)
 chosen.model <- which.min(colMeans(mdf))[[1]]
 
 # Actual forecasts if this model chosen
-fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "weekly")
+fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 
 # Prepare to save the new forecast into file
 save.this <- data.frame(time = tail(monthly$date, 1), 
@@ -2390,7 +2390,7 @@ mdf <- as.data.frame(m)
 chosen.model <- which.min(colMeans(mdf))[[1]]
 
 # Actual forecasts if this model chosen
-fdf <- chosen_forecast(chosen.model, series.ts, reverse_adj, freq = "weekly")
+fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 
 # Prepare to save the new forecast into file
 save.this <- data.frame(time = tail(monthly$date, 1), 

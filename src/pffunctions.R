@@ -20,7 +20,6 @@ extract_type <- function(red.distr, type){
   return(typed.distr)
 }
 
-
 aggregate_weekly <- function(series){
   pcslist <- list(); weeklist <- list(); datelist <- list()  # Create storage lists
   j <- 0; k <- 0  # j is for resetting week counter, k is for gathering dates
@@ -37,23 +36,23 @@ aggregate_weekly <- function(series){
 }
 
 find_errors <- function(segment, beginning, series.ts, method = "none", smooth = "none", freq = "monthly"){
-  capes <- c()
+  apes <- c()
   if(freq == "monthly"){
     for(i in seq(length(series.ts) - 37)){
       # Define training and testing set as ROLLING WINDOW
       if(smooth == ".25"){
         train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .25), 
-                    start = decimal_date(beginning), 
+                    start = decimal_date(beginning + i), 
                     frequency = 12)
         test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
       }
       if(smooth == ".10"){
         train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .10), 
-                    start = decimal_date(beginning), 
+                    start = decimal_date(beginning + i), 
                     frequency = 12)
         test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
       }
-      else{
+      if(smooth == "none"){
         train <- ts(series.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
         test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
       }
@@ -105,10 +104,10 @@ find_errors <- function(segment, beginning, series.ts, method = "none", smooth =
         e <- as.numeric(test) - as.numeric(fcast)  # Raw error
       }
       
-      cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+      ape <- abs(e)/test * 100  # We decided to change this to NON-critical
       
       # Save errors
-      capes <- c(capes, cape)
+      apes <- c(apes, ape)
     }
   } 
     if(freq == "weekly"){
@@ -116,17 +115,17 @@ find_errors <- function(segment, beginning, series.ts, method = "none", smooth =
         # Define training and testing set as ROLLING WINDOW
         if(smooth == ".25"){
           train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(156 + i)], .25), 
-                      start = decimal_date(beginning), 
+                      start = decimal_date(beginning + i), 
                       frequency = 12)
           test <- ts(series.ts[(157 + i)], start = decimal_date(beginning + 157 + i), frequency = 12)
         }
         if(smooth == ".10"){
           train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(156 + i)], .10), 
-                      start = decimal_date(beginning), 
+                      start = decimal_date(beginning + i), 
                       frequency = 12)
           test <- ts(series.ts[(157 + i)], start = decimal_date(beginning + 157 + i), frequency = 12)
         }
-        else{
+        if(smooth == "none"){
           train <- ts(series.ts[(1 + i):(156 + i)], start = decimal_date(beginning + i), frequency = 12)
           test <- ts(series.ts[(157 + i)], start = decimal_date(beginning + 157 + i), frequency = 12)
         }
@@ -178,22 +177,23 @@ find_errors <- function(segment, beginning, series.ts, method = "none", smooth =
           e <- as.numeric(test) - as.numeric(fcast)  # Raw error
         }
         
-        cape <- ifelse(test = e > 0, yes = abs(e * 2), no = abs(e))/test * 100  # Critical APE (for cMAPE later on)
+        ape <- abs(e)/test * 100  # We decided to change this to NON-critical
         
         # Save errors
-        capes <- c(capes, cape)
+        apes <- c(apes, ape)
     }
   }
   
-  return(capes)
+  return(apes)
 }
 
-chosen_forecast <- function(chosen.model, series.ts, reverse_adj, freq = "monthly"){
-  if(freq == "monthly"){
-    train <- ts(tail(series.ts, 36), start = decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)
+chosen_forecast <- function(chosen.model, series.ts, freq = "monthly"){
+  if(freq == "monthly"){  # Monthly forecast
+    train <- ts(tail(series.ts, 36), start = decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)  # 3 year window
     train25 <- ts(itsmr::smooth.fft(tail(series.ts, 36), .25), start = decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)
     train10 <- ts(itsmr::smooth.fft(tail(series.ts, 36), .10), start = decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)
     
+    # Fit model
     if(chosen.model == 1){fit <- ets(train)}
     if(chosen.model == 2){fit <- stl(train, s.window = "periodic", t.window = 7)}
     if(chosen.model == 3){fit <- tbats(train)}
@@ -207,11 +207,11 @@ chosen_forecast <- function(chosen.model, series.ts, reverse_adj, freq = "monthl
       
       y <- as.numeric(fcast1$mean)
       x <- as.numeric(fcast2$mean)
-      forecasts <- (x + y) * reverse_adj
-      upper80s <- fcast1$upper[[1]] * reverse_adj
-      upper95s <- fcast1$upper[[2]] * reverse_adj
-      lower80s <- fcast1$lower[[1]] * reverse_adj
-      lower95s <- fcast1$lower[[2]] * reverse_adj
+      forecasts <- (x + y)
+      upper80s <- fcast1$upper[[1]]
+      upper95s <- fcast1$upper[[2]]
+      lower80s <- fcast1$lower[[1]]
+      lower95s <- fcast1$lower[[2]]
     }
     if(chosen.model == 6){fit <- naive(train)}
     if(chosen.model == 7){fit <- snaive(train)}
@@ -230,11 +230,11 @@ chosen_forecast <- function(chosen.model, series.ts, reverse_adj, freq = "monthl
       
       y <- as.numeric(fcast1$mean)
       x <- as.numeric(fcast2$mean)
-      forecasts <- (x + y)  * reverse_adj
-      upper80s <- fcast1$upper[[1]] * reverse_adj
-      upper95s <- fcast1$upper[[2]] * reverse_adj
-      lower80s <- fcast1$lower[[1]] * reverse_adj
-      lower95s <- fcast1$lower[[2]] * reverse_adj
+      forecasts <- (x + y)
+      upper80s <- fcast1$upper[[1]]
+      upper95s <- fcast1$upper[[2]]
+      lower80s <- fcast1$lower[[1]]
+      lower95s <- fcast1$lower[[2]]
     }
     if(chosen.model == 15){fit <- naive(train25)}
     if(chosen.model == 16){fit <- snaive(train25)}
@@ -253,33 +253,36 @@ chosen_forecast <- function(chosen.model, series.ts, reverse_adj, freq = "monthl
       
       y <- as.numeric(fcast1$mean)
       x <- as.numeric(fcast2$mean)
-      forecasts <- (x + y) * reverse_adj
-      upper80s <- fcast1$upper[[1]] * reverse_adj
-      upper95s <- fcast1$upper[[2]] * reverse_adj
-      lower80s <- fcast1$lower[[1]] * reverse_adj
-      lower95s <- fcast1$lower[[2]] * reverse_adj
+      forecasts <- (x + y)
+      upper80s <- fcast1$upper[[1]]
+      upper95s <- fcast1$upper[[2]]
+      lower80s <- fcast1$lower[[1]]
+      lower95s <- fcast1$lower[[2]]
     }
     if(chosen.model == 24){fit <- naive(train10)}
     if(chosen.model == 25){fit <- snaive(train10)}
     if(chosen.model == 26){fit <- rwf(train10, drift = TRUE)}
     if(chosen.model == 27){fit <- meanf(train10)}
     if(!(chosen.model %in% c(5, 14, 23))){
+      # If model was not any of the LMx2 variants, forecast here
       fcast <- forecast(fit, h = 6)
-      forecasts <- as.numeric(fcast$mean) * reverse_adj
-      upper80s <- as.numeric(fcast$upper[, 1]) * reverse_adj
-      upper95s <- as.numeric(fcast$upper[, 2]) * reverse_adj
-      lower80s <- as.numeric(fcast$lower[, 1]) * reverse_adj
-      lower95s <- as.numeric(fcast$lower[, 2]) * reverse_adj
+      
+      forecasts <- as.numeric(fcast$mean)
+      upper80s <- as.numeric(fcast$upper[, 1])
+      upper95s <- as.numeric(fcast$upper[, 2])
+      lower80s <- as.numeric(fcast$lower[, 1])
+      lower95s <- as.numeric(fcast$lower[, 2])
     }
     
+    # Save to a returnable dataframe
     fdf <- data.frame(fcast = forecasts,
                       upper80 = upper80s,
                       upper95 = upper95s,
                       lower80 = lower80s,
                       lower95 = lower95s)
   }
-  if(freq == "weekly"){
-    train <- ts(tail(series.ts, 156), start = decimal_date(head(tail(monthly$date, 156), 1)), frequency = 52)
+  if(freq == "weekly"){  # Weekly forecast
+    train <- ts(tail(series.ts, 156), start = decimal_date(head(tail(monthly$date, 156), 1)), frequency = 52)  # Three year window
     train25 <- ts(itsmr::smooth.fft(tail(series.ts, 156), .25), start = decimal_date(head(tail(monthly$date, 156), 1)), frequency = 52)
     train10 <- ts(itsmr::smooth.fft(tail(series.ts, 156), .10), start = decimal_date(head(tail(monthly$date, 156), 1)), frequency = 52)
     
