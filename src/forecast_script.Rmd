@@ -233,7 +233,7 @@ weekly <- data.frame(week = red.weekly$week,
 ```{r monthly_model_selection_red, message = FALSE, warning = FALSE, echo = FALSE, results = FALSE}
 # Define the series to be used
 # We want to use 4 years of data. 3 years for the width of the rolling window and we'll let that run for a year.
-segment <- head(tail(monthly$red, 49), 48)
+segment <- head(tail(monthly$red, 49), 48) # REMEMBER YOU CHANGED THIS FROM MONTHLY to MONTHLY_REAL
 beginning <- head(tail(monthly$date, 49), 1)
 series.ts <- ts(segment, start = decimal_date(beginning), frequency = 12)
 
@@ -299,7 +299,7 @@ save.this <- data.frame(time = tail(monthly$date, 1),
                         lower80 = fdf$lower80[1] * scaler,
                         lower95 = fdf$lower95[1] * scaler)
 
-# Save only if file already exists (some histories have not been initialized yet)
+#Save only if file already exists (some histories have not been initialized yet)
 if(file.exists("histories/monthly_red.csv")){
   # Do not save if forecast already exists in history
   existing.history <- read.csv("histories/monthly_red.csv")
@@ -1394,7 +1394,7 @@ chosen.model <- which.min(colMeans(mdf))[[1]]
 fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 
 # Prepare to save the new forecast into file
-save.this <- data.frame(time = tail(monthly$date, 1), 
+save.this <- data.frame(time = (tail(weekly$startdate, 1) + weeks(1)), 
                         model = modelnames[chosen.model], 
                         forecast = fdf$fcast[1],
                         upper80 = fdf$upper80[1],
@@ -1439,7 +1439,7 @@ div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font
 </style>
 <div class = "summary">
 
-Forecast for week `r week(today() + weekss(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+Forecast for week `r week(today() + weeks(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
 
 </div>
 
@@ -1505,7 +1505,7 @@ chosen.model <- which.min(colMeans(mdf))[[1]]
 fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 
 # Prepare to save the new forecast into file
-save.this <- data.frame(time = tail(monthly$date, 1), 
+save.this <- data.frame(time = (tail(weekly$startdate, 1) + weeks(1)), 
                         model = modelnames[chosen.model], 
                         forecast = fdf$fcast[1],
                         upper80 = fdf$upper80[1],
@@ -1550,7 +1550,7 @@ div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font
 </style>
 <div class = "summary">
 
-Forecast for week `r week(today() + weekss(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+Forecast for week `r week(today() + weeks(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
 
 </div>
 
@@ -1616,7 +1616,7 @@ chosen.model <- which.min(colMeans(mdf))[[1]]
 fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 
 # Prepare to save the new forecast into file
-save.this <- data.frame(time = tail(monthly$date, 1), 
+save.this <- data.frame(time = (tail(weekly$startdate, 1) + weeks(1)), 
                         model = modelnames[chosen.model], 
                         forecast = fdf$fcast[1],
                         upper80 = fdf$upper80[1],
@@ -1661,7 +1661,7 @@ div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font
 </style>
 <div class = "summary">
 
-Forecast for week `r week(today() + weekss(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+Forecast for week `r week(today() + weeks(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
 
 </div>
 
@@ -1727,7 +1727,7 @@ chosen.model <- which.min(colMeans(mdf))[[1]]
 fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 
 # Prepare to save the new forecast into file
-save.this <- data.frame(time = tail(monthly$date, 1), 
+save.this <- data.frame(time = (tail(weekly$startdate, 1) + weeks(1)), 
                         model = modelnames[chosen.model], 
                         forecast = fdf$fcast[1],
                         upper80 = fdf$upper80[1],
@@ -1772,7 +1772,7 @@ div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font
 </style>
 <div class = "summary">
 
-Forecast for week `r week(today() + weekss(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+Forecast for week `r week(today() + weeks(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
 
 </div>
 
@@ -1838,7 +1838,7 @@ chosen.model <- which.min(colMeans(mdf))[[1]]
 fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 
 # Prepare to save the new forecast into file
-save.this <- data.frame(time = tail(monthly$date, 1), 
+save.this <- data.frame(time = (tail(weekly$startdate, 1) + weeks(1)), 
                         model = modelnames[chosen.model], 
                         forecast = fdf$fcast[1],
                         upper80 = fdf$upper80[1],
@@ -1883,7 +1883,7 @@ div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font
 </style>
 <div class = "summary">
 
-Forecast for week `r week(today() + weekss(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+Forecast for week `r week(today() + weeks(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
 
 </div>
 
@@ -1949,7 +1949,7 @@ chosen.model <- which.min(colMeans(mdf))[[1]]
 fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 
 # Prepare to save the new forecast into file
-save.this <- data.frame(time = tail(monthly$date, 1), 
+save.this <- data.frame(time = (tail(weekly$startdate, 1) + weeks(1)), 
                         model = modelnames[chosen.model], 
                         forecast = fdf$fcast[1],
                         upper80 = fdf$upper80[1],
@@ -1994,7 +1994,7 @@ div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font
 </style>
 <div class = "summary">
 
-Forecast for week `r week(today() + weekss(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+Forecast for week `r week(today() + weeks(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
 
 </div>
 
@@ -2060,7 +2060,7 @@ chosen.model <- which.min(colMeans(mdf))[[1]]
 fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 
 # Prepare to save the new forecast into file
-save.this <- data.frame(time = tail(monthly$date, 1), 
+save.this <- data.frame(time = (tail(weekly$startdate, 1) + weeks(1)), 
                         model = modelnames[chosen.model], 
                         forecast = fdf$fcast[1],
                         upper80 = fdf$upper80[1],
@@ -2105,7 +2105,7 @@ div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font
 </style>
 <div class = "summary">
 
-Forecast for week `r week(today() + weekss(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+Forecast for week `r week(today() + weeks(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
 
 </div>
 
@@ -2171,7 +2171,7 @@ chosen.model <- which.min(colMeans(mdf))[[1]]
 fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 
 # Prepare to save the new forecast into file
-save.this <- data.frame(time = tail(monthly$date, 1), 
+save.this <- data.frame(time = (tail(weekly$startdate, 1) + weeks(1)), 
                         model = modelnames[chosen.model], 
                         forecast = fdf$fcast[1],
                         upper80 = fdf$upper80[1],
@@ -2216,7 +2216,7 @@ div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font
 </style>
 <div class = "summary">
 
-Forecast for week `r week(today() + weekss(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+Forecast for week `r week(today() + weeks(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
 
 </div>
 
@@ -2282,7 +2282,7 @@ chosen.model <- which.min(colMeans(mdf))[[1]]
 fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 
 # Prepare to save the new forecast into file
-save.this <- data.frame(time = tail(monthly$date, 1), 
+save.this <- data.frame(time = (tail(weekly$startdate, 1) + weeks(1)), 
                         model = modelnames[chosen.model], 
                         forecast = fdf$fcast[1],
                         upper80 = fdf$upper80[1],
@@ -2310,7 +2310,7 @@ if(file.exists("histories/weekly_ABplus.csv")){
 ```{r weekly_ABplus_fig, fig.align="center", echo = FALSE}
 ggplot(data = fdf, aes(x = seq.Date(from = tail(weekly$startdate, 1), to = tail(weekly$startdate, 1) + weeks(3), by = "week"), y = fcast)) + 
   geom_line(aes(colour = "Forecast"), size = 0.8) +
-  geom_line(data = tail(head(weekly, -1), 16), aes(x = startdate, y = Aplus, colour = "Data"), size = 0.8, alpha = 0.7) +
+  geom_line(data = tail(head(weekly, -1), 16), aes(x = startdate, y = ABplus, colour = "Data"), size = 0.8, alpha = 0.7) +
   geom_ribbon(data = fdf, aes(ymin = lower80, ymax = upper80), alpha = 0.3) +
   geom_ribbon(data = fdf, aes(ymin = lower95, ymax = upper95), alpha = 0.2, fill = "blue") +
   geom_segment(x = tail(weekly$startdate, 2)[1], y = tail(weekly$ABplus, 2)[1], xend = tail(weekly$startdate, 1), yend = head(fdf$fcast, 1), color = "#D55E00", linetype = "dashed", alpha = 0.7) +
@@ -2327,7 +2327,7 @@ div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font
 </style>
 <div class = "summary">
 
-Forecast for week `r week(today() + weekss(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+Forecast for week `r week(today() + weeks(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
 
 </div>
 
@@ -2393,7 +2393,7 @@ chosen.model <- which.min(colMeans(mdf))[[1]]
 fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 
 # Prepare to save the new forecast into file
-save.this <- data.frame(time = tail(monthly$date, 1), 
+save.this <- data.frame(time = (tail(weekly$startdate, 1) + weeks(1)), 
                         model = modelnames[chosen.model], 
                         forecast = fdf$fcast[1],
                         upper80 = fdf$upper80[1],
@@ -2438,7 +2438,7 @@ div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font
 </style>
 <div class = "summary">
 
-Forecast for week `r week(today() + weekss(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` platelet products.
+Forecast for week `r week(today() + weeks(1))` of `r lubridate::year(today())`: `r format(round(head(fdf$fcast, 1), 0))  # This is to round AND display only whole numbers.` platelet products.
 
 </div>
 

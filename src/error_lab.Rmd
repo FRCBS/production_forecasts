@@ -30,7 +30,7 @@ library(numbers)
 library(data.table)
 library(R.utils)
 library(DT)
-source("src/pffunctions_errorlab.R")
+source("src/pffunctions.R")
 ```
 
 ```{r read_files, include = FALSE}
@@ -345,6 +345,7 @@ m3 <- matrix(c(ets.capes, stl.capes, tbats.capes, stlf.capes, lmx2.capes,
 modelnames <- c("ETS", "STL", "TBATS", "STLF", "LMx2", "NAIVE", "SNAIVE", "RWF", "MEANF",
                 "ETS.25", "STL.25", "TBATS.25", "STLF.25", "LMx2.25", "NAIVE.25", "SNAIVE.25", "RWF.25", "MEANF.25",
                 "ETS.10", "STL.10", "TBATS.10", "STLF.10", "LMx2.10", "NAIVE.10", "SNAIVE.10", "RWF.10", "MEANF.10")
+
 colnames(m3) <- modelnames
 
 mdf <- as.data.frame(m3)
@@ -389,6 +390,7 @@ save.this <- data.frame(time = monthly$date[(50 + p)],
 if(file.exists("histories/series_4.csv")){
   FILE.EXISTS <- TRUE
   history <- head(read.csv("histories/series_4.csv", header = TRUE), -1)
+
   history$err <- abs((tail(head(monthly_real$red, -1), length(history$forecast)) - history$forecast) / tail(head(monthly_real$red, -1),
                                                                                                             length(history$forecast)))*100
   
