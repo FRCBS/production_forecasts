@@ -1,0 +1,303 @@
+---
+title: "Production Forecasts"
+output: html_document
+author: "Mikko Arvas"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+
+---
+```{r setup, echo = FALSE}
+#echo "rmarkdown::render('output_platelet_counts.Rmd', clean=TRUE,output_format='html_document',output_file='../results/output_platelet_counts.20200312.Rmd')" | R --slave 
+#echo "rmarkdown::render('output_platelet_counts.Rmd', clean=TRUE,output_file='../results/output_platelet_counts.20200312.Rmd')" | R --slave 
+# Set working directory
+#knitr::opts_knit$set(root.dir = "/home/esa/production_forecasts") # Working on Ubuntu
+
+# Colorblind palette
+# black, orange, sky blue, green,
+# yellow, blue, vermilion, purple
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", 
+                "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+# To use for fills, add
+# scale_fill_manual(values=cbbPalette)
+
+# To use for line and point colors, add
+# scale_colour_manual(values=cbbPalette)
+```
+
+```{r imports, message = FALSE, echo = FALSE}
+
+library(ggplot2)
+library(gridExtra)
+library(knitr)
+library(lubridate)
+library(data.table)
+library(tidyverse)
+#source("src/pffunctions.R")
+```
+
+
+# Read in data
+
+```{r read_files, include = TRUE, warning=FALSE}
+#Get the facility codes
+facility <- as_tibble(read.table("../data/facility.txt",sep = "\t",fill = TRUE,header = TRUE,colClasses = c("character"))[,c(1,2)])
+facility$AccountNum <- paste0("F",as.character(facility$AccountNum))
+
+# Get all the files
+#PATH <- "/home/esa/production_forecasts/data/FACS/"
+PATH <- "~/Work/proj/2019Summer/production_forecasts/data/FACS/"
+files <- list.files(path = PATH, pattern = "FAC0091_*")  # Character vector of file names
+
+# Compile a dataframe by going over all files
+dlist <- list()
+for (i in files) {
+  # Read a single file to a df called d
+  d <- read.delim(file = paste0(PATH, "/", i), header = FALSE, sep = ";", stringsAsFactors = FALSE, colClasses = 'character')
+  
+  if(length(d) == 26){
+    d <- d[, !(names(d) %in% c("V10"))]  # The column numbers unfortunately vary between files, so we'll adjust
+    }
+  
+  colnames(d) <- c("V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10",
+                   "V11", "V12", "V13", "V14", "V15", "V16", "V17", "V18", "V19", "V20",
+                   "V21", "V22", "V23", "V24", "V25")  # This is done so as to have easier column handling later on
+  dlist[[i]] <- d
+}
+
+d <- as.data.frame(rbindlist(dlist, fill = TRUE))
+```
+
+#Format data set
+
+```{r modify_dataframe, include = TRUE}
+# Divide into distributions (P) and returns (R)
+P <- d[d$V1 == "P", ]
+R <- d[d$V1 == "R", ]
+
+# For distributions, we'll keep Distribution date, Quantity, ABO type, Exp date
+keep <- c("V12", "V14", "V18", "V22", "V24","V2")
+distr <- P[keep]
+colnames(distr) <- c("date", "product", "quantity", "volume", "exp","facility")
+#Transfrom facility codes into 4 digit numbers
+distr$facility <- paste0("F",unlist(lapply(distr$facility,function(x){substr(x,start=nchar(x) -3,stop = nchar(x))})))
+
+
+
+# For returns we keep the return date and quantity
+keep <- c("V4","V5", "V7","V14")
+retrn <- R[keep]
+colnames(retrn) <- c("date", "product","quantity","facility")
+#Transfrom facility codes into 4 digit numbers
+retrn$facility <- paste0("F",unlist(lapply(retrn$facility,function(x){substr(x,start=nchar(x) -3,stop = nchar(x))})))
+
+# Datify
+distr$date <- dmy(distr$date); distr$exp <- dmy(distr$exp)
+retrn$date <- dmy(retrn$date)
+
+# Numerify
+distr$quantity <- as.numeric(distr$quantity); distr$volume <- as.numeric(distr$volume)
+retrn$quantity <- as.numeric(retrn$quantity)
+
+
+# Product codes for platelets
+#plat.codes <- c("budTR002", "trEnnApu", "A0004V00", "A0005V00", "A0006V00", "A0007V00", "A0008V00",
+#"budTR002", "trEnnApu" are not sold products
+plat.codes <- c("A0004V00", "A0005V00", "A0006V00", "A0007V00", "A0008V00",
+                "A0086VA0", "A0086VB0", "A0086V00", "A0088V00", "A0088VA0", "A0088VB0", "A0089V00",
+                "A0089VB0", "A0089VA0", "A0090V00", "A0090VA0", "A0090VB0", "A0018V00", "A0020V00", 
+                "A0021V00", "A0021VA0", "A0021VB0", "A0047V00", "A0049V00", "A0051V00", "A0054V00",
+                "A0055V00", "A0056V00", "A0057V00", "A0059V00", "A0060V00", "A0067VA0", "A0067VB0",
+                "A0067V00", "A0068VA0", "A0068VB0", "A0068V00", "A0075V00", "A0101V00", "A0102V00",
+                "E3949V00", "E3953V00", "E3954V00", "E3955V00", "E3956V00", "E3957V00", "E3958V00",
+                "E3959V00", "E3960V00", "E3961V00", "E3962V00", "E3963V00", "E3964V00", "E3965V00", 
+                "E3966V00", "E3968VA0", "E3968VB0", "E3968V00", "E3970V00", "E3971V00", "E3973V00",
+                "E3974V00", "E3976V00", "E3981V00", "E3995V00", "E3996V00", "E3997V00", "E3997VA0",
+                "E3997VB0", "E4002V00", "E4004V00", "E6782V00", "E6783V00", "E6953V00", "E6860V00",
+                "E6874VA0", "E6874V00", "E6874VB0", "E6875VB0", "E6875V00", "E7530V00", "E7530VA0",
+                "E7530VB0", "E7531V00", "E7531VA0", "E7531VB0", "E6875VA0")
+
+plat.distr <- distr[distr$product %in% plat.codes, ] %>% arrange(date)
+plat.retrn <- retrn[retrn$product %in% plat.codes, ] %>% arrange(date)
+
+#Label facilities
+plat.distr <- left_join(plat.distr,facility,by = c("facility"="AccountNum"))
+retrn.distr <- left_join(plat.retrn,facility,by = c("facility"="AccountNum"))
+
+
+```
+
+Data starts from `r min(plat.distr$date)`.
+
+
+#Check the products
+
+```{r}
+
+p  <- ggplot(plat.distr,aes(x=product))
+p <- p + geom_bar() + theme(axis.text.x = element_text(angle = 90))
+p <- p + geom_text(stat='count', aes(label=..count..), vjust=-1)
+p
+```
+
+Looks like some of them are very rare. 
+
+
+```{r}
+plat.distr %>% group_by(product) %>% summarise(n=n()) %>% filter(n <100)
+```
+
+How do they change over time?
+
+```{r}
+# Get the ones with over 2000 deliveries
+
+over2000 <- plat.distr %>% group_by(product) %>% summarise(n=n()) %>% filter(n > 2000)
+yearlycounts<- plat.distr %>% mutate(year=year(date)) %>% group_by(product,year) %>% summarise(n=n()) %>% filter(year > 2013 & year < 2020 )
+yearlycounts<- yearlycounts %>% filter(product %in% over2000$product)
+
+p <- ggplot(yearlycounts,aes(x=year,y=n))
+p <- p + geom_line() + facet_wrap(~product)
+p
+```
+
+
+**Should some products be dropped out?**
+
+**Can all products be counted the same?**
+
+
+#Check the volumes
+Is there varition in volumes of products with over 2000 deliveries?
+
+
+```{r}
+summary(plat.distr$volume)
+
+
+```
+Wow, nasty!
+
+```{r}
+#Strange volumes above 4000
+plat.distr %>% filter(volume > 400) %>% select(product,volume,facility)
+```
+
+Let's drop them out
+```{r}
+plat.distr <- plat.distr %>% filter(volume <400)
+```
+
+
+```{r}
+pd <- plat.distr %>% filter(product %in% over2000$product)
+p <- ggplot(pd)
+p <- p + geom_bar(aes(x=volume),fill='red') + facet_grid(~product) + theme(axis.text.x = element_text(angle = 90))
+p
+```
+
+E6953V00 has a lot of ~160 volumes.
+
+**Are they still to be counted as one delivery?**
+
+
+# Check the facilities and their names
+
+`r length(unique(plat.distr$facility) )` facilty codes.
+`r length(unique(plat.distr$Name) )` facilty names.
+
+```{r}
+p  <- ggplot(plat.distr,aes(x=facility))
+p <- p + geom_bar() + theme(axis.text.x = element_text(angle = 90))
+p <- p + geom_text(stat='count', aes(label=..count..), vjust=-1)
+p
+
+```
+
+
+
+```{r}
+
+atleast1000 <- plat.distr %>% group_by(Name,facility) %>%  summarise(n=n(),LastYear=year(last(date)))  %>% ungroup() %>%  filter(n > 999) %>% arrange(desc(n)) %>% select(-n)
+atleast1000
+```
+
+There are `r nrow(atleast1000)` facilities with atleast 1000 platellet products delivered in the data set.
+
+
+
+How to they change in time?
+
+```{r}
+# Get the ones with over 2000 deliveries
+
+yearlycounts<- plat.distr %>% mutate(year=year(date)) %>% group_by(facility,year) %>% summarise(n=n()) %>% filter(year > 2013 & year < 2020 )
+yearlycounts<- yearlycounts %>% filter(facility %in% atleast1000$facility)
+
+p <- ggplot(yearlycounts,aes(x=year,y=n))
+p <- p + geom_line() + facet_wrap(~facility) + theme(axis.text.x = element_text(angle = 90))
+p
+```
+
+
+
+```{r}
+leastDeliveries <- plat.distr %>% group_by(Name,facility) %>%  summarise(n=n(),LastYear=year(last(date))) %>% ungroup() %>% top_n(-10) %>% arrange(n)
+leastDeliveries$n[leastDeliveries$n < 6] <- "1-5"
+leastDeliveries
+```
+
+The two lacking facility names are in here. So we do not need to worry about them.
+
+
+
+**Do we want to limit to some facilities only?**
+
+```{r , warning=FALSE}
+grep("HUS",unique(plat.distr$Name),value = TRUE)
+```
+Quite a few places under HUS.  
+
+**Do we want to group some facilities?**
+
+
+#Return data
+```{r}
+yearlyreturns <- plat.retrn %>% mutate(year=year(date)) %>% group_by(year) %>% summarise( n=n() ) %>% filter(year > 2013 & year < 2020 )
+ 
+p <- ggplot(yearlyreturns,aes(x=year, y=n))
+p <- p + geom_line()
+p
+```
+
+**Do we want to somehow take returns into account?**
+
+#Example data
+
+```{r}
+#Accept all the products
+#Only take facilites with at least 1000 deliveries in the data set
+dailycounts <- plat.distr %>% filter(facility %in% atleast1000$facility) %>%  group_by(Name,date) %>%  summarise(n=n())
+#To anonymise make all counts of 1-5 as "1-5"
+dailycounts$n[dailycounts$n < 6] <- "1-5"
+dailycounts
+
+```
+
+But how many are then actually 1-5?
+
+```{r}
+freqs <- dailycounts %>% ungroup %>% select(-Name) %>% count(n) %>% arrange(nn)
+
+p <- ggplot(freqs,aes(y=nn,x=n))
+p <- p + geom_col() + theme(axis.text.x = element_text(angle = 90))
+#p <- p + geom_text(stat='count', aes(label=..count..), vjust=-1)
+p
+```
+
+So day level data is hard to anonymise? What should we do? 
+
+**Does week level data do?** 
+
+**Do we need to anonymise?**
+
+
