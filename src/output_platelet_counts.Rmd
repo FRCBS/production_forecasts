@@ -7,7 +7,7 @@ date: "`r format(Sys.time(), '%d %B, %Y')`"
 ---
 ```{r setup, echo = FALSE}
 #echo "rmarkdown::render('output_platelet_counts.Rmd', clean=TRUE,output_format='html_document',output_file='../results/output_platelet_counts.20200312.Rmd')" | R --slave 
-#echo "rmarkdown::render('output_platelet_counts.Rmd', clean=TRUE,output_file='../results/output_platelet_counts.20200312.Rmd')" | R --slave 
+#echo "rmarkdown::render('output_platelet_counts.Rmd', clean=TRUE,output_file='../results/output_platelet_counts.20200312.html')" | R --slave 
 # Set working directory
 #knitr::opts_knit$set(root.dir = "/home/esa/production_forecasts") # Working on Ubuntu
 
@@ -40,8 +40,14 @@ library(tidyverse)
 
 ```{r read_files, include = TRUE, warning=FALSE}
 #Get the facility codes
-facility <- as_tibble(read.table("../data/facility.txt",sep = "\t",fill = TRUE,header = TRUE,colClasses = c("character"))[,c(1,2)])
+# I had to resort to perl as the gsub below was not complete enough
+#$ perl -pe 's/[[:^ascii:]]//g;' facility.txt | perl -pe "s/\"|\'//g" > facility.clean.txt
+#
+#facility <- as_tibble(read.table("../data/facility.txt",sep = "\t",fill = TRUE,header = TRUE,colClasses = c("character"))[,c(1,2)])
+facility <- as_tibble(read.table("../data/facility.clean.txt",sep = "\t",fill = TRUE,header = TRUE,colClasses = c("character"))[,c(1,2)])
 facility$AccountNum <- paste0("F",as.character(facility$AccountNum))
+
+#facility$Name <- gsub("[^[:alnum:][:blank:]?&/\\-]", "", facility$Name)
 
 # Get all the files
 #PATH <- "/home/esa/production_forecasts/data/FACS/"
@@ -74,7 +80,7 @@ d <- as.data.frame(rbindlist(dlist, fill = TRUE))
 P <- d[d$V1 == "P", ]
 R <- d[d$V1 == "R", ]
 
-# For distributions, we'll keep Distribution date, Quantity, ABO type, Exp date
+# For distributions, we'll keep Distribution date, Quantity, Exp date
 keep <- c("V12", "V14", "V18", "V22", "V24","V2")
 distr <- P[keep]
 colnames(distr) <- c("date", "product", "quantity", "volume", "exp","facility")
@@ -165,6 +171,7 @@ p
 
 **Can all products be counted the same?**
 
+Tiia says no. All can be counted the same.
 
 #Check the volumes
 Is there varition in volumes of products with over 2000 deliveries?
@@ -178,7 +185,7 @@ summary(plat.distr$volume)
 Wow, nasty!
 
 ```{r}
-#Strange volumes above 4000
+#Strange volumes above 400
 plat.distr %>% filter(volume > 400) %>% select(product,volume,facility)
 ```
 
@@ -199,11 +206,12 @@ E6953V00 has a lot of ~160 volumes.
 
 **Are they still to be counted as one delivery?**
 
+Yes, as Tiia already said. They can be all counted as one :-)!
 
 # Check the facilities and their names
 
-`r length(unique(plat.distr$facility) )` facilty codes.
-`r length(unique(plat.distr$Name) )` facilty names.
+`r length(unique(plat.distr$facility) )` facility codes.
+`r length(unique(plat.distr$Name) )` facility names.
 
 ```{r}
 p  <- ggplot(plat.distr,aes(x=facility))
@@ -217,8 +225,8 @@ p
 
 ```{r}
 
-atleast1000 <- plat.distr %>% group_by(Name,facility) %>%  summarise(n=n(),LastYear=year(last(date)))  %>% ungroup() %>%  filter(n > 999) %>% arrange(desc(n)) %>% select(-n)
-atleast1000
+atleast1000 <- plat.distr %>% group_by(Name,facility) %>%  summarise(n=n(),LastYear=year(last(date)))  %>% ungroup() %>%  filter(n > 999) %>% arrange(desc(n)) 
+atleast1000 %>% select(-Name)
 ```
 
 There are `r nrow(atleast1000)` facilities with atleast 1000 platellet products delivered in the data set.
@@ -230,11 +238,16 @@ How to they change in time?
 ```{r}
 # Get the ones with over 2000 deliveries
 
-yearlycounts<- plat.distr %>% mutate(year=year(date)) %>% group_by(facility,year) %>% summarise(n=n()) %>% filter(year > 2013 & year < 2020 )
-yearlycounts<- yearlycounts %>% filter(facility %in% atleast1000$facility)
+if (FALSE) {
+  # if you want to so the names a bit
+  yearlycounts<- plat.distr %>% mutate(year=year(date)) %>% group_by(facility,year) %>% summarise(n=n(), name=paste0(last(facility)," " ,substr(last(Name),0,10))) %>% filter(year > 2013 & year < 2020 )
+} else {
+  yearlycounts<- plat.distr %>% mutate(year=year(date)) %>% group_by(facility,year) %>% summarise(n=n(),name=last(facility)) %>% filter(year > 2013 & year < 2020 )
+}
+yearlycounts<- yearlycounts %>% filter(facility %in% atleast1000$facility) %>% ungroup()
 
 p <- ggplot(yearlycounts,aes(x=year,y=n))
-p <- p + geom_line() + facet_wrap(~facility) + theme(axis.text.x = element_text(angle = 90))
+p <- p + geom_line() + facet_wrap(~name) + theme(axis.text.x = element_text(angle = 90))
 p
 ```
 
@@ -243,7 +256,13 @@ p
 ```{r}
 leastDeliveries <- plat.distr %>% group_by(Name,facility) %>%  summarise(n=n(),LastYear=year(last(date))) %>% ungroup() %>% top_n(-10) %>% arrange(n)
 leastDeliveries$n[leastDeliveries$n < 6] <- "1-5"
-leastDeliveries
+leastDeliveries %>% select(-Name)
+```
+
+
+```{r}
+leastDeliveries %>% filter(is.na(Name)) %>% select(-Name)
+
 ```
 
 The two lacking facility names are in here. So we do not need to worry about them.
@@ -252,13 +271,20 @@ The two lacking facility names are in here. So we do not need to worry about the
 
 **Do we want to limit to some facilities only?**
 
+Probably we want to limit ourselves to big hospitals only:
+F8116 TAYS
+F8070 TYKS
+F7109 HUS
+F8316 OYS
+
+
 ```{r , warning=FALSE}
-grep("HUS",unique(plat.distr$Name),value = TRUE)
+length(grep("HUS",unique(plat.distr$Name),value = TRUE))
 ```
 Quite a few places under HUS.  
 
 **Do we want to group some facilities?**
-
+Maybe F7109 will do for HUS.
 
 #Return data
 ```{r}
@@ -275,10 +301,14 @@ p
 
 ```{r}
 #Accept all the products
-#Only take facilites with at least 1000 deliveries in the data set
-dailycounts <- plat.distr %>% filter(facility %in% atleast1000$facility) %>%  group_by(Name,date) %>%  summarise(n=n())
+#Only take these facilites 
+#"F8116","F8070","F7109","F8316"
+
+dailycounts <- plat.distr %>% filter(facility %in% c("F8116","F8070","F7109","F8316")) %>%  group_by(Name,date) %>%  summarise(n=n())
 #To anonymise make all counts of 1-5 as "1-5"
 dailycounts$n[dailycounts$n < 6] <- "1-5"
+dailycounts$Name <- as.factor(dailycounts$Name)
+levels(dailycounts$Name) <- c("TAYS","HUS","OYS","TYKS")
 dailycounts
 
 ```
@@ -294,10 +324,15 @@ p <- p + geom_col() + theme(axis.text.x = element_text(angle = 90))
 p
 ```
 
-So day level data is hard to anonymise? What should we do? 
 
-**Does week level data do?** 
+```{r}
+freqs <- dailycounts %>% group_by(Name) %>% count(n) %>% arrange(nn)
 
-**Do we need to anonymise?**
+p <- ggplot(freqs,aes(y=nn,x=n))
+p <- p + geom_col() + theme(axis.text.x = element_text(angle = 90)) + facet_wrap(~Name)
+#p <- p + geom_text(stat='count', aes(label=..count..), vjust=-1)
+p
+```
 
 
+Looks a bit funny, but it could do?
