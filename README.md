@@ -1,6 +1,8 @@
 # production_forecasts
 This repository contains R notebooks modelling blood production time series for forecasting purposes. The aim is to study the previously created models semi-scientifically and to find out future avenues for improving the forecasting results.
 
+_Currently not under active development._
+
 ## Notebooks
 Notebooks starting with "DEP" are deprecated, which means that the reader is mostly just wasting their time due to erroneus methods or values or simply due to redundant information. These are preserved for transparency and documentation purposes.
 
@@ -35,7 +37,7 @@ Best model for plasma series: adjusted dynamic regression (by a large margin!)
 Currently retired (but might see intermittent development). In this notebook we study how to use hospital blood product usage data to create demand predictions.
 
 **delivery_lab.(R)md**
-Currently under development. In this notebook we try weekly and monthly forecasting with delivery data and see how it compares with earlier production forecasts.
+In this notebook we try weekly and monthly forecasting with delivery data and see how it compares with earlier production forecasts.
 
 ## Functions
 
