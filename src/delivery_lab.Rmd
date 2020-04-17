@@ -316,10 +316,10 @@ ggplot(data = distr.weekly, aes(x = startdate, y = pcs)) +
 
 ```{r}
 distr.weekly.mts <- msts(distr.weekly$pcs, start = decimal_date(as.Date("2014-01-06")), seasonal.periods = c(12, 52))
-distr.weekly.mts <- window(distr.weekly.mts, start = 2017)
+#distr.weekly.mts <- window(distr.weekly.mts, start = 2014)
 fit.weekly <- stlf(distr.weekly.mts)
 autoplot(fit.weekly) +
-  labs(title = "2 year forecast with data from 2017 onwards",
+  labs(title = "2 year forecast with data from 2014 onwards",
        subtitle = "Forecast appears much more certain about the shape of the seasons",
        x = "", y = "blood bags") +
   theme_bw()
