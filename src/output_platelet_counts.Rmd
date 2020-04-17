@@ -6,23 +6,12 @@ date: "`r format(Sys.time(), '%d %B, %Y')`"
 
 ---
 ```{r setup, echo = FALSE}
-#echo "rmarkdown::render('output_platelet_counts.Rmd', clean=TRUE,output_format='html_document',output_file='../results/output_platelet_counts.20200312.Rmd')" | R --slave 
-#echo "rmarkdown::render('output_platelet_counts.Rmd', clean=TRUE,output_file='../results/output_platelet_counts.20200312.html')" | R --slave 
+#echo "rmarkdown::render('output_platelet_counts.Rmd', clean=TRUE,output_file='../results/output_platelet_counts.20200324.html')" | R --slave 
 # Set working directory
-#knitr::opts_knit$set(root.dir = "/home/esa/production_forecasts") # Working on Ubuntu
-
-# Colorblind palette
-# black, orange, sky blue, green,
-# yellow, blue, vermilion, purple
-cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", 
-                "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
-
-# To use for fills, add
-# scale_fill_manual(values=cbbPalette)
-
-# To use for line and point colors, add
-# scale_colour_manual(values=cbbPalette)
+setwd("~/Work/proj/2019Summer/production_forecasts/src/")
 ```
+
+
 
 ```{r imports, message = FALSE, echo = FALSE}
 
@@ -63,7 +52,6 @@ for (i in files) {
   if(length(d) == 26){
     d <- d[, !(names(d) %in% c("V10"))]  # The column numbers unfortunately vary between files, so we'll adjust
     }
-  
   colnames(d) <- c("V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10",
                    "V11", "V12", "V13", "V14", "V15", "V16", "V17", "V18", "V19", "V20",
                    "V21", "V22", "V23", "V24", "V25")  # This is done so as to have easier column handling later on
@@ -87,12 +75,18 @@ colnames(distr) <- c("date", "product", "quantity", "volume", "exp","facility")
 #Transfrom facility codes into 4 digit numbers
 distr$facility <- paste0("F",unlist(lapply(distr$facility,function(x){substr(x,start=nchar(x) -3,stop = nchar(x))})))
 
-
-
+#Unfortunately the format of changes in time
+R1<- split(x=R,f=nchar(R$V14) == 0)[[1]]
+R2<- split(x=R,f=nchar(R$V14) == 0)[[2]]
 # For returns we keep the return date and quantity
 keep <- c("V4","V5", "V7","V14")
-retrn <- R[keep]
-colnames(retrn) <- c("date", "product","quantity","facility")
+retrn1 <- R1[keep]
+keep <- c("V4","V5", "V7","V13")
+retrn2 <- R2[keep]
+
+colnames(retrn1) <- c("date", "product","quantity","facility")
+colnames(retrn2) <- c("date", "product","quantity","facility")
+retrn <- rbind(retrn1,retrn2)
 #Transfrom facility codes into 4 digit numbers
 retrn$facility <- paste0("F",unlist(lapply(retrn$facility,function(x){substr(x,start=nchar(x) -3,stop = nchar(x))})))
 
@@ -295,7 +289,17 @@ p <- p + geom_line()
 p
 ```
 
+```{r}
+plat.retrn %>% group_by(facility) %>% count() %>% arrange(desc(n)) %>%  head()
+```
+
+```{r}
+plat.retrn %>% group_by(facility) %>% count() %>% arrange(desc(n)) %>%  tail()
+```
+
+
 **Do we want to somehow take returns into account?**
+Add them in later
 
 #Example data
 
@@ -335,4 +339,84 @@ p
 ```
 
 
-Looks a bit funny, but it could do?
+Looks a bit funny, but it could do. ** Ellie says it is OK**
+
+# All hospitals
+Tiia thought it would be best to include all hospitals in the delivery.
+```{r}
+library("xlsx")
+hospitals <- read.xlsx("../data/SairaalaAsiakkaat2012_Tiilta.xlsx",sheetIndex = 1)
+hcode  <- paste0("F",gsub(" .*","",gsub("^ ","",hospitals[,1])))
+hname  <- substr(x=sub("^ ","",hospitals[,1]),start = 7,stop = 50)
+hospitals <- data.frame(facility = hcode,name=hname)
+```
+
+
+```{r}
+#Accept all the products
+#Only take jhospitals 
+#"F8116","F8070","F7109","F8316"
+
+dailycounts <- plat.distr %>% filter(facility %in% hospitals$facility)   %>%  group_by(facility,date) %>%  summarise(n=n())
+#Names come put much better from the Hospitals object
+dailycounts <- inner_join(dailycounts,hospitals, by = c("facility"="facility")) %>% ungroup() %>% select(-facility)
+
+#To anonymise make all counts of 1-5 as "1-5"
+dailycounts$n[dailycounts$n < 6] <- "1-5"
+dailycounts$class <- "delivery"
+dailycounts
+
+```
+
+## Add the returns
+```{r}
+#add the names
+returns <- inner_join(plat.retrn,hospitals, by = c("facility"="facility")) %>% select(-facility)
+dailyreturns <- returns %>%  group_by(name,date) %>%  summarise(n=n())
+#To anonymise make all counts of 1-5 as "1-5"
+dailyreturns$n[dailyreturns$n < 6] <- "1-5"
+dailyreturns$class <- "return"
+dailyreturns <- dailyreturns %>% select(date,n,name,class)
+dailyreturns
+
+
+```
+
+
+Join
+```{r}
+daily <- bind_rows(dailycounts,dailyreturns) %>% ungroup()%>% arrange(date)
+
+head(daily)
+
+```
+
+
+
+```{r}
+tail(daily)
+```
+
+
+## Summarise a bit
+```{r}
+daily %>% mutate(Year=year(date)) %>% group_by(Year,class) %>% count() %>% tail(10)
+```
+
+This is not counts of bags but counts of days with a delivery or return to/from hospital.
+
+```{r}
+daily %>% group_by(name,class) %>% count() %>% arrange(desc(n)) %>% head(10)
+```
+
+```{r}
+daily %>% group_by(name,class) %>% count() %>% arrange(desc(n)) %>% tail(10)
+```
+This is not counts of bags but counts of days with a delivery or return to/from hospital.
+
+Looks OK. 
+```{r}
+file <- "../results/20200324DailyCountsOfPlateletReturnsAndDeliveries.txt"
+write.table(daily,file=file,sep = ";",row.names = FALSE,quote = FALSE)
+```
+
