@@ -1,7 +1,12 @@
-# Helper functions
-
+# Helper functions for forecast_script.Rmd
 
 extract_type <- function(red.distr, type){
+  # Separate blood types from the master frame.
+  # 
+  # param:: red.distr: The master frame. Distribution of red cell products.
+  # param:: type: 3-length string of the desired blood type, e.g. "AB+", "O -".
+  # return:: Dataframe of the desired blood type.
+  
   # Create a full sequence of dates for imputation purposes
   all.dates <- (seq.Date(min(red.distr$date),
                          max(red.distr$date),
@@ -22,6 +27,11 @@ extract_type <- function(red.distr, type){
 }
 
 aggregate_weekly <- function(series){
+  # Aggregate distributions into weekly sums.
+  # 
+  # param:: series: dataframe of a daily series
+  # return:: dataframe of a weekly series
+  
   pcslist <- list(); weeklist <- list(); datelist <- list()  # Create storage lists
   j <- 0; k <- 0  # j is for resetting week counter, k is for gathering dates
   for(i in seq(to = length(series$date), by = 7)){
@@ -36,7 +46,16 @@ aggregate_weekly <- function(series){
   return(weekly)
 }
 
-find_errors <- function(segment, beginning, series.ts, method = "none", smooth = "none", freq = "monthly"){
+find_errors <- function(beginning, series.ts, method = "none", smooth = "none", freq = "monthly"){
+  # Used in model selection
+  # 
+  # param:: beginning: Beginning of the series
+  # param:: series.ts: timeseries object
+  # param:: method: str of "tslm", "stl", "ets", "tbats", "stlf", "naive", "snaive", "rwf", or "meanf"
+  # param:: smooth: str of "none", ".25", or ".10"
+  # param:: freq: str of "monthly" or "weekly"
+  # return:: A vector of errors.
+  
   apes <- c()
   if(freq == "monthly"){
     for(i in seq(length(series.ts) - 37)){
@@ -566,37 +585,37 @@ chosen_forecast_extended <- function(chosen.model, series.ts, freq = "monthly"){
   return(fdf)
 }
 
-select_model <- function(segment, beginning, series.ts, freq){
+select_model <- function(beginning, series.ts, freq){
   # Standard
-  ets.capes <- find_errors(segment, beginning, series.ts, "ets", smooth = "none", freq = freq)
-  stl.capes <- find_errors(segment, beginning, series.ts, "stl", smooth = "none", freq = freq)
-  tbats.capes <- find_errors(segment, beginning, series.ts, "tbats", smooth = "none", freq = freq)
-  stlf.capes <- find_errors(segment, beginning, series.ts, "stlf", smooth = "none", freq = freq)
-  lmx2.capes <- find_errors(segment, beginning, series.ts, "tslm", smooth = "none", freq = freq)
-  naive.capes <- find_errors(segment, beginning, series.ts, "naive", smooth = "none", freq = freq)
-  snaive.capes <- find_errors(segment, beginning, series.ts, "snaive", smooth = "none", freq = freq)
-  rwf.capes <- find_errors(segment, beginning, series.ts, "rwf", smooth = "none", freq = freq)
-  meanf.capes <- find_errors(segment, beginning, series.ts, "meanf", smooth = "none", freq = freq)
+  ets.capes <- find_errors(beginning, series.ts, "ets", smooth = "none", freq = freq)
+  stl.capes <- find_errors(beginning, series.ts, "stl", smooth = "none", freq = freq)
+  tbats.capes <- find_errors(beginning, series.ts, "tbats", smooth = "none", freq = freq)
+  stlf.capes <- find_errors(beginning, series.ts, "stlf", smooth = "none", freq = freq)
+  lmx2.capes <- find_errors(beginning, series.ts, "tslm", smooth = "none", freq = freq)
+  naive.capes <- find_errors(beginning, series.ts, "naive", smooth = "none", freq = freq)
+  snaive.capes <- find_errors(beginning, series.ts, "snaive", smooth = "none", freq = freq)
+  rwf.capes <- find_errors(beginning, series.ts, "rwf", smooth = "none", freq = freq)
+  meanf.capes <- find_errors(beginning, series.ts, "meanf", smooth = "none", freq = freq)
   # Smooth .25
-  smthets.capes <- find_errors(segment, beginning, series.ts, "ets", smooth = ".25", freq = freq)
-  smthstl.capes <- find_errors(segment, beginning, series.ts, "stl", smooth = ".25", freq = freq)
-  smthtbats.capes <- find_errors(segment, beginning, series.ts, "tbats", smooth = ".25", freq = freq)
-  smthstlf.capes <- find_errors(segment, beginning, series.ts, "stlf", smooth = ".25", freq = freq)
-  smthlmx2.capes <- find_errors(segment, beginning, series.ts, "tslm", smooth = ".25", freq = freq)
-  smthnaive.capes <- find_errors(segment, beginning, series.ts, "naive", smooth = ".25", freq = freq)
-  smthsnaive.capes <- find_errors(segment, beginning, series.ts, "snaive", smooth = ".25", freq = freq)
-  smthrwf.capes <- find_errors(segment, beginning, series.ts, "rwf", smooth = ".25", freq = freq)
-  smthmeanf.capes <- find_errors(segment, beginning, series.ts, "meanf", smooth = ".25", freq = freq)
+  smthets.capes <- find_errors(beginning, series.ts, "ets", smooth = ".25", freq = freq)
+  smthstl.capes <- find_errors(beginning, series.ts, "stl", smooth = ".25", freq = freq)
+  smthtbats.capes <- find_errors(beginning, series.ts, "tbats", smooth = ".25", freq = freq)
+  smthstlf.capes <- find_errors(beginning, series.ts, "stlf", smooth = ".25", freq = freq)
+  smthlmx2.capes <- find_errors(beginning, series.ts, "tslm", smooth = ".25", freq = freq)
+  smthnaive.capes <- find_errors(beginning, series.ts, "naive", smooth = ".25", freq = freq)
+  smthsnaive.capes <- find_errors(beginning, series.ts, "snaive", smooth = ".25", freq = freq)
+  smthrwf.capes <- find_errors(beginning, series.ts, "rwf", smooth = ".25", freq = freq)
+  smthmeanf.capes <- find_errors(beginning, series.ts, "meanf", smooth = ".25", freq = freq)
   # Smooth .10
-  smth10ets.capes <- find_errors(segment, beginning, series.ts, "ets", smooth = ".10", freq = freq)
-  smth10stl.capes <- find_errors(segment, beginning, series.ts, "stl", smooth = ".10", freq = freq)
-  smth10tbats.capes <- find_errors(segment, beginning, series.ts, "tbats", smooth = ".10", freq = freq)
-  smth10stlf.capes <- find_errors(segment, beginning, series.ts, "stlf", smooth = ".10", freq = freq)
-  smth10lmx2.capes <- find_errors(segment, beginning, series.ts, "tslm", smooth = ".10", freq = freq)
-  smth10naive.capes <- find_errors(segment, beginning, series.ts, "naive", smooth = ".10", freq = freq)
-  smth10snaive.capes <- find_errors(segment, beginning, series.ts, "snaive", smooth = ".10", freq = freq)
-  smth10rwf.capes <- find_errors(segment, beginning, series.ts, "rwf", smooth = ".10", freq = freq)
-  smth10meanf.capes <- find_errors(segment, beginning, series.ts, "meanf", smooth = ".10", freq = freq)
+  smth10ets.capes <- find_errors(beginning, series.ts, "ets", smooth = ".10", freq = freq)
+  smth10stl.capes <- find_errors(beginning, series.ts, "stl", smooth = ".10", freq = freq)
+  smth10tbats.capes <- find_errors(beginning, series.ts, "tbats", smooth = ".10", freq = freq)
+  smth10stlf.capes <- find_errors(beginning, series.ts, "stlf", smooth = ".10", freq = freq)
+  smth10lmx2.capes <- find_errors(beginning, series.ts, "tslm", smooth = ".10", freq = freq)
+  smth10naive.capes <- find_errors(beginning, series.ts, "naive", smooth = ".10", freq = freq)
+  smth10snaive.capes <- find_errors(beginning, series.ts, "snaive", smooth = ".10", freq = freq)
+  smth10rwf.capes <- find_errors(beginning, series.ts, "rwf", smooth = ".10", freq = freq)
+  smth10meanf.capes <- find_errors(beginning, series.ts, "meanf", smooth = ".10", freq = freq)
   
   
   m <- matrix(c(ets.capes, stl.capes, tbats.capes, stlf.capes, lmx2.capes, 
@@ -652,10 +671,15 @@ draw_forecast <- function(forecast_dataframe, freq, history, type, modelname, pa
   
 }
 
-save_forecast <- function(fdf, months = TRUE, modelname, file){
+save_forecast <- function(fdf, months = TRUE, modelname, history, file, reverse_adj){
+  # We will need these stored
+  modelnames <- c("ETS", "STL", "TBATS", "STLF", "LMx2", "NAIVE", "SNAIVE", "RWF", "MEANF",
+                  "ETS.25", "STL.25", "TBATS.25", "STLF.25", "LMx2.25", "NAIVE.25", "SNAIVE.25", "RWF.25", "MEANF.25",
+                  "ETS.10", "STL.10", "TBATS.10", "STLF.10", "LMx2.10", "NAIVE.10", "SNAIVE.10", "RWF.10", "MEANF.10")
+  
   if(months){
     # Prepare to save the new forecast into file
-    save.this <- data.frame(time = tail(monthly$date, 1), 
+    save.this <- data.frame(time = tail(history$date, 1),
                             model = modelname, 
                             forecast = fdf$fcast[1] * reverse_adj[1],
                             upper80 = fdf$upper80[1] * reverse_adj[1],
@@ -663,7 +687,7 @@ save_forecast <- function(fdf, months = TRUE, modelname, file){
                             lower80 = fdf$lower80[1] * reverse_adj[1],
                             lower95 = fdf$lower95[1] * reverse_adj[1]) 
   } else{
-    save.this <- data.frame(time = tail(weekly$startdate, 1), 
+    save.this <- data.frame(time = tail(history$startdate, 1), 
                             model = modelname, 
                             forecast = fdf$fcast[1],
                             upper80 = fdf$upper80[1],
@@ -672,69 +696,218 @@ save_forecast <- function(fdf, months = TRUE, modelname, file){
                             lower95 = fdf$lower95[1]) 
   }
   
-  #Save only if file already exists (some histories have not been initialized yet)
+  # Does forecast history exist?
   if(file.exists(file)){
-    # Do not save if forecast already exists in history
-    existing.history <- read.csv(file)
-    existing.history$time <- as.Date(existing.history$time)
-    if(save.this$time %in% existing.history$time){
-      warning("Data point already in file!")
+    fcast.history <- read.csv(file, header = TRUE)
+    fcast.history$time <- as.Date(fcast.history$time)
+    
+    if(months){
+      # Check if missing dates in forecast history
+      all.dates <- seq.Date(min(fcast.history$time), max(fcast.history$time), "month") # Build a sequence of all dates
+      missing <- all.dates[!all.dates %in% fcast.history$time] # Check if some are missing
     } else{
-      # Save to file for historical review
-      write.table(save.this, file = file, sep = ",", append = TRUE, row.names = FALSE, col.names = FALSE)
+      # Check if missing dates in forecast history
+      all.dates <- seq.Date(min(fcast.history$time), max(fcast.history$time), "week") # Build a sequence of all dates
+      missing <- all.dates[!all.dates %in% fcast.history$time] # Check if some are missing
     }
+    
+    if(length(missing) == 0){
+      # Save newest forecast as usual
+      if(save.this$time %in% fcast.history$time){
+        warning("Data point already in file!") # Do not save if a forecast exists already!
+      } else{
+        write.table(save.this, file = file, sep = ",", append = TRUE, row.names = FALSE, col.names = FALSE)
+      }
+    } else{
+      # Fix missing dates
+      dat2 <- data.frame(time = all.dates)
+      fixed.fhistory <- merge(fcast.history, dat2, all = TRUE)
+      
+      # Iterate through missing days and compute forecasts for them, then insert to fixed.fhistory
+      if(months){
+        for(mdate in missing){
+          cutreal<- history[history$date <= mdate, ] # Cut real history at the missing date
+          beginning <- head(tail(cutreal$date, 49), 1) # Define beginning of 4 year window 
+          segment <- head(tail(cutreal$red, 49), 48) # Define 4 year window
+          series.ts <- ts(segment, start = decimal_date(beginning), frequency = 12) # Transform into a ts object
+          
+          scaleback <- as.numeric(bizdays(ts(seq(1), start = decimal_date(cutreal$date[length(cutreal$date)]), frequency = 12), FinCenter = "Zurich")) # Scaler for saving
+          
+          # Forecast
+          chosen.model <- select_model(beginning, series.ts, freq = "monthly") # Choose model
+          mcast <- chosen_forecast(chosen.model, series.ts, freq = "monthly") # Output a forecast
+          missing.fcast <- data.frame(time = tail(cutreal$date, 1), 
+                                      model = modelnames[chosen.model], 
+                                      forecast = mcast$fcast[1] * scaleback,
+                                      upper80 = mcast$upper80[1] * scaleback,
+                                      upper95 = mcast$upper95[1] * scaleback,
+                                      lower80 = mcast$lower80[1] * scaleback,
+                                      lower95 = mcast$lower95[1] * scaleback) 
+          
+          fixed.fhistory[fixed.fhistory$time == mdate, ] <- missing.fcast
+        }
+      } else{
+        for(mdate in missing){
+          cutreal<- history[history$startdate <= mdate, ] # Cut real history at the missing date
+          wbeginning <- head(tail(cutreal$startdate, 209), 1) # Define beginning of 4 year window 
+          segment <- head(tail(cutreal$red, 209), 208) # Define 4 year window
+          series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52) # Transform into a ts object
+          
+          # Forecast
+          chosen.model <- select_model(beginning, series.ts, freq = "weekly") # Choose model
+          mcast <- chosen_forecast(chosen.model, series.ts, freq = "weekly") # Output a forecast
+          missing.fcast <- data.frame(time = tail(cutreal$startdate, 1), 
+                                      model = modelnames[chosen.model], 
+                                      forecast = mcast$fcast[1],
+                                      upper80 = mcast$upper80[1],
+                                      upper95 = mcast$upper95[1],
+                                      lower80 = mcast$lower80[1],
+                                      lower95 = mcast$lower95[1]) 
+          
+          fixed.fhistory[fixed.fhistory$time == mdate, ] <- missing.fcast
+        }
+      }
+      
+      # First save the fixed forecast history into a file
+      write.csv(fixed.fhistory, file = file, row.names = FALSE)
+      
+      # Then save newest forecast as usual
+      if(save.this$time %in% fcast.history$time){
+        warning("Data point already in file!") # Do not save if a forecast exists already!
+      } else{
+        write.table(save.this, file = file, sep = ",", append = TRUE, row.names = FALSE, col.names = FALSE)
+        }
+    }
+  
   } else{
-    warning("History not initialized!")
+    # If history is missing entirely, we choose to generate 2 years for monthly fcasts and 6 months for weekly fcasts (required for plotting)
+    if(months){
+      N <- 24 # Preallocate 24 rows
+      forecast.history <- data.frame(time = rep(as.Date("2016-01-01"), N),
+                                     model = rep("", N),
+                                     forecast = rep(NA, N),
+                                     upper80 = rep(NA, N),
+                                     upper95 = rep(NA, N),
+                                     lower80 = rep(NA, N),
+                                     lower95 = rep(NA, N),
+                                     stringsAsFactors = FALSE)
+      
+      for(i in seq(0, 23)){
+        cutreal <- head(history, -(24-i)) # Erase (24-x) months from real history
+        beginning <- head(tail(cutreal$date, 49), 1) # Define beginning of 4 year window 
+        segment <- head(tail(cutreal$red, 49), 48) # Define 4 year window
+        series.ts <- ts(segment, start = decimal_date(beginning), frequency = 12) # Transform into a ts object
+        
+        scaleback <- as.numeric(bizdays(ts(seq(1), start = decimal_date(cutreal$date[length(cutreal$date)]), frequency = 12), FinCenter = "Zurich")) # Scaler for saving
+        
+        # Forecast
+        chosen.model <- select_model(beginning, series.ts, freq = "monthly") # Choose model
+        mcast <- chosen_forecast(chosen.model, series.ts, freq = "monthly") # Output a forecast
+        missing.fcast <- data.frame(time = tail(cutreal$date, 1), 
+                                    model = modelnames[chosen.model], 
+                                    forecast = mcast$fcast[1] * scaleback,
+                                    upper80 = mcast$upper80[1] * scaleback,
+                                    upper95 = mcast$upper95[1] * scaleback,
+                                    lower80 = mcast$lower80[1] * scaleback,
+                                    lower95 = mcast$lower95[1] * scaleback)
+        forecast.history[(i+1), ] <- missing.fcast
+      }
+      
+      # Save into a csv
+      write.csv(forecast.history, file = file, row.names = FALSE)
+      
+    } else{
+      N <- 24 # Preallocate 52 rows
+      forecast.history <- data.frame(time = rep(as.Date("2016-01-01"), N),
+                                     model = rep("", N),
+                                     forecast = rep(NA, N),
+                                     upper80 = rep(NA, N),
+                                     upper95 = rep(NA, N),
+                                     lower80 = rep(NA, N),
+                                     lower95 = rep(NA, N),
+                                     stringsAsFactors = FALSE)
+      
+      for(i in seq(0, 23)){
+        cutreal <- head(history, -(24-i)) # Erase (24-x) weeks from real history
+        wbeginning <- head(tail(cutreal$startdate, 209), 1) # Define beginning of 4 year window 
+        segment <- head(tail(cutreal$red, 209), 208)
+        series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52)
+        
+        # Forecast
+        chosen.model <- select_model(wbeginning, series.ts, "weekly") # Choose model
+        mcast <- chosen_forecast(chosen.model, series.ts, freq = "weekly") # Output a forecast
+        missing.fcast <- data.frame(time = tail(cutreal$startdate, 1), 
+                                    model = modelnames[chosen.model], 
+                                    forecast = mcast$fcast[1],
+                                    upper80 = mcast$upper80[1],
+                                    upper95 = mcast$upper95[1],
+                                    lower80 = mcast$lower80[1],
+                                    lower95 = mcast$lower95[1])
+        forecast.history[(i+1), ] <- missing.fcast
+      }
+      
+      # Save into a csv
+      write.csv(forecast.history, file = file, row.names = FALSE)
+    }
+    
+    # Then save newest forecast as usual
+    write.table(save.this, file = file, sep = ",", append = TRUE, row.names = FALSE, col.names = FALSE)
+    
   }
+  
 }
 
 draw_history <- function(forecasthistory, history, freq = "monthly", type, palette){
-  # Load history if it exists
-  if(file.exists(forecasthistory)){
-    FILE.EXISTS <- TRUE
-    fcast.history <- head(read.csv(forecasthistory, header = TRUE), -1)
-    fcast.history$err <- abs((tail(head(history[[type]], -1), length(fcast.history$forecast)) - fcast.history$forecast) / tail(head(history[[type]], -1),
-                                                                                                              length(fcast.history$forecast)))*100
-    # Plot
-    if(freq == "monthly"){
-      p <- ggplot(data = fcast.history, aes(x = as.Date(time), y = forecast, colour = "Forecast"), label = model) +
-        geom_line(aes(colour = "Forecast"), size = 0.9, alpha = palette[["alphaSeg"]]) +
-        geom_line(data = head(history, -1), aes(x = date, y = get(type), colour = "Data"), size = 0.8, alpha = palette[["alphaSeg"]]) +
-        labs(title = "Monthly history",
-             subtitle = paste0("Mean error: ", round(mean(fcast.history$err), 2), "%"),
-             x = "",
-             y = "Units per month",
-             colour = "Series: ") +
-        theme_minimal() + 
-        theme(legend.position = "bottom", legend.margin = margin(t = -20, b = 0)) + 
-        scale_colour_manual(values = c(palette[["colData"]], palette[["colPred"]]), labels = c("Data", "Forecast"))
-    } else{
-      p <- ggplot(data = fcast.history, aes(x = as.Date(time), y = forecast, colour = "Forecast"), label = model) +
-        geom_line(aes(colour = "Forecast"), size = 0.9, alpha = palette[["alphaSeg"]]) +
-        geom_line(data = head(history, -1), aes(x = startdate, y = get(type), colour = "Data"), size = 0.8, alpha = palette[["alphaSeg"]]) +
-        labs(title = "Weekly history",
-             subtitle = paste0("Mean error: ", round(mean(fcast.history$err), 2), "%"),
-             x = "",
-             y = "Units per week",
-             colour = "Series: ") +
-        theme_minimal() + 
-        theme(legend.position = "bottom", legend.margin = margin(t = -20, b = 0)) + 
-        scale_colour_manual(values = c(palette[["colData"]], palette[["colPred"]]), labels = c("Data", "Forecast"))
-    }
-    print(p)
-    model.freq <- as.data.frame(count(fcast.history$model), stringsAsFactors = FALSE); colnames(model.freq) <- c("model", "frequency")
-    model.freq$model <- as.character(model.freq$model)
-    model.freq$error <- round(aggregate(fcast.history$err, by = list(fcast.history$model), mean)$x, 2)
-    for(name in modelnames){
-      if(!(name %in% model.freq$model)){
-        model.freq <- rbind(model.freq, list(name, 0, 0))
-      }
-    }
-    model.freq$frequency <- round(model.freq$frequency / sum(model.freq$frequency) * 100, 2)
-    model.freq <- data.frame(model.freq, row.names = 1)
-    datatable(model.freq, rownames = TRUE, filter="top", options = list(pageLength = 9))
-  } else {
-    FILE.EXISTS <- FALSE
-    warning("History not available.")
+  # Monthly forecast history plot: 2 years
+  # Weekly forecast history plot: 6 months
+  # Tables: full history for both
+  
+  fcast.history.full <- head(read.csv(forecasthistory, header = TRUE), -1)
+  fcast.history.full$err <- abs((tail(head(history[[type]], -1), length(fcast.history.full$forecast)) - fcast.history.full$forecast) / tail(head(history[[type]], -1), length(fcast.history.full$forecast))) * 100
+  
+  # Plot
+  if(freq == "monthly"){
+    # Cut for plots: 2 years
+    fcast.history <- tail(fcast.history.full, 24)
+    
+    p <- ggplot(data = fcast.history, aes(x = as.Date(time), y = forecast, colour = "Forecast"), label = model) +
+      geom_line(aes(colour = "Forecast"), size = 0.9, alpha = palette[["alphaSeg"]]) +
+      geom_line(data = head(history, -1), aes(x = date, y = get(type), colour = "Data"), size = 0.8, alpha = palette[["alphaSeg"]]) +
+      labs(title = "Monthly history (2 years)",
+           subtitle = paste0("Mean error: ", round(mean(fcast.history$err), 2), "%"),
+           x = "",
+           y = "Units per month",
+           colour = "Series: ") +
+      theme_minimal() + 
+      theme(legend.position = "bottom", legend.margin = margin(t = -20, b = 0)) + 
+      scale_colour_manual(values = c(palette[["colData"]], palette[["colPred"]]), labels = c("Data", "Forecast"))
+  } else{
+    # Cut for plots: 6 months
+    fcast.history <- tail(fcast.history.full, 24)
+    
+    p <- ggplot(data = fcast.history, aes(x = as.Date(time), y = forecast, colour = "Forecast"), label = model) +
+      geom_line(aes(colour = "Forecast"), size = 0.9, alpha = palette[["alphaSeg"]]) +
+      geom_line(data = head(history, -1), aes(x = startdate, y = get(type), colour = "Data"), size = 0.8, alpha = palette[["alphaSeg"]]) +
+      labs(title = "Weekly history (6 months)",
+           subtitle = paste0("Mean error: ", round(mean(fcast.history$err), 2), "%"),
+           x = "",
+           y = "Units per week",
+           colour = "Series: ") +
+      theme_minimal() + 
+      theme(legend.position = "bottom", legend.margin = margin(t = -20, b = 0)) + 
+      scale_colour_manual(values = c(palette[["colData"]], palette[["colPred"]]), labels = c("Data", "Forecast"))
   }
+  print(p)
+  model.freq <- as.data.frame(count(fcast.history.full$model), stringsAsFactors = FALSE); colnames(model.freq) <- c("model", "frequency")
+  model.freq$model <- as.character(model.freq$model)
+  model.freq$error <- round(aggregate(fcast.history.full$err, by = list(fcast.history.full$model), mean)$x, 2)
+  for(name in modelnames){
+    if(!(name %in% model.freq$model)){
+      model.freq <- rbind(model.freq, list(name, 0, 0))
+    }
+  }
+  model.freq$frequency <- round(model.freq$frequency / sum(model.freq$frequency) * 100, 2)
+  model.freq <- data.frame(model.freq, row.names = 1)
+  datatable(model.freq, rownames = TRUE, filter="top", options = list(pageLength = 9))
+  
 }

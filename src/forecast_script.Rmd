@@ -248,7 +248,7 @@ wbeginning <- head(tail(weekly$startdate, 209), 1) # Define beginning of (weekly
 segment <- head(tail(monthly$red, 49), 48)
 series.ts <- ts(segment, start = decimal_date(beginning), frequency = 12)
 
-chosen.model <- select_model(segment, beginning, series.ts, "monthly")
+chosen.model <- select_model(beginning, series.ts, "monthly")
 modelname <- modelnames[chosen.model]
 ```
 
@@ -266,7 +266,7 @@ fdf_red_for_tables <- fdf_for_tables * reverse_adj # The tables need anything fr
 ```
 
 ```{r save_monthly_red, echo = FALSE}
-save_forecast(fdf, months = TRUE, modelname, "histories/monthly_red.csv") # Check pffunctions.R
+save_forecast(fdf, months = TRUE, modelname, monthly, "histories/monthly_red.csv", reverse_adj) # Check pffunctions.R
 ```
 
 ```{r, monthly_red_fig, fig.align = "center", echo = FALSE}
@@ -289,7 +289,7 @@ Forecast for `r as.character(lubridate::month(today(), label = TRUE, abbr = FALS
 segment <- head(tail(monthly$Ominus, 49), 48)
 series.ts <- ts(segment, start = decimal_date(beginning), frequency = 12)
 
-chosen.model <- select_model(segment, beginning, series.ts, "monthly")
+chosen.model <- select_model(beginning, series.ts, "monthly")
 modelname <- modelnames[chosen.model]
 ```
 
@@ -302,7 +302,7 @@ fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
 ```{r save_monthly_Ominus, echo = FALSE}
-save_forecast(fdf, months = TRUE, modelname, "histories/monthly_Ominus.csv") # Check pffunctions.R
+save_forecast(fdf, months = TRUE, modelname, monthly, "histories/monthly_Ominus.csv", reverse_adj) # Check pffunctions.R
 ```
 
 ```{r, monthly_Ominus_fig, fig.align = "center", echo = FALSE}
@@ -325,7 +325,7 @@ Forecast for `r as.character(lubridate::month(today(), label = TRUE, abbr = FALS
 segment <- head(tail(monthly$Oplus, 49), 48)
 series.ts <- ts(segment, start = decimal_date(beginning), frequency = 12)
 
-chosen.model <- select_model(segment, beginning, series.ts, "monthly")
+chosen.model <- select_model(beginning, series.ts, "monthly")
 modelname <- modelnames[chosen.model]
 ```
 
@@ -338,7 +338,7 @@ fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
 ```{r save_monthly_Oplus, echo = FALSE}
-save_forecast(fdf, months = TRUE, modelname, "histories/monthly_Oplus.csv") # Check pffunctions.R
+save_forecast(fdf, months = TRUE, modelname, monthly, "histories/monthly_Oplus.csv", reverse_adj) # Check pffunctions.R
 ```
 
 ```{r, monthly_Oplus_fig, fig.align = "center", echo = FALSE}
@@ -361,7 +361,7 @@ Forecast for `r as.character(lubridate::month(today(), label = TRUE, abbr = FALS
 segment <- head(tail(monthly$Aminus, 49), 48)
 series.ts <- ts(segment, start = decimal_date(beginning), frequency = 12)
 
-chosen.model <- select_model(segment, beginning, series.ts, "monthly")
+chosen.model <- select_model(beginning, series.ts, "monthly")
 modelname <- modelnames[chosen.model]
 ```
 
@@ -374,7 +374,7 @@ fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
 ```{r save_monthly_Aminus, echo = FALSE}
-save_forecast(fdf, months = TRUE, modelname, "histories/monthly_Aminus.csv") # Check pffunctions.R
+save_forecast(fdf, months = TRUE, modelname, monthly, "histories/monthly_Aminus.csv", reverse_adj) # Check pffunctions.R
 ```
 
 ```{r, monthly_Aminus_fig, fig.align = "center", echo = FALSE}
@@ -397,7 +397,7 @@ Forecast for `r as.character(lubridate::month(today(), label = TRUE, abbr = FALS
 segment <- head(tail(monthly$Aplus, 49), 48)
 series.ts <- ts(segment, start = decimal_date(beginning), frequency = 12)
 
-chosen.model <- select_model(segment, beginning, series.ts, "monthly")
+chosen.model <- select_model(beginning, series.ts, "monthly")
 modelname <- modelnames[chosen.model]
 ```
 
@@ -410,7 +410,7 @@ fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
 ```{r save_monthly_Aplus, echo = FALSE}
-save_forecast(fdf, months = TRUE, modelname, "histories/monthly_Aplus.csv") # Check pffunctions.R
+save_forecast(fdf, months = TRUE, modelname, monthly, "histories/monthly_Aplus.csv", reverse_adj) # Check pffunctions.R
 ```
 
 ```{r, monthly_Aplus_fig, fig.align = "center", echo = FALSE}
@@ -433,7 +433,7 @@ Forecast for `r as.character(lubridate::month(today(), label = TRUE, abbr = FALS
 segment <- head(tail(monthly$Bminus, 49), 48)
 series.ts <- ts(segment, start = decimal_date(beginning), frequency = 12)
 
-chosen.model <- select_model(segment, beginning, series.ts, "monthly")
+chosen.model <- select_model(beginning, series.ts, "monthly")
 modelname <- modelnames[chosen.model]
 ```
 
@@ -446,7 +446,7 @@ fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
 ```{r save_monthly_Bminus, echo = FALSE}
-save_forecast(fdf, months = TRUE, modelname, "histories/monthly_Bminus.csv") # Check pffunctions.R
+save_forecast(fdf, months = TRUE, modelname, monthly, "histories/monthly_Bminus.csv", reverse_adj) # Check pffunctions.R
 ```
 
 ```{r, monthly_Bminus_fig, fig.align = "center", echo = FALSE}
@@ -469,7 +469,7 @@ Forecast for `r as.character(lubridate::month(today(), label = TRUE, abbr = FALS
 segment <- head(tail(monthly$Bplus, 49), 48)
 series.ts <- ts(segment, start = decimal_date(beginning), frequency = 12)
 
-chosen.model <- select_model(segment, beginning, series.ts, "monthly")
+chosen.model <- select_model(beginning, series.ts, "monthly")
 modelname <- modelnames[chosen.model]
 ```
 
@@ -482,7 +482,7 @@ fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
 ```{r save_monthly_Bplus, echo = FALSE}
-save_forecast(fdf, months = TRUE, modelname, "histories/monthly_Bplus.csv") # Check pffunctions.R
+save_forecast(fdf, months = TRUE, modelname, monthly, "histories/monthly_Bplus.csv", reverse_adj) # Check pffunctions.R
 ```
 
 ```{r, monthly_Bplus_fig, fig.align = "center", echo = FALSE}
@@ -505,7 +505,7 @@ Forecast for `r as.character(lubridate::month(today(), label = TRUE, abbr = FALS
 segment <- head(tail(monthly$ABminus, 49), 48)
 series.ts <- ts(segment, start = decimal_date(beginning), frequency = 12)
 
-chosen.model <- select_model(segment, beginning, series.ts, "monthly")
+chosen.model <- select_model(beginning, series.ts, "monthly")
 modelname <- modelnames[chosen.model]
 ```
 
@@ -518,7 +518,7 @@ fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
 ```{r save_monthly_ABminus, echo = FALSE}
-save_forecast(fdf, months = TRUE, modelname, "histories/monthly_ABminus.csv") # Check pffunctions.R
+save_forecast(fdf, months = TRUE, modelname, monthly, "histories/monthly_ABminus.csv", reverse_adj) # Check pffunctions.R
 ```
 
 ```{r, monthly_ABminus_fig, fig.align = "center", echo = FALSE}
@@ -541,7 +541,7 @@ Forecast for `r as.character(lubridate::month(today(), label = TRUE, abbr = FALS
 segment <- head(tail(monthly$ABplus, 49), 48)
 series.ts <- ts(segment, start = decimal_date(beginning), frequency = 12)
 
-chosen.model <- select_model(segment, beginning, series.ts, "monthly")
+chosen.model <- select_model(beginning, series.ts, "monthly")
 modelname <- modelnames[chosen.model]
 ```
 
@@ -554,7 +554,7 @@ fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
 ```{r save_monthly_ABplus, echo = FALSE}
-save_forecast(fdf, months = TRUE, modelname, "histories/monthly_ABplus.csv") # Check pffunctions.R
+save_forecast(fdf, months = TRUE, modelname, monthly, "histories/monthly_ABplus.csv", reverse_adj) # Check pffunctions.R
 ```
 
 ```{r, monthly_ABplus_fig, fig.align = "center", echo = FALSE}
@@ -577,7 +577,7 @@ Forecast for `r as.character(lubridate::month(today(), label = TRUE, abbr = FALS
 segment <- head(tail(monthly$plat, 49), 48)
 series.ts <- ts(segment, start = decimal_date(beginning), frequency = 12)
 
-chosen.model <- select_model(segment, beginning, series.ts, "monthly")
+chosen.model <- select_model(beginning, series.ts, "monthly")
 modelname <- modelnames[chosen.model]
 ```
 
@@ -592,7 +592,7 @@ fdf_pla_for_tables <- fdf_for_tables * reverse_adj # The tables need anything fr
 ```
 
 ```{r save_monthly_plat, echo = FALSE}
-save_forecast(fdf, months = TRUE, modelname, "histories/monthly_plat.csv")
+save_forecast(fdf, months = TRUE, modelname, monthly, "histories/monthly_plat.csv", reverse_adj)
 ```
 
 ```{r, monthly_pla_fig, fig.align = "center", echo = FALSE}
@@ -697,7 +697,8 @@ datatable(df2, rownames = TRUE, options = list(autoWidth = TRUE,
 segment <- head(tail(weekly$red, 209), 208)
 series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52)
 
-chosen.model <- select_model(segment, wbeginning, series.ts, "weekly")
+chosen.model <- select_model(wbeginning, series.ts, "weekly")
+modelname <- modelnames[chosen.model]
 ```
 
 ```{r weekly_fcast_red, echo = FALSE, results = FALSE}
@@ -706,7 +707,7 @@ fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 ```
 
 ```{r save_weekly_red, echo = FALSE}
-save_forecast(fdf, months = FALSE, modelname, "histories/weekly_red.csv")
+save_forecast(fdf, months = FALSE, modelname, weekly, "histories/weekly_red.csv", reverse_adj)
 ```
 
 ```{r, weekly_red_fig, fig.align = "center", echo = FALSE}
@@ -729,7 +730,8 @@ Forecast for week `r week(last_month)` of `r lubridate::year(last_month)`: `r fo
 segment <- head(tail(weekly$Ominus, 209), 208)
 series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52)
 
-chosen.model <- select_model(segment, wbeginning, series.ts, "weekly")
+chosen.model <- select_model(wbeginning, series.ts, "weekly")
+modelname <- modelnames[chosen.model]
 ```
 
 ```{r weekly_fcast_Ominus, echo = FALSE, results = FALSE}
@@ -738,7 +740,7 @@ fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 ```
 
 ```{r save_weekly_Ominus, echo = FALSE}
-save_forecast(fdf, months = FALSE, modelname, "histories/weekly_Ominus.csv")
+save_forecast(fdf, months = FALSE, modelname, weekly, "histories/weekly_Ominus.csv", reverse_adj)
 ```
 
 ```{r, weekly_Ominus_fig, fig.align = "center", echo = FALSE}
@@ -761,7 +763,8 @@ Forecast for week `r week(last_month)` of `r lubridate::year(last_month)`: `r fo
 segment <- head(tail(weekly$Oplus, 209), 208)
 series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52)
 
-chosen.model <- select_model(segment, wbeginning, series.ts, "weekly")
+chosen.model <- select_model(wbeginning, series.ts, "weekly")
+modelname <- modelnames[chosen.model]
 ```
 
 ```{r weekly_fcast_Oplus, echo = FALSE, results = FALSE}
@@ -770,7 +773,7 @@ fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 ```
 
 ```{r save_weekly_Oplus, echo = FALSE}
-save_forecast(fdf, months = FALSE, modelname, "histories/weekly_Oplus.csv")
+save_forecast(fdf, months = FALSE, modelname, weekly, "histories/weekly_Oplus.csv", reverse_adj)
 ```
 
 ```{r, weekly_Oplus_fig, fig.align = "center", echo = FALSE}
@@ -793,7 +796,8 @@ Forecast for week `r week(last_month)` of `r lubridate::year(last_month)`: `r fo
 segment <- head(tail(weekly$Aminus, 209), 208)
 series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52)
 
-chosen.model <- select_model(segment, wbeginning, series.ts, "weekly")
+chosen.model <- select_model(wbeginning, series.ts, "weekly")
+modelname <- modelnames[chosen.model]
 ```
 
 ```{r weekly_fcast_Aminus, echo = FALSE, results = FALSE}
@@ -802,7 +806,7 @@ fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 ```
 
 ```{r save_weekly_Aminus, echo = FALSE}
-save_forecast(fdf, months = FALSE, modelname, "histories/weekly_Aminus.csv")
+save_forecast(fdf, months = FALSE, modelname, weekly, "histories/weekly_Aminus.csv", reverse_adj)
 ```
 
 ```{r, weekly_Aminus_fig, fig.align = "center", echo = FALSE}
@@ -825,7 +829,8 @@ Forecast for week `r week(last_month)` of `r lubridate::year(last_month)`: `r fo
 segment <- head(tail(weekly$Aplus, 209), 208)
 series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52)
 
-chosen.model <- select_model(segment, wbeginning, series.ts, "weekly")
+chosen.model <- select_model(wbeginning, series.ts, "weekly")
+modelname <- modelnames[chosen.model]
 ```
 
 ```{r weekly_fcast_Aplus, echo = FALSE, results = FALSE}
@@ -834,7 +839,7 @@ fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 ```
 
 ```{r save_weekly_Aplus, echo = FALSE}
-save_forecast(fdf, months = FALSE, modelname, "histories/weekly_Aplus.csv")
+save_forecast(fdf, months = FALSE, modelname, weekly, "histories/weekly_Aplus.csv", reverse_adj)
 ```
 
 ```{r, weekly_Aplus_fig, fig.align = "center", echo = FALSE}
@@ -857,7 +862,8 @@ Forecast for week `r week(last_month)` of `r lubridate::year(last_month)`: `r fo
 segment <- head(tail(weekly$Bminus, 209), 208)
 series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52)
 
-chosen.model <- select_model(segment, wbeginning, series.ts, "weekly")
+chosen.model <- select_model(wbeginning, series.ts, "weekly")
+modelname <- modelnames[chosen.model]
 ```
 
 ```{r weekly_fcast_Bminus, echo = FALSE, results = FALSE}
@@ -866,7 +872,7 @@ fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 ```
 
 ```{r save_weekly_Bminus, echo = FALSE}
-save_forecast(fdf, months = FALSE, modelname, "histories/weekly_Bminus.csv")
+save_forecast(fdf, months = FALSE, modelname, weekly, "histories/weekly_Bminus.csv", reverse_adj)
 ```
 
 ```{r, weekly_Bminus_fig, fig.align = "center", echo = FALSE}
@@ -889,7 +895,8 @@ Forecast for week `r week(last_month)` of `r lubridate::year(last_month)`: `r fo
 segment <- head(tail(weekly$Bplus, 209), 208)
 series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52)
 
-chosen.model <- select_model(segment, wbeginning, series.ts, "weekly")
+chosen.model <- select_model(wbeginning, series.ts, "weekly")
+modelname <- modelnames[chosen.model]
 ```
 
 ```{r weekly_fcast_Bplus, echo = FALSE, results = FALSE}
@@ -898,7 +905,7 @@ fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 ```
 
 ```{r save_weekly_Bplus, echo = FALSE}
-save_forecast(fdf, months = FALSE, modelname, "histories/weekly_Bplus.csv")
+save_forecast(fdf, months = FALSE, modelname, weekly, "histories/weekly_Bplus.csv", reverse_adj)
 ```
 
 ```{r, weekly_Bplus_fig, fig.align = "center", echo = FALSE}
@@ -921,7 +928,8 @@ Forecast for week `r week(last_month)` of `r lubridate::year(last_month)`: `r fo
 segment <- head(tail(weekly$ABminus, 209), 208)
 series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52)
 
-chosen.model <- select_model(segment, wbeginning, series.ts, "weekly")
+chosen.model <- select_model(wbeginning, series.ts, "weekly")
+modelname <- modelnames[chosen.model]
 ```
 
 ```{r weekly_fcast_ABminus, echo = FALSE, results = FALSE}
@@ -930,7 +938,7 @@ fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 ```
 
 ```{r save_weekly_ABminus, echo = FALSE}
-save_forecast(fdf, months = FALSE, modelname, "histories/weekly_ABminus.csv")
+save_forecast(fdf, months = FALSE, modelname, weekly, "histories/weekly_ABminus.csv", reverse_adj)
 ```
 
 ```{r, weekly_ABminus_fig, fig.align = "center", echo = FALSE}
@@ -953,7 +961,8 @@ Forecast for week `r week(last_month)` of `r lubridate::year(last_month)`: `r fo
 segment <- head(tail(weekly$ABplus, 209), 208)
 series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52)
 
-chosen.model <- select_model(segment, wbeginning, series.ts, "weekly")
+chosen.model <- select_model(wbeginning, series.ts, "weekly")
+modelname <- modelnames[chosen.model]
 ```
 
 ```{r weekly_fcast_ABplus, echo = FALSE, results = FALSE}
@@ -962,7 +971,7 @@ fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 ```
 
 ```{r save_weekly_ABplus, echo = FALSE}
-save_forecast(fdf, months = FALSE, modelname, "histories/weekly_ABplus.csv")
+save_forecast(fdf, months = FALSE, modelname, weekly, "histories/weekly_ABplus.csv", reverse_adj)
 ```
 
 ```{r, weekly_ABplus_fig, fig.align = "center", echo = FALSE}
@@ -985,7 +994,8 @@ Forecast for week `r week(last_month)` of `r lubridate::year(last_month)`: `r fo
 segment <- head(tail(weekly$plat, 209), 208)
 series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52)
 
-chosen.model <- select_model(segment, wbeginning, series.ts, "weekly")
+chosen.model <- select_model(wbeginning, series.ts, "weekly")
+modelname <- modelnames[chosen.model]
 ```
 
 ```{r weekly_fcast_plat, echo = FALSE, results = FALSE}
@@ -994,7 +1004,7 @@ fdf <- chosen_forecast(chosen.model, series.ts, freq = "weekly")
 ```
 
 ```{r save_weekly_plat, echo = FALSE}
-save_forecast(fdf, months = FALSE, modelname, "histories/weekly_plat.csv")
+save_forecast(fdf, months = FALSE, modelname, weekly, "histories/weekly_plat.csv", reverse_adj)
 ```
 
 ```{r, weekly_plat_fig, fig.align = "center", echo = FALSE}
