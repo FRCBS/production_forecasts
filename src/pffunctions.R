@@ -677,6 +677,14 @@ save_forecast <- function(fdf, months = TRUE, modelname, history, file, reverse_
                   "ETS.25", "STL.25", "TBATS.25", "STLF.25", "LMx2.25", "NAIVE.25", "SNAIVE.25", "RWF.25", "MEANF.25",
                   "ETS.10", "STL.10", "TBATS.10", "STLF.10", "LMx2.10", "NAIVE.10", "SNAIVE.10", "RWF.10", "MEANF.10")
   
+  # Extract type from filename
+  if(months){
+    type <- regmatches(filestr, regexec("monthly_(.*).csv", filestr))[[1]][2]
+  } else{
+    type <- regmatches(filestr, regexec("weekly_(.*).csv", filestr))[[1]][2]
+  }
+  
+  
   if(months){
     # Prepare to save the new forecast into file
     save.this <- data.frame(time = tail(history$date, 1),
@@ -728,7 +736,7 @@ save_forecast <- function(fdf, months = TRUE, modelname, history, file, reverse_
         for(mdate in missing){
           cutreal<- history[history$date <= mdate, ] # Cut real history at the missing date
           beginning <- head(tail(cutreal$date, 49), 1) # Define beginning of 4 year window 
-          segment <- head(tail(cutreal$red, 49), 48) # Define 4 year window
+          segment <- head(tail(cutreal[, type], 49), 48) # Define 4 year window
           series.ts <- ts(segment, start = decimal_date(beginning), frequency = 12) # Transform into a ts object
           
           scaleback <- as.numeric(bizdays(ts(seq(1), start = decimal_date(cutreal$date[length(cutreal$date)]), frequency = 12), FinCenter = "Zurich")) # Scaler for saving
@@ -750,7 +758,7 @@ save_forecast <- function(fdf, months = TRUE, modelname, history, file, reverse_
         for(mdate in missing){
           cutreal<- history[history$startdate <= mdate, ] # Cut real history at the missing date
           wbeginning <- head(tail(cutreal$startdate, 209), 1) # Define beginning of 4 year window 
-          segment <- head(tail(cutreal$red, 209), 208) # Define 4 year window
+          segment <- head(tail(cutreal[, type], 209), 208) # Define 4 year window
           series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52) # Transform into a ts object
           
           # Forecast
@@ -795,7 +803,7 @@ save_forecast <- function(fdf, months = TRUE, modelname, history, file, reverse_
       for(i in seq(0, 23)){
         cutreal <- head(history, -(24-i)) # Erase (24-x) months from real history
         beginning <- head(tail(cutreal$date, 49), 1) # Define beginning of 4 year window 
-        segment <- head(tail(cutreal$red, 49), 48) # Define 4 year window
+        segment <- head(tail(cutreal[, type], 49), 48) # Define 4 year window
         series.ts <- ts(segment, start = decimal_date(beginning), frequency = 12) # Transform into a ts object
         
         scaleback <- as.numeric(bizdays(ts(seq(1), start = decimal_date(cutreal$date[length(cutreal$date)]), frequency = 12), FinCenter = "Zurich")) # Scaler for saving
@@ -830,7 +838,7 @@ save_forecast <- function(fdf, months = TRUE, modelname, history, file, reverse_
       for(i in seq(0, 23)){
         cutreal <- head(history, -(24-i)) # Erase (24-x) weeks from real history
         wbeginning <- head(tail(cutreal$startdate, 209), 1) # Define beginning of 4 year window 
-        segment <- head(tail(cutreal$red, 209), 208)
+        segment <- head(tail(cutreal[, type], 209), 208)
         series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52)
         
         # Forecast
