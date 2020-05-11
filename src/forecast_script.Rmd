@@ -606,7 +606,7 @@ div.summary { background-color:#e6f0ff; border-radius: 5px; padding: 20px; font-
 Forecast for `r as.character(lubridate::month(last_month, label = TRUE, abbr = FALSE))` `r lubridate::year(last_month)`: `r format(round(head(fdf_for_plots$fcast, 1), 0))  # This is to round AND display only whole numbers.` platelet units.
 
 </div>
-## Tables
+## Tables (Distributions)
 ```{r}
 # First the following table
 #      | realization x months ago ||    forecast for x months   |
