@@ -679,9 +679,9 @@ save_forecast <- function(fdf, months = TRUE, modelname, history, file, reverse_
   
   # Extract type from filename
   if(months){
-    type <- regmatches(filestr, regexec("monthly_(.*).csv", filestr))[[1]][2]
+    type <- regmatches(file, regexec("monthly_(.*).csv", file))[[1]][2]
   } else{
-    type <- regmatches(filestr, regexec("weekly_(.*).csv", filestr))[[1]][2]
+    type <- regmatches(file, regexec("weekly_(.*).csv", file))[[1]][2]
   }
   
   
@@ -810,6 +810,8 @@ save_forecast <- function(fdf, months = TRUE, modelname, history, file, reverse_
         
         # Forecast
         chosen.model <- select_model(beginning, series.ts, freq = "monthly") # Choose model
+        print(chosen.model)
+        print(modelnames[chosen.model])
         mcast <- chosen_forecast(chosen.model, series.ts, freq = "monthly") # Output a forecast
         missing.fcast <- data.frame(time = tail(cutreal$date, 1), 
                                     model = modelnames[chosen.model], 
@@ -817,15 +819,17 @@ save_forecast <- function(fdf, months = TRUE, modelname, history, file, reverse_
                                     upper80 = mcast$upper80[1] * scaleback,
                                     upper95 = mcast$upper95[1] * scaleback,
                                     lower80 = mcast$lower80[1] * scaleback,
-                                    lower95 = mcast$lower95[1] * scaleback)
+                                    lower95 = mcast$lower95[1] * scaleback, stringsAsFactors = FALSE)
+        print(missing.fcast)
         forecast.history[(i+1), ] <- missing.fcast
+        print(forecast.history)
       }
       
       # Save into a csv
       write.csv(forecast.history, file = file, row.names = FALSE)
       
     } else{
-      N <- 24 # Preallocate 52 rows
+      N <- 24 # Preallocate 24 rows
       forecast.history <- data.frame(time = rep(as.Date("2016-01-01"), N),
                                      model = rep("", N),
                                      forecast = rep(NA, N),
@@ -850,7 +854,7 @@ save_forecast <- function(fdf, months = TRUE, modelname, history, file, reverse_
                                     upper80 = mcast$upper80[1],
                                     upper95 = mcast$upper95[1],
                                     lower80 = mcast$lower80[1],
-                                    lower95 = mcast$lower95[1])
+                                    lower95 = mcast$lower95[1], stringsAsFactors = FALSE)
         forecast.history[(i+1), ] <- missing.fcast
       }
       

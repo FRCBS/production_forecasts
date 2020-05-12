@@ -607,7 +607,7 @@ Forecast for `r as.character(lubridate::month(last_month, label = TRUE, abbr = F
 
 </div>
 ## Tables (Distributions)
-```{r}
+```{r tables, echo = FALSE}
 # First the following table
 #      | realization x months ago ||    forecast for x months   |
 # RED  | 6 | 5 | 4 | 3 | 2 | 1   || CURRENT | 2 | 3 | 4 | 5 | 6 |
@@ -679,6 +679,10 @@ rownames(df2) <- c("Red cells", "Platelets")
 colnames(df2) <- c(paste0("history\n", year(today()) - 1),
                    paste0("forecast\n", year(today())),
                    paste0("forecast\n", year(today()) + 1))
+
+# Round
+df2 <- round(df2, 0)
+
 # Table it out
 datatable(df2, rownames = TRUE, options = list(autoWidth = TRUE, 
                                                paging = FALSE, 
