@@ -6,7 +6,7 @@ date: "`r format(Sys.time(), '%d %B, %Y')`"
 
 ---
 ```{r setup, echo = FALSE}
-#echo "rmarkdown::render('output_platelet_counts.Rmd', clean=TRUE,output_file='../results/output_platelet_counts.20200324.html')" | R --slave 
+#echo "rmarkdown::render('output_platelet_counts.Rmd', clean=TRUE,output_file='../results/output_platelet_counts.20200611.html')" | R --slave 
 # Set working directory
 setwd("~/Work/proj/2019Summer/production_forecasts/src/")
 ```
@@ -361,6 +361,68 @@ dailycounts <- plat.distr %>% filter(facility %in% hospitals$facility)   %>%  gr
 #Names come put much better from the Hospitals object
 dailycounts <- inner_join(dailycounts,hospitals, by = c("facility"="facility")) %>% ungroup() %>% select(-facility)
 
+```
+
+## Provide descriptives of counts
+
+First bin the hospitals a bit based on delivires in year 2019
+```{r}
+count2019<- dailycounts %>% filter(date >= "2019-01-01"  & date <= "2019-12-31") %>%  group_by(name) %>% summarise(count=sum(n))
+ggplot(count2019) + geom_histogram(aes(x=count),binwidth = 100)  
+
+```
+```{r}
+
+ggplot(count2019 %>% filter(count < 1000)) + geom_histogram(aes(x=count),binwidth = 50)  
+
+```
+
+Based on that lets bin them by 100 and 1000.
+
+```{r}
+count2019 <- count2019 %>% mutate( size = case_when(count < 100 ~ "small",
+                                       count >= 100 & count < 1000 ~ "medium",
+                                       count >= 1000 ~ "large" )
+                      )
+
+dailycounts<- left_join(dailycounts,count2019,by=c("name"="name")) %>% select(-count)
+#Mark NAs as small
+dailycounts$size[is.na(dailycounts$size)] <- "small" 
+```
+
+
+Summarise by group and year
+
+```{r}
+#https://www.r-bloggers.com/computing-the-mode-in-r/
+Mode = function(x){
+    ta = table(x)
+    tam = max(ta)
+    if (all(ta == tam))
+         mod = NA
+    else
+         if(is.numeric(x))
+    mod = as.numeric(names(ta)[ta == tam])
+    else
+         mod = names(ta)[ta == tam]
+    return(mod)
+}
+
+
+descs <- dailycounts %>% mutate(year=year(date)) %>% group_by(size,year) %>% summarise(mean=mean(n),
+                                                                              sd=sd(n),
+                                                                              median=median(n),
+                                                                              q25=quantile(n,0.25),
+                                                                              q75=quantile(n,0.75),
+                                                                              mode1=Mode(n)[1],
+                                                                              mode2=Mode(n)[2]
+                                                                              )
+
+write.csv(descs,file="../results/20200611delivery_descs.csv",row.names = FALSE)
+```
+
+
+```{r}
 #To anonymise make all counts of 1-5 as "1-5"
 dailycounts$n[dailycounts$n < 6] <- "1-5"
 dailycounts$class <- "delivery"
@@ -373,18 +435,41 @@ dailycounts
 #add the names
 returns <- inner_join(plat.retrn,hospitals, by = c("facility"="facility")) %>% select(-facility)
 dailyreturns <- returns %>%  group_by(name,date) %>%  summarise(n=n())
-#To anonymise make all counts of 1-5 as "1-5"
-dailyreturns$n[dailyreturns$n < 6] <- "1-5"
 dailyreturns$class <- "return"
 dailyreturns <- dailyreturns %>% select(date,n,name,class)
-dailyreturns
+#Add the size class
+dailyreturns<- left_join(dailyreturns,count2019,by=c("name"="name")) %>% select(-count)
+#Mark NAs as small
+dailyreturns$size[is.na(dailyreturns$size)] <- "small" 
+
+#dailyreturns
 
 
 ```
 
 
-Join
 ```{r}
+descs <- dailyreturns %>% mutate(year=year(date)) %>% group_by(size,year) %>% summarise(mean=mean(n),
+                                                                              sd=sd(n),
+                                                                              median=median(n),
+                                                                              q25=quantile(n,0.25),
+                                                                              q75=quantile(n,0.75),
+                                                                              mode1=Mode(n)[1],
+                                                                              mode2=Mode(n)[2]
+                                                                              )
+
+write.csv(descs,file="../results/20200611returns_descs.csv",row.names = FALSE)
+descs
+
+```
+
+
+
+Anomymise and join 
+```{r}
+#To anonymise make all counts of 1-5 as "1-5"
+dailyreturns$n[dailyreturns$n < 6] <- "1-5"
+
 daily <- bind_rows(dailycounts,dailyreturns) %>% ungroup()%>% arrange(date)
 
 head(daily)
@@ -416,7 +501,7 @@ This is not counts of bags but counts of days with a delivery or return to/from 
 
 Looks OK. 
 ```{r}
-file <- "../results/20200324DailyCountsOfPlateletReturnsAndDeliveries.txt"
+file <- "../results/20200611DailyCountsOfPlateletReturnsAndDeliveries.txt"
 write.table(daily,file=file,sep = ";",row.names = FALSE,quote = FALSE)
 ```
 
