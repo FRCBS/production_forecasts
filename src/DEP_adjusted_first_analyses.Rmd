@@ -64,6 +64,13 @@ grid.arrange(grobs=list(p1, p2, p3, p4),
                                    c(4, 3, NA)))
 ```
 
+```{r}
+p1 + theme_bw() + 
+  labs(title = "RBC demand through almost two decades",
+       x = "Time",
+       y = "RBC units")
+```
+
 
 Initial remarks: Blood product types don't seem to correlate in sales. Why are platelets and plasma triangular while red cells have a smoother downwards trend curve? It's also obvious that red cells get sold in much larger quantities than platelets or plasma.
 

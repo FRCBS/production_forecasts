@@ -50,9 +50,17 @@ usage <- aggregate(ketju$pcs, by = list(ketju$time), sum); colnames(usage) <- c(
 
 ## Ketju weekday analysis
 ```{r, message = FALSE, warning = FALSE}
+Sys.setlocale("LC_TIME", "fi_FI.UTF-8")
 freqs <- count(weekdays(ketju$time))
 freqs$x <- factor(freqs$x, levels = c("maanantai", "tiistai", "keskiviikko", "torstai", "perjantai", "lauantai", "sunnuntai"))
-ggplot(data = freqs, aes(x = x, y = freq)) + geom_histogram(stat = "identity", fill = "#DF013A") + theme_minimal()
+ggplot(data = freqs, aes(x = x, y = freq)) + 
+  geom_histogram(stat = "identity") + 
+  theme_minimal() + 
+  labs(title = "Transfusion frequency by weekday",
+       subtitle = "Fewer operations are performed on weekends",
+       y = "Frequency",
+       x = "Weekday") +
+  scale_x_discrete(labels = c("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"))
 
 expfreqs <- count(weekdays(ketju$exp))
 expfreqs$x <- factor(expfreqs$x, levels = c("maanantai", "tiistai", "keskiviikko", "torstai", "perjantai", "lauantai", "sunnuntai"))
@@ -74,91 +82,91 @@ ketju$diff <- as.numeric(ketju$exp - ketju$time)
 hmlinna <- ggplot(ketju[ketju$hospital == "FIMLAB  HÄMEENLINNA VERIKESKUS", ], aes(x = ketju$diff[ketju$hospital == "FIMLAB  HÄMEENLINNA VERIKESKUS"])) +
   geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
-  xlab("HÄMEENL") +
+  xlab("1") +
   ylab("count")
 
 phks <- ggplot(ketju[ketju$hospital == "PHKS VERIKESKUS, LAHTI", ], aes(x = ketju$diff[ketju$hospital == "PHKS VERIKESKUS, LAHTI"])) + 
   geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
-  xlab("LAHTI") +
+  xlab("2") +
   ylab("")
 
 tyks <- ggplot(ketju[ketju$hospital == "TYKSLAB VERIKESKUS", ], aes(x = ketju$diff[ketju$hospital == "TYKSLAB VERIKESKUS"])) + 
   geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
-  xlab("TYKSLAB") +
+  xlab("3") +
   ylab("")
 
 satadiag <- ggplot(ketju[ketju$hospital == "SATADIAG VERIKESKUS, RAUMA", ], aes(x = ketju$diff[ketju$hospital == "SATADIAG VERIKESKUS, RAUMA"])) +
   geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
-  xlab("RAUMA") +
+  xlab("4") +
   ylab("")
 
 tampere <- ggplot(ketju[ketju$hospital == "FIMLAB TAMPERE VERIKESKUS", ], aes(x = ketju$diff[ketju$hospital == "FIMLAB TAMPERE VERIKESKUS"])) +
   geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
-  xlab("TAMPERE") +
+  xlab("5") +
   ylab("")
 
 jkyla <- ggplot(ketju[ketju$hospital == "FIMLAB VERIKESKUS, JYVÄSKYLÄ", ], aes(x = ketju$diff[ketju$hospital == "FIMLAB VERIKESKUS, JYVÄSKYLÄ"])) +
   geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
-  xlab("JKYLÄ") +
+  xlab("6") +
   ylab("")
 
 kymks <- ggplot(ketju[ketju$hospital == "KYMKS VERIKESKUS, KOTKA", ], aes(x = ketju$diff[ketju$hospital == "KYMKS VERIKESKUS, KOTKA"])) +
   geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
-  xlab("KOTKA") +
+  xlab("7") +
   ylab("")
 
 ekks <- ggplot(ketju[ketju$hospital == "EKKS VERIKESKUS, LAPPEENRANTA", ], aes(x = ketju$diff[ketju$hospital == "EKKS VERIKESKUS, LAPPEENRANTA"])) +
   geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
-  xlab("LRANTA") +
+  xlab("8") +
   ylab("")
 
 sjoki <- ggplot(ketju[ketju$hospital == "SEINÄJOEN KS VERIKESKUS", ], aes(x = ketju$diff[ketju$hospital == "SEINÄJOEN KS VERIKESKUS"])) +
   geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
-  xlab("SJOKI") +
+  xlab("9") +
   ylab("")
 
 vaasa <- ggplot(ketju[ketju$hospital == "VAASAN KS VERIKESKUS", ], aes(x = ketju$diff[ketju$hospital == "VAASAN KS VERIKESKUS"])) +
   geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
-  xlab("VAASA") +
+  xlab("10") +
   ylab("")
 
 kokkola <- ggplot(ketju[ketju$hospital == "NORDLAB KOKKOLA VERIKESKUS", ], aes(x = ketju$diff[ketju$hospital == "NORDLAB KOKKOLA VERIKESKUS"])) +
   geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
-  xlab("KOKKOLA") +
+  xlab("11") +
   ylab("")
 
 kuopio <- ggplot(ketju[ketju$hospital == "ISLAB KUOPIO VERIKESKUS", ], aes(x = ketju$diff[ketju$hospital == "ISLAB KUOPIO VERIKESKUS"])) +
   geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
-  xlab("KUOPIO") +
+  xlab("12") +
   ylab("")
 
 oulu <- ggplot(ketju[ketju$hospital == "NORDLAB OULU VERIKESKUS", ], aes(x = ketju$diff[ketju$hospital == "NORDLAB OULU VERIKESKUS"])) +
   geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
-  xlab("OULU") +
+  xlab("13") +
   ylab("")
 
 rovaniemi <- ggplot(ketju[ketju$hospital == "NORDLAB ROVANIEMI VERIKESKUS", ], aes(x = ketju$diff[ketju$hospital == "NORDLAB ROVANIEMI VERIKESKUS"])) +
   geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
-  xlab("RNIEMI") +
+  xlab("14") +
   ylab("")
 
 pori <- ggplot(ketju[ketju$hospital == "SATADIAG VERIKESKUS, PORI", ], aes(x = ketju$diff[ketju$hospital == "SATADIAG VERIKESKUS, PORI"])) +
   geom_histogram(bins = 30, color = "black", fill = "#DF013A") +
   xlim(c(0, 35)) +
-  xlab("PORI") +
+  xlab("15") +
   ylab("")
 
 grid.arrange(grobs = list(hmlinna, phks, tyks, satadiag, tampere, jkyla, kymks,
@@ -369,6 +377,7 @@ There is a "clear" weekly seasonality in most hospitals, and it is more pronounc
 
 ## Total usage across all hospitals (in 2019, *without imputation*)
 ```{r total_2019_wo_imput, echo=FALSE}
+Sys.setlocale("LC_TIME", "en_US.UTF-8")
 labs <- rep(c("other", "other", "thursday", "other", "other", "sunday", "monday"), 24)
 usage.2019 <- usage[usage$time >= "2019-01-01" & usage$time <= "2019-06-17", ]
 usage.2019.labbed <- usage.2019
@@ -377,7 +386,11 @@ ggplot(data = usage.2019.labbed, aes(x = time, y = pcs)) +
   geom_line() + 
   geom_point(aes(colour = factor(labs))) +
   scale_colour_manual(values = c("#DF013A", "black", "blue", "#298A08")) +
-  theme(legend.position = "bottom")
+  theme_bw() +
+  theme(legend.position = "bottom", legend.title = element_blank()) +
+  labs(title = "Transfusions in hospitals, 2019",
+       subtitle = "Most transfusions happen in the middle of the week",
+       y = "Blood bags", x = "Time")
   
 ```
 

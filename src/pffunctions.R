@@ -46,13 +46,12 @@ aggregate_weekly <- function(series){
   return(weekly)
 }
 
-find_errors <- function(beginning, series.ts, method = "none", smooth = "none", freq = "monthly"){
+find_errors <- function(beginning, series.ts, method = "none", freq = "monthly"){
   # Used in model selection
   # 
   # param:: beginning: Beginning of the series
   # param:: series.ts: timeseries object
-  # param:: method: str of "tslm", "stl", "ets", "tbats", "stlf", "naive", "snaive", "rwf", or "meanf"
-  # param:: smooth: str of "none", ".25", or ".10"
+  # param:: method: str of model
   # param:: freq: str of "monthly" or "weekly"
   # return:: A vector of errors.
   
@@ -60,56 +59,74 @@ find_errors <- function(beginning, series.ts, method = "none", smooth = "none", 
   if(freq == "monthly"){
     for(i in seq(length(series.ts) - 37)){
       # Define training and testing set as ROLLING WINDOW
-      if(smooth == ".25"){
-        train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .25), 
-                    start = decimal_date(beginning + i), 
-                    frequency = 12)
-        test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
+
+      train <- ts(series.ts[i:(35 + i)], start = decimal_date(beginning) + months(i - 1), frequency = 12)
+      test <- ts(series.ts[(36 + i)], start = decimal_date(beginning) + months(36 + i), frequency = 12)
+
+      # xregs for arimax
+      nrow <- length(train)
+      onehotyear <- matrix(c(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                             0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                             0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+                             0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+                             0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+                             0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
+                             0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+                             0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+                             0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0,
+                             0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+                             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+                             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                           ncol = 11,
+                           byrow = TRUE)
+      month.m <- matrix(, ncol = 11, nrow = nrow)
+      for(j in 1:nrow){
+        month.m[j,] <- onehotyear[month(beginning + months(j - 1) + months(i - 1)),]
       }
-      if(smooth == ".10"){
-        train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(36 + i)], .10), 
-                    start = decimal_date(beginning + i), 
-                    frequency = 12)
-        test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-      }
-      if(smooth == "none"){
-        train <- ts(series.ts[(1 + i):(36 + i)], start = decimal_date(beginning + i), frequency = 12)
-        test <- ts(series.ts[(37 + i)], start = decimal_date(beginning + 37 + i), frequency = 12)
-      }
+      horizon.m <- matrix(onehotyear[month(beginning + months(nrow + i - 1)), ], ncol = 11)
       
-      if(!(method == "tslm")){
-        if(method == "stl"){
-          # Fit
-          fit <- stl(train, s.window = "periodic", t.window = 7)
-        }
-        if(method == "ets"){
-          fit <- ets(train)
-        }
-        if(method == "tbats"){
-          fit <- tbats(train)
-        }
-        if(method == "stlf"){
-          fit <- stlf(train)
-        }
-        if(method == "naive"){
-          fit <- naive(train)
-        }
-        if(method == "snaive"){
-          fit <- snaive(train)
-        }
-        if(method == "rwf"){
-          fit <- rwf(train, drift = TRUE)
-        }
-        if(method == "meanf"){
-          fit <- meanf(train)
-        }
-        # Forecast 1 step (week) ahead
-        fcast <- forecast(fit, h = 1)
-        # Calculate errors
-        e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+      # Fit & Forecast
+      if(method == "snaive"){
+        fit <- snaive(train)
+        fcast <- forecast(fit, h = 1)$mean
       }
-      else{
-        # Fit & forecast
+      if(method == "5-MA"){
+        fit <- ma(train, order = 5)
+        fcast <- forecast(fit, h = 1)$mean
+      }
+      if(method == "7-MA"){
+        fit <- ma(train, order = 7)
+        fcast <- forecast(fit, h = 1)$mean
+      }
+      if(method == "9-MA"){
+        fit <- ma(train, order = 9)
+        fcast <- forecast(fit, h = 1)$mean
+      }
+      if(method == "12-MA"){
+        fit <- ma(train, order = 12)
+        fcast <- forecast(fit, h = 1)$mean
+      }
+      if(method == "stl"){
+        fit <- stl(train, s.window = "periodic", t.window = 7)
+        fcast <- forecast(fit, h = 1)$mean
+      }
+      if(method == "ets"){
+        fit <- ets(train)
+        fcast <- forecast(fit, h = 1)$mean
+      }
+      if(method == "tbats"){
+        fit <- tbats(train)
+        fcast <- forecast(fit, h = 1)$mean
+      }
+      if(method == "stlf"){
+        fit <- stlf(train)
+        fcast <- forecast(fit, h = 1)$mean
+      }
+      if(method == "arimax"){
+        fit <- auto.arima(train, xreg = month.m)
+        fcast <- forecast(fit, xreg = horizon.m, h = 1)$mean
+      }
+      if(method == "dynreg"){
         fit1 <- tslm(train ~ trend + season)
         fcast1 <- forecast(fit1, h = 1)
         
@@ -119,12 +136,74 @@ find_errors <- function(beginning, series.ts, method = "none", smooth = "none", 
         y <- as.numeric(fcast1$mean)
         x <- as.numeric(fcast2$mean)
         fcast <- x + y
+      }
+      if(method == "nn"){
+        fit <- nnetar(train)
+        fcast <- forecast(fit, h = 1)$mean
+      }
+      if(method == "combined"){
+        # Seasonal naive
+        snaive.fit <- snaive(train)
+        snaive.fcast <- forecast(snaive.fit, h = 1)$mean
         
-        # Calculate errors
-        e <- as.numeric(test) - as.numeric(fcast)  # Raw error
+        # 5-MA
+        ma5.fit <- ma(train, order = 5)
+        ma5.fcast <- forecast(ma5.fit, h = 1)$mean
+        
+        # 7-MA
+        ma7.fit <- ma(train, order = 7)
+        ma7.fcast <- forecast(ma7.fit, h = 1)$mean
+        
+        # 9-MA
+        ma9.fit <- ma(train, order = 9)
+        ma9.fcast <- forecast(ma9.fit, h = 1)$mean
+        
+        # 12-MA
+        ma12.fit <- ma(train, order = 12)
+        ma12.fcast <- forecast(ma12.fit, h = 1)$mean
+        
+        # STL
+        stl.fit <- stl(train, s.window = "periodic", t.window = 7)
+        stl.fcast <- forecast(stl.fit, h = 1)$mean
+        
+        # ETS
+        ets.fit <- ets(train)
+        ets.fcast <- forecast(ets.fit, h = 1)$mean
+        
+        # TBATS
+        tbats.fit <- tbats(train)
+        tbats.fcast <- forecast(tbats.fit, h = 1)$mean
+        
+        # STLF
+        stlf.fit <- stlf(train)
+        stlf.fcast <- forecast(stlf.fit, h = 1)$mean
+        
+        # Arimax
+        arimax.fit <- auto.arima(train, xreg = month.m)
+        arimax.fcast <- forecast(arimax.fit, xreg = horizon.m, h = 1)$mean
+        
+        # Dynamic regression
+        fit1 <- tslm(train ~ trend + season)
+        fcast1 <- forecast(fit1, h = 1)
+        
+        fit2 <- auto.arima(fit1$residuals)
+        fcast2 <- forecast(fit2, h = 1)
+        
+        y <- as.numeric(fcast1$mean)
+        x <- as.numeric(fcast2$mean)
+        dynreg.fcast <- x + y
+        
+        # NNETAR
+        nn.fit <- nnetar(train)
+        nn.fcast <- forecast(nn.fit, h = 1)$mean
+        
+        fcast <- mean(c(snaive.fcast, ma5.fcast, ma7.fcast, ma9.fcast, ma12.fcast, stl.fcast, 
+                        ets.fcast, tbats.fcast, stlf.fcast, arimax.fcast, dynreg.fcast, nn.fcast))
       }
       
-      ape <- abs(e)/test * 100  # We decided to change this to NON-critical
+      # Calculate errors
+      e <- as.numeric(test) - as.numeric(fcast)  # Raw error
+      ape <- abs(e)/test * 100  # absolute percentage error
       
       # Save errors
       apes <- c(apes, ape)
@@ -133,56 +212,74 @@ find_errors <- function(beginning, series.ts, method = "none", smooth = "none", 
     if(freq == "weekly"){
       for(i in seq(length(series.ts) - 157)){
         # Define training and testing set as ROLLING WINDOW
-        if(smooth == ".25"){
-          train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(156 + i)], .25), 
-                      start = decimal_date(beginning + i), 
-                      frequency = 12)
-          test <- ts(series.ts[(157 + i)], start = decimal_date(beginning + 157 + i), frequency = 12)
-        }
-        if(smooth == ".10"){
-          train <- ts(itsmr::smooth.fft(series.ts[(1 + i):(156 + i)], .10), 
-                      start = decimal_date(beginning + i), 
-                      frequency = 12)
-          test <- ts(series.ts[(157 + i)], start = decimal_date(beginning + 157 + i), frequency = 12)
-        }
-        if(smooth == "none"){
-          train <- ts(series.ts[(1 + i):(156 + i)], start = decimal_date(beginning + i), frequency = 12)
-          test <- ts(series.ts[(157 + i)], start = decimal_date(beginning + 157 + i), frequency = 12)
-        }
         
-        if(!(method == "tslm")){
-          if(method == "stl"){
-            # Fit
-            fit <- stl(train, s.window = "periodic", t.window = 7)
-          }
-          if(method == "ets"){
-            fit <- ets(train)
-          }
-          if(method == "tbats"){
-            fit <- tbats(train)
-          }
-          if(method == "stlf"){
-            fit <- stlf(train)
-          }
-          if(method == "naive"){
-            fit <- naive(train)
-          }
-          if(method == "snaive"){
-            fit <- snaive(train)
-          }
-          if(method == "rwf"){
-            fit <- rwf(train, drift = TRUE)
-          }
-          if(method == "meanf"){
-            fit <- meanf(train)
-          }
-          # Forecast 1 step (week) ahead
-          fcast <- forecast(fit, h = 1)
-          # Calculate errors
-          e <- as.numeric(test) - as.numeric(fcast$mean)  # Raw error
+        train <- ts(series.ts[i:(155 + i)], start = decimal_date(beginning) + weeks(i - 1), frequency = 52)
+        test <- ts(series.ts[(156 + i)], start = decimal_date(beginning) + weeks(156 + i), frequency = 52)
+
+        # xregs for arimax
+        nrow <- length(train)
+        onehotyear <- matrix(c(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                              ncol = 11,
+                              byrow = TRUE)
+        
+        month.m <- matrix(, nrow = nrow, ncol = 11)
+        for(j in 1:length(train)){
+          month.m[j,] <- onehotyear[month((beginning + weeks(j - 1)) + weeks(i - 1)), ]
         }
-        else{
-          # Fit & forecast
+        horizon.m <- matrix(onehotyear[month(beginning + weeks(nrow + i - 1)), ], ncol = 11)
+        # Fit & Forecast
+        if(method == "snaive"){
+          fit <- snaive(train)
+          fcast <- forecast(fit, h = 1)$mean
+        }
+        if(method == "5-MA"){
+          fit <- ma(train, order = 5)
+          fcast <- forecast(fit, h = 1)$mean
+        }
+        if(method == "7-MA"){
+          fit <- ma(train, order = 7)
+          fcast <- forecast(fit, h = 1)$mean
+        }
+        if(method == "9-MA"){
+          fit <- ma(train, order = 9)
+          fcast <- forecast(fit, h = 1)$mean
+        }
+        if(method == "12-MA"){
+          fit <- ma(train, order = 12)
+          fcast <- forecast(fit, h = 1)$mean
+        }
+        if(method == "stl"){
+          fit <- stl(train, s.window = "periodic", t.window = 7)
+          fcast <- forecast(fit, h = 1)$mean
+        }
+        if(method == "ets"){
+          fit <- ets(train)
+          fcast <- forecast(fit, h = 1)$mean
+        }
+        if(method == "tbats"){
+          fit <- tbats(train)
+          fcast <- forecast(fit, h = 1)$mean
+        }
+        if(method == "stlf"){
+          fit <- stlf(train)
+          fcast <- forecast(fit, h = 1)$mean
+        }
+        if(method == "arimax"){
+          fit <- auto.arima(train, xreg = month.m)
+          fcast <- forecast(fit, xreg = horizon.m, h = 1)$mean
+        }
+        if(method == "dynreg"){
           fit1 <- tslm(train ~ trend + season)
           fcast1 <- forecast(fit1, h = 1)
           
@@ -192,33 +289,156 @@ find_errors <- function(beginning, series.ts, method = "none", smooth = "none", 
           y <- as.numeric(fcast1$mean)
           x <- as.numeric(fcast2$mean)
           fcast <- x + y
+        }
+        if(method == "nn"){
+          fit <- nnetar(train)
+          fcast <- forecast(fit, h = 1)$mean
+        }
+        if(method == "combined"){
+          # Seasonal naive
+          snaive.fit <- snaive(train)
+          snaive.fcast <- forecast(snaive.fit, h = 1)$mean
           
-          # Calculate errors
-          e <- as.numeric(test) - as.numeric(fcast)  # Raw error
+          # 5-MA
+          ma5.fit <- ma(train, order = 5)
+          ma5.fcast <- forecast(ma5.fit, h = 1)$mean
+          
+          # 7-MA
+          ma7.fit <- ma(train, order = 7)
+          ma7.fcast <- forecast(ma7.fit, h = 1)$mean
+          
+          # 9-MA
+          ma9.fit <- ma(train, order = 9)
+          ma9.fcast <- forecast(ma9.fit, h = 1)$mean
+          
+          # 12-MA
+          ma12.fit <- ma(train, order = 12)
+          ma12.fcast <- forecast(ma12.fit, h = 1)$mean
+          
+          # STL
+          stl.fit <- stl(train, s.window = "periodic", t.window = 7)
+          stl.fcast <- forecast(stl.fit, h = 1)$mean
+          
+          # ETS
+          ets.fit <- ets(train)
+          ets.fcast <- forecast(ets.fit, h = 1)$mean
+          
+          # TBATS
+          tbats.fit <- tbats(train)
+          tbats.fcast <- forecast(tbats.fit, h = 1)$mean
+          
+          # STLF
+          stlf.fit <- stlf(train)
+          stlf.fcast <- forecast(stlf.fit, h = 1)$mean
+          
+          # Arimax
+          arimax.fit <- auto.arima(train, xreg = month.m)
+          arimax.fcast <- forecast(arimax.fit, xreg = horizon.m, h = 1)$mean
+          
+          # Dynamic regression
+          fit1 <- tslm(train ~ trend + season)
+          fcast1 <- forecast(fit1, h = 1)
+          
+          fit2 <- auto.arima(fit1$residuals)
+          fcast2 <- forecast(fit2, h = 1)
+          
+          y <- as.numeric(fcast1$mean)
+          x <- as.numeric(fcast2$mean)
+          dynreg.fcast <- x + y
+          
+          # NNETAR
+          nn.fit <- nnetar(train)
+          nn.fcast <- forecast(nn.fit, h = 1)$mean
+          
+          fcast <- mean(c(snaive.fcast, ma5.fcast, ma7.fcast, ma9.fcast, ma12.fcast, stl.fcast, 
+                          ets.fcast, tbats.fcast, stlf.fcast, arimax.fcast, dynreg.fcast, nn.fcast))
         }
         
-        ape <- abs(e)/test * 100  # We decided to change this to NON-critical
+        # Calculate errors
+        e <- as.numeric(test) - as.numeric(fcast)  # Raw error
+        ape <- abs(e)/test * 100  # absolute percentage error
         
         # Save errors
         apes <- c(apes, ape)
-    }
+      }
   }
   
   return(apes)
 }
 
-chosen_forecast <- function(chosen.model, series.ts, freq = "monthly"){
+select_model <- function(beginning, series.ts, freq){
+  # Standard
+  snaive.apes <- find_errors(beginning, series.ts, "snaive", freq = freq)
+  ma5.apes <- find_errors(beginning, series.ts, "5-MA", freq = freq)
+  ma7.apes <- find_errors(beginning, series.ts, "7-MA", freq = freq)
+  ma9.apes <- find_errors(beginning, series.ts, "9-MA", freq = freq)
+  ma12.apes <- find_errors(beginning, series.ts, "12-MA", freq = freq)
+  stl.apes <- find_errors(beginning, series.ts, "stl", freq = freq)
+  ets.apes <- find_errors(beginning, series.ts, "ets", freq = freq)
+  tbats.apes <- find_errors(beginning, series.ts, "tbats", freq = freq)
+  stlf.apes <- find_errors(beginning, series.ts, "stlf", freq = freq)
+  arimax.apes <- find_errors(beginning, series.ts, "arimax", freq = freq)
+  dynreg.apes <- find_errors(beginning, series.ts, "dynreg", freq = freq)
+  nn.apes <- find_errors(beginning, series.ts, "nn", freq = freq)
+  comb.apes <- find_errors(beginning, series.ts, "combined", freq = freq)
+  
+  m <- matrix(c(snaive.apes, ma5.apes, ma7.apes, ma9.apes, ma12.apes, stl.apes, ets.apes, 
+                tbats.apes, stlf.apes, arimax.apes, dynreg.apes, nn.apes, comb.apes),
+              ncol = 13,
+              byrow = FALSE)
+  
+  mdf <- as.data.frame(m)
+  
+  chosen.model <- which.min(colMeans(mdf))[[1]]
+  
+  return(chosen.model)
+}
+
+chosen_forecast <- function(chosen.model, series.ts, monthly, freq = "monthly"){
   if(freq == "monthly"){  # Monthly forecast
     train <- ts(tail(series.ts, 36), start = decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)  # 3 year window
-    train25 <- ts(itsmr::smooth.fft(tail(series.ts, 36), .25), start = decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)
-    train10 <- ts(itsmr::smooth.fft(tail(series.ts, 36), .10), start = decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)
+    # xregs for arimax
+    nrow <- length(train)
+    onehotyear <- matrix(c(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                         ncol = 11,
+                         byrow = TRUE)
     
+    month.m <- matrix(, nrow = nrow, ncol = 11)
+    for(j in 1:nrow){
+      month.m[j,] <- onehotyear[month(head(tail(monthly$date, 36), 1) + months(j - 1)), ]
+    }
+    horizon.m <- matrix(, nrow = 6, ncol = 11)
+    k <- 0
+    for(j in nrow:(nrow + 5)){
+      k <- k + 1
+      horizon.m[k,] <- onehotyear[month(head(tail(monthly$date, 36), 1) + months(j)), ]
+    }
     # Fit model
-    if(chosen.model == 1){fit <- ets(train)}
-    if(chosen.model == 2){fit <- stl(train, s.window = "periodic", t.window = 7)}
-    if(chosen.model == 3){fit <- tbats(train)}
-    if(chosen.model == 4){fit <- stlf(train)}
-    if(chosen.model == 5){
+    if(chosen.model == 1){fit <- snaive(train)}
+    if(chosen.model == 2){fit <- ma(train, order = 5)}
+    if(chosen.model == 3){fit <- ma(train, order = 7)}
+    if(chosen.model == 4){fit <- ma(train, order = 9)}
+    if(chosen.model == 5){fit <- ma(train, order = 12)}
+    if(chosen.model == 6){fit <- stl(train, s.window = "periodic", t.window = 7)}
+    if(chosen.model == 7){fit <- ets(train)}
+    if(chosen.model == 8){fit <- tbats(train)}
+    if(chosen.model == 9){fit <- stlf(train)}
+    if(chosen.model == 10){
+      fit <- auto.arima(train, xreg = month.m)
+      forecasts <- forecast(fit, xreg = horizon.m, h = 6)$mean
+      }
+    if(chosen.model == 11){
       fit1 <- tslm(train ~ trend + season)
       fcast1 <- forecast(fit1, h = 6)
       
@@ -233,16 +453,50 @@ chosen_forecast <- function(chosen.model, series.ts, freq = "monthly"){
       lower80s <- fcast1$lower[[1]]
       lower95s <- fcast1$lower[[2]]
     }
-    if(chosen.model == 6){fit <- naive(train)}
-    if(chosen.model == 7){fit <- snaive(train)}
-    if(chosen.model == 8){fit <- rwf(train, drift = TRUE)}
-    if(chosen.model == 9){fit <- meanf(train)}
-    if(chosen.model == 10){fit <- ets(train25)}
-    if(chosen.model == 11){fit <- stl(train25, s.window = "periodic", t.window = 7)}
-    if(chosen.model == 12){fit <- tbats(train25)}
-    if(chosen.model == 13){fit <- stlf(train25)}
-    if(chosen.model == 14){
-      fit1 <- tslm(train25 ~ trend + season)
+    if(chosen.model == 12){fit <- nnetar(train)}
+    if(chosen.model == 13){
+      # Seasonal naive
+      snaive.fit <- snaive(train)
+      snaive.fcast <- forecast(snaive.fit, h = 6)$mean
+      
+      # 5-MA
+      ma5.fit <- ma(train, order = 5)
+      ma5.fcast <- forecast(ma5.fit, h = 6)$mean
+      
+      # 7-MA
+      ma7.fit <- ma(train, order = 7)
+      ma7.fcast <- forecast(ma7.fit, h = 6)$mean
+      
+      # 9-MA
+      ma9.fit <- ma(train, order = 9)
+      ma9.fcast <- forecast(ma9.fit, h = 6)$mean
+      
+      # 12-MA
+      ma12.fit <- ma(train, order = 12)
+      ma12.fcast <- forecast(ma12.fit, h = 6)$mean
+      
+      # STL
+      stl.fit <- stl(train, s.window = "periodic", t.window = 7)
+      stl.fcast <- forecast(stl.fit, h = 6)$mean
+      
+      # ETS
+      ets.fit <- ets(train)
+      ets.fcast <- forecast(ets.fit, h = 6)$mean
+      
+      # TBATS
+      tbats.fit <- tbats(train)
+      tbats.fcast <- forecast(tbats.fit, h = 6)$mean
+      
+      # STLF
+      stlf.fit <- stlf(train)
+      stlf.fcast <- forecast(stlf.fit, h = 6)$mean
+      
+      # Arimax
+      arimax.fit <- auto.arima(train, xreg = month.m)
+      arimax.fcast <- forecast(arimax.fit, xreg = horizon.m, h = 6)$mean
+      
+      # Dynamic regression
+      fit1 <- tslm(train ~ trend + season)
       fcast1 <- forecast(fit1, h = 6)
       
       fit2 <- auto.arima(fit1$residuals)
@@ -250,43 +504,20 @@ chosen_forecast <- function(chosen.model, series.ts, freq = "monthly"){
       
       y <- as.numeric(fcast1$mean)
       x <- as.numeric(fcast2$mean)
-      forecasts <- (x + y)
-      upper80s <- fcast1$upper[[1]]
-      upper95s <- fcast1$upper[[2]]
-      lower80s <- fcast1$lower[[1]]
-      lower95s <- fcast1$lower[[2]]
-    }
-    if(chosen.model == 15){fit <- naive(train25)}
-    if(chosen.model == 16){fit <- snaive(train25)}
-    if(chosen.model == 17){fit <- rwf(train25, drift = TRUE)}
-    if(chosen.model == 18){fit <- meanf(train25)}
-    if(chosen.model == 19){fit <- ets(train10)}
-    if(chosen.model == 20){fit <- stl(train10, s.window = "periodic", t.window = 7)}
-    if(chosen.model == 21){fit <- tbats(train10)}
-    if(chosen.model == 22){fit <- stlf(train10)}
-    if(chosen.model == 23){
-      fit1 <- tslm(train10 ~ trend + season)
-      fcast1 <- forecast(fit1, h = 6)
+      dynreg.fcast <- x + y
       
-      fit2 <- auto.arima(fit1$residuals)
-      fcast2 <- forecast(fit2, h = 6)
+      # NNETAR
+      nn.fit <- nnetar(train)
+      nn.fcast <- forecast(nn.fit, h = 6)$mean
       
-      y <- as.numeric(fcast1$mean)
-      x <- as.numeric(fcast2$mean)
-      forecasts <- (x + y)
-      upper80s <- fcast1$upper[[1]]
-      upper95s <- fcast1$upper[[2]]
-      lower80s <- fcast1$lower[[1]]
-      lower95s <- fcast1$lower[[2]]
+      forecasts <- colMeans(matrix(c(snaive.fcast, ma5.fcast, ma7.fcast, ma9.fcast, ma12.fcast, stl.fcast,
+                                 ets.fcast, tbats.fcast, stlf.fcast, arimax.fcast, dynreg.fcast, nn.fcast), 
+                               ncol = 6, 
+                               byrow = TRUE))
     }
-    if(chosen.model == 24){fit <- naive(train10)}
-    if(chosen.model == 25){fit <- snaive(train10)}
-    if(chosen.model == 26){fit <- rwf(train10, drift = TRUE)}
-    if(chosen.model == 27){fit <- meanf(train10)}
-    if(!(chosen.model %in% c(5, 14, 23))){
-      # If model was not any of the LMx2 variants, forecast here
+    if(!(chosen.model %in% c(10, 11, 13))){
+      # If model was not any of the above, forecast here
       fcast <- forecast(fit, h = 6)
-      
       forecasts <- as.numeric(fcast$mean)
       upper80s <- as.numeric(fcast$upper[, 1])
       upper95s <- as.numeric(fcast$upper[, 2])
@@ -295,22 +526,64 @@ chosen_forecast <- function(chosen.model, series.ts, freq = "monthly"){
     }
     
     # Save to a returnable dataframe
+    if(!(chosen.model %in% c(10, 13))){
     fdf <- data.frame(fcast = forecasts,
                       upper80 = upper80s,
                       upper95 = upper95s,
                       lower80 = lower80s,
                       lower95 = lower95s)
+    } else { # Because some models don't have CI
+      fdf <- data.frame(fcast = forecasts,
+                        upper80 = forecasts,
+                        upper95 = forecasts,
+                        lower80 = forecasts,
+                        lower95 = forecasts)
+    }
   }
   if(freq == "weekly"){  # Weekly forecast
     train <- ts(tail(series.ts, 156), start = decimal_date(head(tail(monthly$date, 156), 1)), frequency = 52)  # Three year window
-    train25 <- ts(itsmr::smooth.fft(tail(series.ts, 156), .25), start = decimal_date(head(tail(monthly$date, 156), 1)), frequency = 52)
-    train10 <- ts(itsmr::smooth.fft(tail(series.ts, 156), .10), start = decimal_date(head(tail(monthly$date, 156), 1)), frequency = 52)
+    # xregs for arimax
+    nrow <- length(train)
+    onehotyear <- matrix(c(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                         ncol = 11,
+                         byrow = TRUE)
     
-    if(chosen.model == 1){fit <- ets(train)}
-    if(chosen.model == 2){fit <- stl(train, s.window = "periodic", t.window = 7)}
-    if(chosen.model == 3){fit <- tbats(train)}
-    if(chosen.model == 4){fit <- stlf(train)}
-    if(chosen.model == 5){
+    month.m <- matrix(, nrow = nrow, ncol = 11)
+    for(j in 1:length(train)){
+      month.m[j,] <- onehotyear[month(head(tail(monthly$date, 156), 1) + weeks(j - 1)), ]
+    }
+    horizon.m <- matrix(, nrow = 4, ncol = 11)
+    k <- 0
+    for(j in length(train):(length(train) + 4)){
+      k <- k + 1
+      month.m[k,] <- onehotyear[month(head(tail(monthly$date, 156), 1) + weeks(j)), ]
+    }
+    # Fit model
+    if(chosen.model == 1){fit <- snaive(train)}
+    if(chosen.model == 2){fit <- ma(train, order = 5)}
+    if(chosen.model == 3){fit <- ma(train, order = 7)}
+    if(chosen.model == 4){fit <- ma(train, order = 9)}
+    if(chosen.model == 5){fit <- ma(train, order = 12)}
+    if(chosen.model == 6){fit <- stl(train, s.window = "periodic", t.window = 7)}
+    if(chosen.model == 7){fit <- ets(train)}
+    if(chosen.model == 8){fit <- tbats(train)}
+    if(chosen.model == 9){fit <- stlf(train)}
+    if(chosen.model == 10){
+      fit <- auto.arima(train, xreg = month.m)
+      forecasts <- forecast(fit, xreg = horizon.m, h = 4)$mean
+    }
+    if(chosen.model == 11){
       fit1 <- tslm(train ~ trend + season)
       fcast1 <- forecast(fit1, h = 4)
       
@@ -325,16 +598,50 @@ chosen_forecast <- function(chosen.model, series.ts, freq = "monthly"){
       lower80s <- fcast1$lower[[1]]
       lower95s <- fcast1$lower[[2]]
     }
-    if(chosen.model == 6){fit <- naive(train)}
-    if(chosen.model == 7){fit <- snaive(train)}
-    if(chosen.model == 8){fit <- rwf(train, drift = TRUE)}
-    if(chosen.model == 9){fit <- meanf(train)}
-    if(chosen.model == 10){fit <- ets(train25)}
-    if(chosen.model == 11){fit <- stl(train25, s.window = "periodic", t.window = 7)}
-    if(chosen.model == 12){fit <- tbats(train25)}
-    if(chosen.model == 13){fit <- stlf(train25)}
-    if(chosen.model == 14){
-      fit1 <- tslm(train25 ~ trend + season)
+    if(chosen.model == 12){fit <- nnetar(train)}
+    if(chosen.model == 13){
+      # Seasonal naive
+      snaive.fit <- snaive(train)
+      snaive.fcast <- forecast(snaive.fit, h = 4)$mean
+      
+      # 5-MA
+      ma5.fit <- ma(train, order = 5)
+      ma5.fcast <- forecast(ma5.fit, h = 4)$mean
+      
+      # 7-MA
+      ma7.fit <- ma(train, order = 7)
+      ma7.fcast <- forecast(ma7.fit, h = 4)$mean
+      
+      # 9-MA
+      ma9.fit <- ma(train, order = 9)
+      ma9.fcast <- forecast(ma9.fit, h = 4)$mean
+      
+      # 12-MA
+      ma12.fit <- ma(train, order = 12)
+      ma12.fcast <- forecast(ma12.fit, h = 4)$mean
+      
+      # STL
+      stl.fit <- stl(train, s.window = "periodic", t.window = 7)
+      stl.fcast <- forecast(stl.fit, h = 4)$mean
+      
+      # ETS
+      ets.fit <- ets(train)
+      ets.fcast <- forecast(ets.fit, h = 4)$mean
+      
+      # TBATS
+      tbats.fit <- tbats(train)
+      tbats.fcast <- forecast(tbats.fit, h = 4)$mean
+      
+      # STLF
+      stlf.fit <- stlf(train)
+      stlf.fcast <- forecast(stlf.fit, h = 4)$mean
+      
+      # Arimax
+      arimax.fit <- auto.arima(train, xreg = month.m)
+      arimax.fcast <- forecast(arimax.fit, xreg = horizon.m, h = 4)$mean
+      
+      # Dynamic regression
+      fit1 <- tslm(train ~ trend + season)
       fcast1 <- forecast(fit1, h = 4)
       
       fit2 <- auto.arima(fit1$residuals)
@@ -342,40 +649,19 @@ chosen_forecast <- function(chosen.model, series.ts, freq = "monthly"){
       
       y <- as.numeric(fcast1$mean)
       x <- as.numeric(fcast2$mean)
-      forecasts <- (x + y)
-      upper80s <- fcast1$upper[[1]]
-      upper95s <- fcast1$upper[[2]]
-      lower80s <- fcast1$lower[[1]]
-      lower95s <- fcast1$lower[[2]]
-    }
-    if(chosen.model == 15){fit <- naive(train25)}
-    if(chosen.model == 16){fit <- snaive(train25)}
-    if(chosen.model == 17){fit <- rwf(train25, drift = TRUE)}
-    if(chosen.model == 18){fit <- meanf(train25)}
-    if(chosen.model == 19){fit <- ets(train10)}
-    if(chosen.model == 20){fit <- stl(train10, s.window = "periodic", t.window = 7)}
-    if(chosen.model == 21){fit <- tbats(train10)}
-    if(chosen.model == 22){fit <- stlf(train10)}
-    if(chosen.model == 23){
-      fit1 <- tslm(train10 ~ trend + season)
-      fcast1 <- forecast(fit1, h = 4)
+      dynreg.fcast <- x + y
       
-      fit2 <- auto.arima(fit1$residuals)
-      fcast2 <- forecast(fit2, h = 4)
+      # NNETAR
+      nn.fit <- nnetar(train)
+      nn.fcast <- forecast(nn.fit, h = 4)
       
-      y <- as.numeric(fcast1$mean)
-      x <- as.numeric(fcast2$mean)
-      forecasts <- (x + y)
-      upper80s <- fcast1$upper[[1]]
-      upper95s <- fcast1$upper[[2]]
-      lower80s <- fcast1$lower[[1]]
-      lower95s <- fcast1$lower[[2]]
+      forecasts <- colMeans(matrix(c(snaive.fcast, ma5.fcast, ma7.fcast, ma9.fcast, ma12.fcast, stl.fcast,
+                                     ets.fcast, tbats.fcast, stlf.fcast, arimax.fcast, dynreg.fcast, nn.fcast), 
+                                   ncol = 4, 
+                                   byrow = TRUE))
     }
-    if(chosen.model == 24){fit <- naive(train10)}
-    if(chosen.model == 25){fit <- snaive(train10)}
-    if(chosen.model == 26){fit <- rwf(train10, drift = TRUE)}
-    if(chosen.model == 27){fit <- meanf(train10)}
-    if(!(chosen.model %in% c(5, 14, 23))){
+    if(!(chosen.model %in% c(10, 11, 13))){
+      # If model was not any of the above, forecast here
       fcast <- forecast(fit, h = 4)
       forecasts <- as.numeric(fcast$mean)
       upper80s <- as.numeric(fcast$upper[, 1])
@@ -383,33 +669,73 @@ chosen_forecast <- function(chosen.model, series.ts, freq = "monthly"){
       lower80s <- as.numeric(fcast$lower[, 1])
       lower95s <- as.numeric(fcast$lower[, 2])
     }
-    
-    fdf <- data.frame(fcast = forecasts,
-                      upper80 = upper80s,
-                      upper95 = upper95s,
-                      lower80 = lower80s,
-                      lower95 = lower95s)
+    # Save to a returnable dataframe
+    if(!(chosen.model %in% c(10, 13))){
+      fdf <- data.frame(fcast = forecasts,
+                        upper80 = upper80s,
+                        upper95 = upper95s,
+                        lower80 = lower80s,
+                        lower95 = lower95s)
+    } else {
+      fdf <- data.frame(fcast = forecasts,
+                        upper80 = forecasts,
+                        upper95 = forecasts,
+                        lower80 = forecasts,
+                        lower95 = forecasts)
+    }
   }
-  
   return(fdf)
 }
 
-#2 An extended forecasting function is needed to safely create longer forecast sequences. It's not efficient per se,
+# An extended forecasting function is needed to safely create longer forecast sequences. It's not efficient per se,
 # but keeps everything else intact.
 # Forecasted periods are changed from 6 to 23 (to accommodate two whole years). The actual required length is determined in
 # forecast_script.Rmd
-chosen_forecast_extended <- function(chosen.model, series.ts, freq = "monthly"){
+chosen_forecast_extended <- function(chosen.model, series.ts, monthly, freq = "monthly"){
   if(freq == "monthly"){  # Monthly forecast
     train <- ts(tail(series.ts, 36), start = decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)  # 3 year window
-    train25 <- ts(itsmr::smooth.fft(tail(series.ts, 36), .25), start = decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)
-    train10 <- ts(itsmr::smooth.fft(tail(series.ts, 36), .10), start = decimal_date(head(tail(monthly$date, 36), 1)), frequency = 12)
+    # xregs for arimax
+    nrow <- length(train)
+    onehotyear <- matrix(c(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                         ncol = 11,
+                         byrow = TRUE)
     
+    month.m <- matrix(, nrow = nrow, ncol = 11)
+    for(j in 1:length(train)){
+      month.m[j,] <- onehotyear[month(head(tail(monthly$date, 36), 1) + months(j - 1)), ]
+    }
+    horizon.m <- matrix(, nrow = 23, ncol = 11)
+    k <- 0
+    for(j in length(train):(length(train) + 22)){
+      k <- k + 1
+      horizon.m[k,] <- onehotyear[month(head(tail(monthly$date, 36), 1) + months(j)), ]
+    }
     # Fit model
-    if(chosen.model == 1){fit <- ets(train)}
-    if(chosen.model == 2){fit <- stl(train, s.window = "periodic", t.window = 7)}
-    if(chosen.model == 3){fit <- tbats(train)}
-    if(chosen.model == 4){fit <- stlf(train)}
-    if(chosen.model == 5){
+    if(chosen.model == 1){fit <- snaive(train)}
+    if(chosen.model == 2){fit <- ma(train, order = 5)}
+    if(chosen.model == 3){fit <- ma(train, order = 7)}
+    if(chosen.model == 4){fit <- ma(train, order = 9)}
+    if(chosen.model == 5){fit <- ma(train, order = 12)}
+    if(chosen.model == 6){fit <- stl(train, s.window = "periodic", t.window = 7)}
+    if(chosen.model == 7){fit <- ets(train)}
+    if(chosen.model == 8){fit <- tbats(train)}
+    if(chosen.model == 9){fit <- stlf(train)}
+    if(chosen.model == 10){
+      fit <- auto.arima(train, xreg = month.m)
+      forecasts <- forecast(fit, xreg = horizon.m, h = 23)$mean
+    }
+    if(chosen.model == 11){
       fit1 <- tslm(train ~ trend + season)
       fcast1 <- forecast(fit1, h = 23)
       
@@ -424,16 +750,50 @@ chosen_forecast_extended <- function(chosen.model, series.ts, freq = "monthly"){
       lower80s <- fcast1$lower[[1]]
       lower95s <- fcast1$lower[[2]]
     }
-    if(chosen.model == 6){fit <- naive(train)}
-    if(chosen.model == 7){fit <- snaive(train)}
-    if(chosen.model == 8){fit <- rwf(train, drift = TRUE)}
-    if(chosen.model == 9){fit <- meanf(train)}
-    if(chosen.model == 10){fit <- ets(train25)}
-    if(chosen.model == 11){fit <- stl(train25, s.window = "periodic", t.window = 7)}
-    if(chosen.model == 12){fit <- tbats(train25)}
-    if(chosen.model == 13){fit <- stlf(train25)}
-    if(chosen.model == 14){
-      fit1 <- tslm(train25 ~ trend + season)
+    if(chosen.model == 12){fit <- nnetar(train)}
+    if(chosen.model == 13){
+      # Seasonal naive
+      snaive.fit <- snaive(train)
+      snaive.fcast <- forecast(snaive.fit, h = 23)$mean
+      
+      # 5-MA
+      ma5.fit <- ma(train, order = 5)
+      ma5.fcast <- forecast(ma5.fit, h = 23)$mean
+      
+      # 7-MA
+      ma7.fit <- ma(train, order = 7)
+      ma7.fcast <- forecast(ma7.fit, h = 23)$mean
+      
+      # 9-MA
+      ma9.fit <- ma(train, order = 9)
+      ma9.fcast <- forecast(ma9.fit, h = 23)$mean
+      
+      # 12-MA
+      ma12.fit <- ma(train, order = 12)
+      ma12.fcast <- forecast(ma12.fit, h = 23)$mean
+      
+      # STL
+      stl.fit <- stl(train, s.window = "periodic", t.window = 7)
+      stl.fcast <- forecast(stl.fit, h = 23)$mean
+      
+      # ETS
+      ets.fit <- ets(train)
+      ets.fcast <- forecast(ets.fit, h = 23)$mean
+      
+      # TBATS
+      tbats.fit <- tbats(train)
+      tbats.fcast <- forecast(tbats.fit, h = 23)$mean
+      
+      # STLF
+      stlf.fit <- stlf(train)
+      stlf.fcast <- forecast(stlf.fit, h = 23)$mean
+      
+      # Arimax
+      arimax.fit <- auto.arima(train, xreg = month.m)
+      arimax.fcast <- forecast(arimax.fit, xreg = horizon.m, h = 23)$mean
+      
+      # Dynamic regression
+      fit1 <- tslm(train ~ trend + season)
       fcast1 <- forecast(fit1, h = 23)
       
       fit2 <- auto.arima(fit1$residuals)
@@ -441,41 +801,19 @@ chosen_forecast_extended <- function(chosen.model, series.ts, freq = "monthly"){
       
       y <- as.numeric(fcast1$mean)
       x <- as.numeric(fcast2$mean)
-      forecasts <- (x + y)
-      upper80s <- fcast1$upper[[1]]
-      upper95s <- fcast1$upper[[2]]
-      lower80s <- fcast1$lower[[1]]
-      lower95s <- fcast1$lower[[2]]
-    }
-    if(chosen.model == 15){fit <- naive(train25)}
-    if(chosen.model == 16){fit <- snaive(train25)}
-    if(chosen.model == 17){fit <- rwf(train25, drift = TRUE)}
-    if(chosen.model == 18){fit <- meanf(train25)}
-    if(chosen.model == 19){fit <- ets(train10)}
-    if(chosen.model == 20){fit <- stl(train10, s.window = "periodic", t.window = 7)}
-    if(chosen.model == 21){fit <- tbats(train10)}
-    if(chosen.model == 22){fit <- stlf(train10)}
-    if(chosen.model == 23){
-      fit1 <- tslm(train10 ~ trend + season)
-      fcast1 <- forecast(fit1, h = 23)
+      dynreg.fcast <- x + y
       
-      fit2 <- auto.arima(fit1$residuals)
-      fcast2 <- forecast(fit2, h = 23)
+      # NNETAR
+      nn.fit <- nnetar(train)
+      nn.fcast <- forecast(nn.fit, h = 23)
       
-      y <- as.numeric(fcast1$mean)
-      x <- as.numeric(fcast2$mean)
-      forecasts <- (x + y)
-      upper80s <- fcast1$upper[[1]]
-      upper95s <- fcast1$upper[[2]]
-      lower80s <- fcast1$lower[[1]]
-      lower95s <- fcast1$lower[[2]]
+      forecasts <- colMeans(matrix(c(snaive.fcast, ma5.fcast, ma7.fcast, ma9.fcast, ma12.fcast, stl.fcast,
+                                     ets.fcast, tbats.fcast, stlf.fcast, arimax.fcast, dynreg.fcast, nn.fcast), 
+                                   ncol = 23, 
+                                   byrow = TRUE))
     }
-    if(chosen.model == 24){fit <- naive(train10)}
-    if(chosen.model == 25){fit <- snaive(train10)}
-    if(chosen.model == 26){fit <- rwf(train10, drift = TRUE)}
-    if(chosen.model == 27){fit <- meanf(train10)}
-    if(!(chosen.model %in% c(5, 14, 23))){
-      # If model was not any of the LMx2 variants, forecast here
+    if(!(chosen.model %in% c(10, 11, 13))){
+      # If model was not any of the above, forecast here
       fcast <- forecast(fit, h = 23)
       
       forecasts <- as.numeric(fcast$mean)
@@ -486,152 +824,22 @@ chosen_forecast_extended <- function(chosen.model, series.ts, freq = "monthly"){
     }
     
     # Save to a returnable dataframe
-    fdf <- data.frame(fcast = forecasts,
-                      upper80 = upper80s,
-                      upper95 = upper95s,
-                      lower80 = lower80s,
-                      lower95 = lower95s)
-  }
-  if(freq == "weekly"){  # Weekly forecast
-    train <- ts(tail(series.ts, 156), start = decimal_date(head(tail(monthly$date, 156), 1)), frequency = 52)  # Three year window
-    train25 <- ts(itsmr::smooth.fft(tail(series.ts, 156), .25), start = decimal_date(head(tail(monthly$date, 156), 1)), frequency = 52)
-    train10 <- ts(itsmr::smooth.fft(tail(series.ts, 156), .10), start = decimal_date(head(tail(monthly$date, 156), 1)), frequency = 52)
-    
-    if(chosen.model == 1){fit <- ets(train)}
-    if(chosen.model == 2){fit <- stl(train, s.window = "periodic", t.window = 7)}
-    if(chosen.model == 3){fit <- tbats(train)}
-    if(chosen.model == 4){fit <- stlf(train)}
-    if(chosen.model == 5){
-      fit1 <- tslm(train ~ trend + season)
-      fcast1 <- forecast(fit1, h = 4)
-      
-      fit2 <- auto.arima(fit1$residuals)
-      fcast2 <- forecast(fit2, h = 4)
-      
-      y <- as.numeric(fcast1$mean)
-      x <- as.numeric(fcast2$mean)
-      forecasts <- (x + y)
-      upper80s <- fcast1$upper[[1]]
-      upper95s <- fcast1$upper[[2]]
-      lower80s <- fcast1$lower[[1]]
-      lower95s <- fcast1$lower[[2]]
+    if(!(chosen.model %in% c(10, 13))){
+      fdf <- data.frame(fcast = forecasts,
+                        upper80 = upper80s,
+                        upper95 = upper95s,
+                        lower80 = lower80s,
+                        lower95 = lower95s)
+    } else { # Because some models don't have CI
+      fdf <- data.frame(fcast = forecasts,
+                        upper80 = forecasts,
+                        upper95 = forecasts,
+                        lower80 = forecasts,
+                        lower95 = forecasts)
     }
-    if(chosen.model == 6){fit <- naive(train)}
-    if(chosen.model == 7){fit <- snaive(train)}
-    if(chosen.model == 8){fit <- rwf(train, drift = TRUE)}
-    if(chosen.model == 9){fit <- meanf(train)}
-    if(chosen.model == 10){fit <- ets(train25)}
-    if(chosen.model == 11){fit <- stl(train25, s.window = "periodic", t.window = 7)}
-    if(chosen.model == 12){fit <- tbats(train25)}
-    if(chosen.model == 13){fit <- stlf(train25)}
-    if(chosen.model == 14){
-      fit1 <- tslm(train25 ~ trend + season)
-      fcast1 <- forecast(fit1, h = 4)
-      
-      fit2 <- auto.arima(fit1$residuals)
-      fcast2 <- forecast(fit2, h = 4)
-      
-      y <- as.numeric(fcast1$mean)
-      x <- as.numeric(fcast2$mean)
-      forecasts <- (x + y)
-      upper80s <- fcast1$upper[[1]]
-      upper95s <- fcast1$upper[[2]]
-      lower80s <- fcast1$lower[[1]]
-      lower95s <- fcast1$lower[[2]]
-    }
-    if(chosen.model == 15){fit <- naive(train25)}
-    if(chosen.model == 16){fit <- snaive(train25)}
-    if(chosen.model == 17){fit <- rwf(train25, drift = TRUE)}
-    if(chosen.model == 18){fit <- meanf(train25)}
-    if(chosen.model == 19){fit <- ets(train10)}
-    if(chosen.model == 20){fit <- stl(train10, s.window = "periodic", t.window = 7)}
-    if(chosen.model == 21){fit <- tbats(train10)}
-    if(chosen.model == 22){fit <- stlf(train10)}
-    if(chosen.model == 23){
-      fit1 <- tslm(train10 ~ trend + season)
-      fcast1 <- forecast(fit1, h = 4)
-      
-      fit2 <- auto.arima(fit1$residuals)
-      fcast2 <- forecast(fit2, h = 4)
-      
-      y <- as.numeric(fcast1$mean)
-      x <- as.numeric(fcast2$mean)
-      forecasts <- (x + y)
-      upper80s <- fcast1$upper[[1]]
-      upper95s <- fcast1$upper[[2]]
-      lower80s <- fcast1$lower[[1]]
-      lower95s <- fcast1$lower[[2]]
-    }
-    if(chosen.model == 24){fit <- naive(train10)}
-    if(chosen.model == 25){fit <- snaive(train10)}
-    if(chosen.model == 26){fit <- rwf(train10, drift = TRUE)}
-    if(chosen.model == 27){fit <- meanf(train10)}
-    if(!(chosen.model %in% c(5, 14, 23))){
-      fcast <- forecast(fit, h = 4)
-      forecasts <- as.numeric(fcast$mean)
-      upper80s <- as.numeric(fcast$upper[, 1])
-      upper95s <- as.numeric(fcast$upper[, 2])
-      lower80s <- as.numeric(fcast$lower[, 1])
-      lower95s <- as.numeric(fcast$lower[, 2])
-    }
-    
-    fdf <- data.frame(fcast = forecasts,
-                      upper80 = upper80s,
-                      upper95 = upper95s,
-                      lower80 = lower80s,
-                      lower95 = lower95s)
   }
   
   return(fdf)
-}
-
-select_model <- function(beginning, series.ts, freq){
-  # Standard
-  ets.capes <- find_errors(beginning, series.ts, "ets", smooth = "none", freq = freq)
-  stl.capes <- find_errors(beginning, series.ts, "stl", smooth = "none", freq = freq)
-  tbats.capes <- find_errors(beginning, series.ts, "tbats", smooth = "none", freq = freq)
-  stlf.capes <- find_errors(beginning, series.ts, "stlf", smooth = "none", freq = freq)
-  lmx2.capes <- find_errors(beginning, series.ts, "tslm", smooth = "none", freq = freq)
-  naive.capes <- find_errors(beginning, series.ts, "naive", smooth = "none", freq = freq)
-  snaive.capes <- find_errors(beginning, series.ts, "snaive", smooth = "none", freq = freq)
-  rwf.capes <- find_errors(beginning, series.ts, "rwf", smooth = "none", freq = freq)
-  meanf.capes <- find_errors(beginning, series.ts, "meanf", smooth = "none", freq = freq)
-  # Smooth .25
-  smthets.capes <- find_errors(beginning, series.ts, "ets", smooth = ".25", freq = freq)
-  smthstl.capes <- find_errors(beginning, series.ts, "stl", smooth = ".25", freq = freq)
-  smthtbats.capes <- find_errors(beginning, series.ts, "tbats", smooth = ".25", freq = freq)
-  smthstlf.capes <- find_errors(beginning, series.ts, "stlf", smooth = ".25", freq = freq)
-  smthlmx2.capes <- find_errors(beginning, series.ts, "tslm", smooth = ".25", freq = freq)
-  smthnaive.capes <- find_errors(beginning, series.ts, "naive", smooth = ".25", freq = freq)
-  smthsnaive.capes <- find_errors(beginning, series.ts, "snaive", smooth = ".25", freq = freq)
-  smthrwf.capes <- find_errors(beginning, series.ts, "rwf", smooth = ".25", freq = freq)
-  smthmeanf.capes <- find_errors(beginning, series.ts, "meanf", smooth = ".25", freq = freq)
-  # Smooth .10
-  smth10ets.capes <- find_errors(beginning, series.ts, "ets", smooth = ".10", freq = freq)
-  smth10stl.capes <- find_errors(beginning, series.ts, "stl", smooth = ".10", freq = freq)
-  smth10tbats.capes <- find_errors(beginning, series.ts, "tbats", smooth = ".10", freq = freq)
-  smth10stlf.capes <- find_errors(beginning, series.ts, "stlf", smooth = ".10", freq = freq)
-  smth10lmx2.capes <- find_errors(beginning, series.ts, "tslm", smooth = ".10", freq = freq)
-  smth10naive.capes <- find_errors(beginning, series.ts, "naive", smooth = ".10", freq = freq)
-  smth10snaive.capes <- find_errors(beginning, series.ts, "snaive", smooth = ".10", freq = freq)
-  smth10rwf.capes <- find_errors(beginning, series.ts, "rwf", smooth = ".10", freq = freq)
-  smth10meanf.capes <- find_errors(beginning, series.ts, "meanf", smooth = ".10", freq = freq)
-  
-  
-  m <- matrix(c(ets.capes, stl.capes, tbats.capes, stlf.capes, lmx2.capes, 
-                naive.capes, snaive.capes, rwf.capes, meanf.capes,
-                smthets.capes, smthstl.capes, smthtbats.capes, smthstlf.capes, 
-                smthlmx2.capes, smthnaive.capes, smthsnaive.capes, smthrwf.capes, smthmeanf.capes,
-                smth10ets.capes, smth10stl.capes, smth10tbats.capes, smth10stlf.capes, 
-                smth10lmx2.capes, smth10naive.capes, smth10snaive.capes, smth10rwf.capes, smth10meanf.capes),
-              ncol = 27,
-              byrow = FALSE)
-  
-  mdf <- as.data.frame(m)
-  
-  chosen.model <- which.min(colMeans(mdf))[[1]]
-  
-  return(chosen.model)
 }
 
 draw_forecast <- function(forecast_dataframe, freq, history, type, modelname, palette){
@@ -673,9 +881,7 @@ draw_forecast <- function(forecast_dataframe, freq, history, type, modelname, pa
 
 save_forecast <- function(fdf, months = TRUE, modelname, history, file, reverse_adj){
   # We will need these stored
-  modelnames <- c("ETS", "STL", "TBATS", "STLF", "LMx2", "NAIVE", "SNAIVE", "RWF", "MEANF",
-                  "ETS.25", "STL.25", "TBATS.25", "STLF.25", "LMx2.25", "NAIVE.25", "SNAIVE.25", "RWF.25", "MEANF.25",
-                  "ETS.10", "STL.10", "TBATS.10", "STLF.10", "LMx2.10", "NAIVE.10", "SNAIVE.10", "RWF.10", "MEANF.10")
+  modelnames <- c("SNAIVE", "5-MA", "7-MA", "9-MA", "12-MA", "STL", "ETS", "TBATS", "STLF", "ARIMAX", "DYNREG", "NN", "COMBINED")
   
   # Extract type from filename
   if(months){
@@ -704,7 +910,7 @@ save_forecast <- function(fdf, months = TRUE, modelname, history, file, reverse_
                             lower95 = fdf$lower95[1]) 
   }
   
-  # Does forecast history exist?
+  # Does forecast history file exist?
   if(file.exists(file)){
     fcast.history <- read.csv(file, header = TRUE)
     fcast.history$time <- as.Date(fcast.history$time)
@@ -743,7 +949,7 @@ save_forecast <- function(fdf, months = TRUE, modelname, history, file, reverse_
           
           # Forecast
           chosen.model <- select_model(beginning, series.ts, freq = "monthly") # Choose model
-          mcast <- chosen_forecast(chosen.model, series.ts, freq = "monthly") # Output a forecast
+          mcast <- chosen_forecast(chosen.model, series.ts, history, freq = "monthly") # Output a forecast
           missing.fcast <- data.frame(time = tail(cutreal$date, 1), 
                                       model = modelnames[chosen.model], 
                                       forecast = mcast$fcast[1] * scaleback,
@@ -763,7 +969,7 @@ save_forecast <- function(fdf, months = TRUE, modelname, history, file, reverse_
           
           # Forecast
           chosen.model <- select_model(beginning, series.ts, freq = "weekly") # Choose model
-          mcast <- chosen_forecast(chosen.model, series.ts, freq = "weekly") # Output a forecast
+          mcast <- chosen_forecast(chosen.model, series.ts, history, freq = "weekly") # Output a forecast
           missing.fcast <- data.frame(time = tail(cutreal$startdate, 1), 
                                       model = modelnames[chosen.model], 
                                       forecast = mcast$fcast[1],
@@ -810,9 +1016,7 @@ save_forecast <- function(fdf, months = TRUE, modelname, history, file, reverse_
         
         # Forecast
         chosen.model <- select_model(beginning, series.ts, freq = "monthly") # Choose model
-        print(chosen.model)
-        print(modelnames[chosen.model])
-        mcast <- chosen_forecast(chosen.model, series.ts, freq = "monthly") # Output a forecast
+        mcast <- chosen_forecast(chosen.model, series.ts, history, freq = "monthly") # Output a forecast
         missing.fcast <- data.frame(time = tail(cutreal$date, 1), 
                                     model = modelnames[chosen.model], 
                                     forecast = mcast$fcast[1] * scaleback,
@@ -820,9 +1024,7 @@ save_forecast <- function(fdf, months = TRUE, modelname, history, file, reverse_
                                     upper95 = mcast$upper95[1] * scaleback,
                                     lower80 = mcast$lower80[1] * scaleback,
                                     lower95 = mcast$lower95[1] * scaleback, stringsAsFactors = FALSE)
-        print(missing.fcast)
         forecast.history[(i+1), ] <- missing.fcast
-        print(forecast.history)
       }
       
       # Save into a csv
@@ -847,7 +1049,7 @@ save_forecast <- function(fdf, months = TRUE, modelname, history, file, reverse_
         
         # Forecast
         chosen.model <- select_model(wbeginning, series.ts, "weekly") # Choose model
-        mcast <- chosen_forecast(chosen.model, series.ts, freq = "weekly") # Output a forecast
+        mcast <- chosen_forecast(chosen.model, series.ts, history, freq = "weekly") # Output a forecast
         missing.fcast <- data.frame(time = tail(cutreal$startdate, 1), 
                                     model = modelnames[chosen.model], 
                                     forecast = mcast$fcast[1],
