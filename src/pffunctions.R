@@ -453,7 +453,10 @@ chosen_forecast <- function(chosen.model, series.ts, monthly, freq = "monthly"){
       lower80s <- fcast1$lower[[1]]
       lower95s <- fcast1$lower[[2]]
     }
-    if(chosen.model == 12){fit <- nnetar(train)}
+    if(chosen.model == 12){
+      fit <- nnetar(train)
+      forecasts <- forecast(fit, h = 6)$mean
+    }
     if(chosen.model == 13){
       # Seasonal naive
       snaive.fit <- snaive(train)
@@ -515,7 +518,7 @@ chosen_forecast <- function(chosen.model, series.ts, monthly, freq = "monthly"){
                                ncol = 6, 
                                byrow = TRUE))
     }
-    if(!(chosen.model %in% c(10, 11, 13))){
+    if(!(chosen.model %in% c(10, 11, 12, 13))){
       # If model was not any of the above, forecast here
       fcast <- forecast(fit, h = 6)
       forecasts <- as.numeric(fcast$mean)
@@ -526,13 +529,13 @@ chosen_forecast <- function(chosen.model, series.ts, monthly, freq = "monthly"){
     }
     
     # Save to a returnable dataframe
-    if(!(chosen.model %in% c(10, 13))){
+    if(!(chosen.model %in% c(10, 12, 13))){
     fdf <- data.frame(fcast = forecasts,
                       upper80 = upper80s,
                       upper95 = upper95s,
                       lower80 = lower80s,
                       lower95 = lower95s)
-    } else { # Because some models don't have CI
+    } else { # Because models 10, 12, and 13 don't have CI
       fdf <- data.frame(fcast = forecasts,
                         upper80 = forecasts,
                         upper95 = forecasts,
