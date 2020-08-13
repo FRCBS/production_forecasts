@@ -601,7 +601,10 @@ chosen_forecast <- function(chosen.model, series.ts, monthly, freq = "monthly"){
       lower80s <- fcast1$lower[[1]]
       lower95s <- fcast1$lower[[2]]
     }
-    if(chosen.model == 12){fit <- nnetar(train)}
+    if(chosen.model == 12){
+      fit <- nnetar(train)
+      forecasts <- forecast(fit, h = 4)$mean
+      }
     if(chosen.model == 13){
       # Seasonal naive
       snaive.fit <- snaive(train)
@@ -663,7 +666,7 @@ chosen_forecast <- function(chosen.model, series.ts, monthly, freq = "monthly"){
                                    ncol = 4, 
                                    byrow = TRUE))
     }
-    if(!(chosen.model %in% c(10, 11, 13))){
+    if(!(chosen.model %in% c(10, 11, 12, 13))){
       # If model was not any of the above, forecast here
       fcast <- forecast(fit, h = 4)
       forecasts <- as.numeric(fcast$mean)
@@ -673,7 +676,7 @@ chosen_forecast <- function(chosen.model, series.ts, monthly, freq = "monthly"){
       lower95s <- as.numeric(fcast$lower[, 2])
     }
     # Save to a returnable dataframe
-    if(!(chosen.model %in% c(10, 13))){
+    if(!(chosen.model %in% c(10, 12, 13))){
       fdf <- data.frame(fcast = forecasts,
                         upper80 = upper80s,
                         upper95 = upper95s,
@@ -753,7 +756,10 @@ chosen_forecast_extended <- function(chosen.model, series.ts, monthly, freq = "m
       lower80s <- fcast1$lower[[1]]
       lower95s <- fcast1$lower[[2]]
     }
-    if(chosen.model == 12){fit <- nnetar(train)}
+    if(chosen.model == 12){
+      fit <- nnetar(train)
+      forecasts <- forecast(fit, h = 23)$mean
+      }
     if(chosen.model == 13){
       # Seasonal naive
       snaive.fit <- snaive(train)
@@ -815,7 +821,7 @@ chosen_forecast_extended <- function(chosen.model, series.ts, monthly, freq = "m
                                    ncol = 23, 
                                    byrow = TRUE))
     }
-    if(!(chosen.model %in% c(10, 11, 13))){
+    if(!(chosen.model %in% c(10, 11, 12, 13))){
       # If model was not any of the above, forecast here
       fcast <- forecast(fit, h = 23)
       
@@ -827,7 +833,7 @@ chosen_forecast_extended <- function(chosen.model, series.ts, monthly, freq = "m
     }
     
     # Save to a returnable dataframe
-    if(!(chosen.model %in% c(10, 13))){
+    if(!(chosen.model %in% c(10, 12, 13))){
       fdf <- data.frame(fcast = forecasts,
                         upper80 = upper80s,
                         upper95 = upper95s,

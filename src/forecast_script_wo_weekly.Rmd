@@ -5,10 +5,10 @@ output: html_document
 
 ```{r setup, echo = FALSE}
 # Set working directory
-ROOTDIR <- "~/prodfore" # Your path
+ROOTDIR <- "~/prodfore-esa" # Your path
 knitr::opts_chunk$set(root.dir = ROOTDIR, warning = FALSE, message = FALSE) # No warnings for final output
 knitr::opts_knit$set(root.dir = ROOTDIR) # We need this also?
-
+packrat::on()
 # Colorblind palette
 # black, orange, sky blue, green,
 # yellow, blue, vermilion, purple
@@ -24,7 +24,7 @@ names(palette) <- c("alpha80", "alpha95", "alphaSeg", "alphaPred", "fill80", "fi
 library(forecast)
 library(ggplot2)
 library(gridExtra)
-library(knitr)
+#library(knitr)
 library(plyr)
 library(lubridate)
 library(numbers)
@@ -36,7 +36,7 @@ source("src/pffunctions.R")
 
 ```{r read_files, include = FALSE}
 # Get all the files
-PATH <- "~/prodfore/data/" # Your data directory
+PATH <- "~/prodfore-esa/data/processed_FACS/"
 files <- list.files(path = PATH, pattern = "FAC0091_*")  # Character vector of file names
 
 # Compile a dataframe by going over all files
@@ -199,7 +199,7 @@ plat.monthly <- aggregate(pcs ~ month(date) + year(date), data = all.plat, FUN =
 plat.retrn.monthly <- aggregate(pcs ~ month(date) + year(date), data = all.plat.retrn, FUN = sum)
 
 # Dates
-months <- seq(from = as.Date("2014-01-06"), to = max(distr$date), by = "month")
+months <- seq(from = as.Date("2014-01-01"), to = max(distr$date), by = "month")
 
 # Adjustment series
 adj <- as.numeric(bizdays(ts(months, start = decimal_date(as.Date("2014-01-06")), frequency = 12), FinCenter = "Zurich"))
