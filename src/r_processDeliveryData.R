@@ -23,16 +23,16 @@ for (i in files) {
     d[d$V1 == 'P', 'V7'] <- NA
     d[d$V1 == 'P', 'V8'] <- NA
     if (ncol(d) == 25) {
-      d[d$V1 == 'P', 'V14'] <- NA
+      #d[d$V1 == 'P', 'V14'] <- NA \\ this column now contains product codes
       d[d$V1 == 'P', 'V15'] <- NA
       
     } else if (ncol(d) == 26) {
-    d[d$V1 == 'P', 'V15'] <- NA
+    #d[d$V1 == 'P', 'V15'] <- NA \\ this column now contains product codes
     d[d$V1 == 'P', 'V16'] <- NA
     } else {
       stop(ncol(d))
     }
-    d[d$V1 == 'R', 'V5'] <- NA
+    #d[d$V1 == 'R', 'V5'] <- NA \\ this column now contains product codes
     d[d$V1 == 'R', 'V12'] <- NA
     
     
