@@ -456,7 +456,7 @@ fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
 ```{r save_monthly_Aplus, echo = FALSE}
-type <- "Aminus"
+type <- "Aplus"
 save_forecast(fdf, months = TRUE, modelname, monthly, paste0(HISTORYDIR, type, ".csv"), reverse_adj) # Check pffunctions.R
 ```
 
