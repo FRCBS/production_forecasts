@@ -563,14 +563,14 @@ chosen_forecast <- function(chosen.model, series.ts, monthly, freq = "monthly"){
                          byrow = TRUE)
     
     month.m <- matrix(, nrow = nrow, ncol = 11)
-    for(j in 1:length(train)){
+    for(j in 1:nrow){
       month.m[j,] <- onehotyear[month(head(tail(monthly$date, 156), 1) + weeks(j - 1)), ]
     }
     horizon.m <- matrix(, nrow = 4, ncol = 11)
     k <- 0
-    for(j in length(train):(length(train) + 4)){
+    for(j in nrow:(nrow + 3)){
       k <- k + 1
-      month.m[k,] <- onehotyear[month(head(tail(monthly$date, 156), 1) + weeks(j)), ]
+      horizon.m[k,] <- onehotyear[month(head(tail(monthly$date, 156), 1) + weeks(j)), ]
     }
     # Fit model
     if(chosen.model == 1){fit <- snaive(train)}
