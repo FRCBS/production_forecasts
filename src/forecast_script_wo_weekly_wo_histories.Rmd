@@ -267,7 +267,7 @@ plat.weekly <- aggregate_weekly(all.plat)
 
 # Create a master frame
 weekly <- data.frame(week = red.weekly$week,
-                     startdate = red.weekly$startdate,
+                     date = red.weekly$date,
                      red = red.weekly$pcs,
                      Ominus = Ominus.weekly$pcs,
                      Oplus = Oplus.weekly$pcs,
@@ -279,7 +279,7 @@ weekly <- data.frame(week = red.weekly$week,
                      ABplus = ABplus.weekly$pcs,
                      plat = plat.weekly$pcs)
 
-wbeginning <- head(tail(weekly$startdate, 209), 1) # Define beginning of (weekly) time here
+wbeginning <- head(tail(weekly$date, 209), 1) # Define beginning of (weekly) time here
 ```
 
 ## 6 month forecast {.tabset .tabset-fade .tabset-pills}
