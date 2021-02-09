@@ -46,7 +46,6 @@ aggregate_weekly <- function(series){
   return(weekly)
 }
 
-
 find_errors <- function(method = "none", rw_years, period, train, horizon.m, month.m){
   
   # Fit & Forecast
@@ -914,6 +913,14 @@ save_forecast <- function(fdf, months = TRUE, modelname, history, file, reverse_
         # Forecast
         chosen.model <- select_model(wbeginning, series.ts, "weekly", rw_years) # Choose model
         mcast <- chosen_forecast(chosen.model, series.ts, history, freq = "weekly", rw_years) # Output a forecast
+        cutreal <- head(history, -(24-i)) # Erase (24-x) weeks from real history
+        wbeginning <- head(tail(cutreal$date, 209), 1) # Define beginning of 4 year window 
+        segment <- head(tail(cutreal[, type], 209), 208)
+        series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52)
+        
+        # Forecast
+        chosen.model <- select_model(wbeginning, series.ts, "weekly") # Choose model
+        mcast <- chosen_forecast(chosen.model, series.ts, history, freq = "weekly") # Output a forecast
         missing.fcast <- data.frame(time = tail(cutreal$date, 1), 
                                     model = modelnames[chosen.model], 
                                     forecast = mcast$fcast[1],

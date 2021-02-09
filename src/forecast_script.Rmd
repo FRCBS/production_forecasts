@@ -156,7 +156,6 @@ all.red.retrn[is.na(all.red.retrn)] <- 0
 # Cut to time after 2014
 all.red.retrn <- all.red.retrn[all.red.retrn$date >= start_date, ]
 
-
 # Extracting types
 Ominus.distr <- extract_type(red.distr, "O -",start_date)  # This our custom function, see pffunctions.R
 Oplus.distr <- extract_type(red.distr, "O +",start_date)
@@ -220,7 +219,6 @@ months <- seq(from = start_date, to = max(distr$date), by = "month") #This needs
 adj <- as.numeric(bizdays(ts(months, 
                              start = c(year(start_date), month(start_date), day(start_date)), #  c(year, month, day) is apparently the only robust way to do this.
                              frequency = 12), FinCenter = "Zurich"))
-
 # scaler <- as.numeric(bizdays(ts(1, start = decimal_date(months[length(months)]), frequency = 12), FinCenter = "Zurich")) This was written to scale a singular forecasted month back to real values, for saving-to-file purposes
 
 end_date <- months[length(months)] # Ugly but around 30 times faster than tail(x, 1)!
@@ -686,7 +684,6 @@ red_sales_history <- red_sales_history[1:(length(red_sales_history) - 1)]
 
 # Same for returns
 red_return_history <- c(monthly_real[monthly_real$date >= as.Date(paste0(year(end_date), "-01-01")), ]$red.ret)
-# We also need them in negative values
 red_return_history <- red_return_history[1:(length(red_return_history) - 1)] * -1
 
 # Get distributions history of the current year
