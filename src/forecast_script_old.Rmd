@@ -3,7 +3,7 @@ title: "Production Forecasts"
 output: html_document
 ---
 
-```{r setup, echo = FALSE, message=FALSE, warning=FALSE}
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
 # Set working directory
 ROOTDIR <- "~/production_forecasts" # Your directory
 DATADIR <- paste0(ROOTDIR, "/data/FACS")
@@ -24,7 +24,7 @@ palette <- list(1, 1, 1, 0.7, "royalblue2", "deepskyblue1", "darkred", "darkgree
 names(palette) <- c("alpha80", "alpha95", "alphaSeg", "alphaPred", "fill80", "fill95", "colPred", "colData")
 ```
 
-```{r imports, message = FALSE, echo = FALSE, warning=FALSE}
+```{r imports, message=FALSE, warning=FALSE, echo=FALSE}
 library(forecast)
 library(ggplot2)
 library(gridExtra)
@@ -307,8 +307,12 @@ fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 fdf_red_for_tables <- fdf_for_tables * reverse_adj # The tables need anything from 6 months to 23 months, so we just scale everything from the extended 
 ```
 
-```{r, monthly_red_fig, fig.align = "center", echo = FALSE}
+```{r save_monthly_red, echo = FALSE}
 type <- "red"
+save_forecast(fdf, months = TRUE, modelname, monthly, paste0(HISTORYDIR, type, ".csv"), reverse_adj) # Check pffunctions.R
+```
+
+```{r, monthly_red_fig, fig.align = "center", echo = FALSE}
 draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, type, modelname, palette) # Check pffunctions.R
 ```
 
@@ -340,8 +344,12 @@ fdf <- chosen_forecast(chosen.model, series.ts, monthly, freq = "monthly")
 fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
-```{r, monthly_Ominus_fig, fig.align = "center", echo = FALSE}
+```{r save_monthly_Ominus, echo = FALSE}
 type <- "Ominus"
+save_forecast(fdf, months = TRUE, modelname, monthly, paste0(HISTORYDIR, type, ".csv"), reverse_adj) # Check pffunctions.R
+```
+
+```{r, monthly_Ominus_fig, fig.align = "center", echo = FALSE}
 draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, type,  modelname, palette) # Check pffunctions.R
 ```
 
@@ -373,8 +381,12 @@ fdf <- chosen_forecast(chosen.model, series.ts, monthly, freq = "monthly")
 fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
+```{r save_monthly_Oplus, echo = FALSE}
+type  <- "Oplus"
+save_forecast(fdf, months = TRUE, modelname, monthly, paste0(HISTORYDIR, type, ".csv"), reverse_adj) # Check pffunctions.R
+```
+
 ```{r, monthly_Oplus_fig, fig.align = "center", echo = FALSE}
-type <- "Oplus"
 draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, type,  modelname, palette) # Check pffunctions.R
 ```
 
@@ -406,8 +418,12 @@ fdf <- chosen_forecast(chosen.model, series.ts, monthly, freq = "monthly")
 fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
-```{r, monthly_Aminus_fig, fig.align = "center", echo = FALSE}
+```{r save_monthly_Aminus, echo = FALSE}
 type <- "Aminus"
+save_forecast(fdf, months = TRUE, modelname, monthly, paste0(HISTORYDIR, type, ".csv"), reverse_adj) # Check pffunctions.R
+```
+
+```{r, monthly_Aminus_fig, fig.align = "center", echo = FALSE}
 draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, type,  modelname, palette) # Check pffunctions.R
 ```
 
@@ -439,8 +455,12 @@ fdf <- chosen_forecast(chosen.model, series.ts, monthly, freq = "monthly")
 fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
-```{r, monthly_Aplus_fig, fig.align = "center", echo = FALSE}
+```{r save_monthly_Aplus, echo = FALSE}
 type <- "Aplus"
+save_forecast(fdf, months = TRUE, modelname, monthly, paste0(HISTORYDIR, type, ".csv"), reverse_adj) # Check pffunctions.R
+```
+
+```{r, monthly_Aplus_fig, fig.align = "center", echo = FALSE}
 draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, type,  modelname, palette) # Check pffunctions.R
 ```
 
@@ -472,8 +492,12 @@ fdf <- chosen_forecast(chosen.model, series.ts, monthly, freq = "monthly")
 fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
-```{r, monthly_Bminus_fig, fig.align = "center", echo = FALSE}
+```{r save_monthly_Bminus, echo = FALSE}
 type <- "Bminus"
+save_forecast(fdf, months = TRUE, modelname, monthly, paste0(HISTORYDIR, type, ".csv"), reverse_adj) # Check pffunctions.R
+```
+
+```{r, monthly_Bminus_fig, fig.align = "center", echo = FALSE}
 draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, type,  modelname, palette) # Check pffunctions.R
 ```
 
@@ -505,8 +529,12 @@ fdf <- chosen_forecast(chosen.model, series.ts, monthly, freq = "monthly")
 fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
-```{r, monthly_Bplus_fig, fig.align = "center", echo = FALSE}
+```{r save_monthly_Bplus, echo = FALSE}
 type <- "Bplus"
+save_forecast(fdf, months = TRUE, modelname, monthly, paste0(HISTORYDIR, type, ".csv"), reverse_adj) # Check pffunctions.R
+```
+
+```{r, monthly_Bplus_fig, fig.align = "center", echo = FALSE}
 draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, type,  modelname, palette) # Check pffunctions.R
 ```
 
@@ -538,8 +566,12 @@ fdf <- chosen_forecast(chosen.model, series.ts, monthly, freq = "monthly")
 fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
-```{r, monthly_ABminus_fig, fig.align = "center", echo = FALSE}
+```{r save_monthly_ABminus, echo = FALSE}
 type <- "ABminus"
+save_forecast(fdf, months = TRUE, modelname, monthly, paste0(HISTORYDIR, type, ".csv"), reverse_adj) # Check pffunctions.R
+```
+
+```{r, monthly_ABminus_fig, fig.align = "center", echo = FALSE}
 draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, type,  modelname, palette) # Check pffunctions.R
 ```
 
@@ -571,8 +603,12 @@ fdf <- chosen_forecast(chosen.model, series.ts, monthly, freq = "monthly")
 fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
-```{r, monthly_ABplus_fig, fig.align = "center", echo = FALSE}
+```{r save_monthly_ABplus, echo = FALSE}
 type <- "ABplus"
+save_forecast(fdf, months = TRUE, modelname, monthly, paste0(HISTORYDIR, type, ".csv"), reverse_adj) # Check pffunctions.R
+```
+
+```{r, monthly_ABplus_fig, fig.align = "center", echo = FALSE}
 draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, type,  modelname, palette) # Check pffunctions.R
 ```
 
@@ -605,8 +641,12 @@ fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 fdf_pla_for_tables <- fdf_for_tables * reverse_adj # The tables need anything from 6 months to 23 months, so we just scale everything from the extended
 ```
 
-```{r, monthly_pla_fig, fig.align = "center", echo = FALSE}
+```{r save_monthly_plat, echo = FALSE}
 type <- "plat"
+save_forecast(fdf, months = TRUE, modelname, monthly, paste0(HISTORYDIR, type, ".csv"), reverse_adj)
+```
+
+```{r, monthly_pla_fig, fig.align = "center", echo = FALSE}
 draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, type, modelname, palette)
 ```
 <style>
@@ -747,4 +787,471 @@ datatable(df2, rownames = TRUE, options = list(autoWidth = TRUE,
                                                info = FALSE, 
                                                ordering = FALSE), 
           class = "cell-border")
+```
+
+## 4 week forecast {.tabset .tabset-fade .tabset-pills}
+
+### All red
+```{r weekly_model_selection_red, echo = FALSE, results = FALSE}
+# Define the series to be used
+# We want to use 4 years of data. 3 years for the width of the rolling window and we'll let that run for a year.
+segment <- head(tail(weekly$red, 209), 208)
+series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52)
+
+chosen.model <- select_model(wbeginning, series.ts, "weekly")
+modelname <- modelnames[chosen.model]
+```
+
+```{r weekly_fcast_red, echo = FALSE, results = FALSE}
+# Now forecast with the chosen model
+fdf <- chosen_forecast(chosen.model, series.ts, monthly, freq = "weekly")
+```
+
+```{r save_weekly_red, echo = FALSE}
+type <- "red"
+save_forecast(fdf, months = FALSE, modelname, weekly, paste0(WEEKLYDIR, type, ".csv"), reverse_adj)
+```
+
+```{r, weekly_red_fig, fig.align = "center", echo = FALSE}
+draw_forecast(fdf, freq = "weekly", history = weekly, type, modelname, palette)
+```
+
+<style>
+div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font-size: 25px;}
+</style>
+<div class = "summary">
+
+Forecast for week `r week(last_month)` of `r lubridate::year(last_month)`: `r format(round(head(fdf_for_plots$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+
+</div>
+
+### O-
+```{r weekly_model_selection_Ominus, echo = FALSE, results = FALSE}
+# Define the series to be used
+# We want to use 4 years of data. 3 years for the width of the rolling window and we'll let that run for a year.
+segment <- head(tail(weekly$Ominus, 209), 208)
+series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52)
+
+chosen.model <- select_model(wbeginning, series.ts, "weekly")
+modelname <- modelnames[chosen.model]
+```
+
+```{r weekly_fcast_Ominus, echo = FALSE, results = FALSE}
+# Now forecast with the chosen model
+fdf <- chosen_forecast(chosen.model, series.ts, monthly, freq = "weekly")
+```
+
+```{r save_weekly_Ominus, echo = FALSE}
+type <- "Ominus"
+save_forecast(fdf, months = FALSE, modelname, weekly, paste0(WEEKLYDIR, type, ".csv"), reverse_adj)
+```
+
+```{r, weekly_Ominus_fig, fig.align = "center", echo = FALSE}
+draw_forecast(fdf, freq = "weekly", history = weekly, type, modelname, palette)
+```
+
+<style>
+div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font-size: 25px;}
+</style>
+<div class = "summary">
+
+Forecast for week `r week(last_month)` of `r lubridate::year(last_month)`: `r format(round(head(fdf_for_plots$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+
+</div>
+
+### O+
+```{r weekly_model_selection_Oplus, echo = FALSE, results = FALSE}
+# Define the series to be used
+# We want to use 4 years of data. 3 years for the width of the rolling window and we'll let that run for a year.
+segment <- head(tail(weekly$Oplus, 209), 208)
+series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52)
+
+chosen.model <- select_model(wbeginning, series.ts, "weekly")
+modelname <- modelnames[chosen.model]
+```
+
+```{r weekly_fcast_Oplus, echo = FALSE, results = FALSE}
+# Now forecast with the chosen model
+fdf <- chosen_forecast(chosen.model, series.ts, monthly, freq = "weekly")
+```
+
+```{r save_weekly_Oplus, echo = FALSE}
+type <- "Oplus"
+save_forecast(fdf, months = FALSE, modelname, weekly, paste0(WEEKLYDIR, type, ".csv"), reverse_adj)
+```
+
+```{r, weekly_Oplus_fig, fig.align = "center", echo = FALSE}
+draw_forecast(fdf, freq = "weekly", history = weekly, type, modelname, palette)
+```
+
+<style>
+div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font-size: 25px;}
+</style>
+<div class = "summary">
+
+Forecast for week `r week(last_month)` of `r lubridate::year(last_month)`: `r format(round(head(fdf_for_plots$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+
+</div>
+
+### A-
+```{r weekly_model_selection_Aminus, echo = FALSE, results = FALSE}
+# Define the series to be used
+# We want to use 4 years of data. 3 years for the width of the rolling window and we'll let that run for a year.
+segment <- head(tail(weekly$Aminus, 209), 208)
+series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52)
+
+chosen.model <- select_model(wbeginning, series.ts, "weekly")
+modelname <- modelnames[chosen.model]
+```
+
+```{r weekly_fcast_Aminus, echo = FALSE, results = FALSE}
+# Now forecast with the chosen model
+fdf <- chosen_forecast(chosen.model, series.ts, monthly, freq = "weekly")
+```
+
+```{r save_weekly_Aminus, echo = FALSE}
+type <- "Aminus"
+save_forecast(fdf, months = FALSE, modelname, weekly, paste0(WEEKLYDIR, type, ".csv"), reverse_adj)
+```
+
+```{r, weekly_Aminus_fig, fig.align = "center", echo = FALSE}
+draw_forecast(fdf, freq = "weekly", history = weekly, type, modelname, palette)
+```
+
+<style>
+div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font-size: 25px;}
+</style>
+<div class = "summary">
+
+Forecast for week `r week(last_month)` of `r lubridate::year(last_month)`: `r format(round(head(fdf_for_plots$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+
+</div>
+
+### A+
+```{r weekly_model_selection_Aplus, echo = FALSE, results = FALSE}
+# Define the series to be used
+# We want to use 4 years of data. 3 years for the width of the rolling window and we'll let that run for a year.
+segment <- head(tail(weekly$Aplus, 209), 208)
+series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52)
+
+chosen.model <- select_model(wbeginning, series.ts, "weekly")
+modelname <- modelnames[chosen.model]
+```
+
+```{r weekly_fcast_Aplus, echo = FALSE, results = FALSE}
+# Now forecast with the chosen model
+fdf <- chosen_forecast(chosen.model, series.ts, monthly, freq = "weekly")
+```
+
+```{r save_weekly_Aplus, echo = FALSE}
+type <- "Aplus"
+save_forecast(fdf, months = FALSE, modelname, weekly, paste0(WEEKLYDIR, type, ".csv"), reverse_adj)
+```
+
+```{r, weekly_Aplus_fig, fig.align = "center", echo = FALSE}
+draw_forecast(fdf, freq = "weekly", history = weekly, type, modelname, palette)
+```
+
+<style>
+div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font-size: 25px;}
+</style>
+<div class = "summary">
+
+Forecast for week `r week(last_month)` of `r lubridate::year(last_month)`: `r format(round(head(fdf_for_plots$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+
+</div>
+
+### B-
+```{r weekly_model_selection_Bminus, echo = FALSE, results = FALSE}
+# Define the series to be used
+# We want to use 4 years of data. 3 years for the width of the rolling window and we'll let that run for a year.
+segment <- head(tail(weekly$Bminus, 209), 208)
+series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52)
+
+chosen.model <- select_model(wbeginning, series.ts, "weekly")
+modelname <- modelnames[chosen.model]
+```
+
+```{r weekly_fcast_Bminus, echo = FALSE, results = FALSE}
+# Now forecast with the chosen model
+fdf <- chosen_forecast(chosen.model, series.ts, monthly, freq = "weekly")
+```
+
+```{r save_weekly_Bminus, echo = FALSE}
+type <- "Bminus"
+save_forecast(fdf, months = FALSE, modelname, weekly, paste0(WEEKLYDIR, type, ".csv"), reverse_adj)
+```
+
+```{r, weekly_Bminus_fig, fig.align = "center", echo = FALSE}
+draw_forecast(fdf, freq = "weekly", history = weekly, type, modelname, palette)
+```
+
+<style>
+div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font-size: 25px;}
+</style>
+<div class = "summary">
+
+Forecast for week `r week(last_month)` of `r lubridate::year(last_month)`: `r format(round(head(fdf_for_plots$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+
+</div>
+
+### B+
+```{r weekly_model_selection_Bplus, echo = FALSE, results = FALSE}
+# Define the series to be used
+# We want to use 4 years of data. 3 years for the width of the rolling window and we'll let that run for a year.
+segment <- head(tail(weekly$Bplus, 209), 208)
+series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52)
+
+chosen.model <- select_model(wbeginning, series.ts, "weekly")
+modelname <- modelnames[chosen.model]
+```
+
+```{r weekly_fcast_Bplus, echo = FALSE, results = FALSE}
+# Now forecast with the chosen model
+fdf <- chosen_forecast(chosen.model, series.ts, monthly, freq = "weekly")
+```
+
+```{r save_weekly_Bplus, echo = FALSE}
+type <- "Bplus"
+save_forecast(fdf, months = FALSE, modelname, weekly, paste0(WEEKLYDIR, type, ".csv"), reverse_adj)
+```
+
+```{r, weekly_Bplus_fig, fig.align = "center", echo = FALSE}
+draw_forecast(fdf, freq = "weekly", history = weekly, type, modelname, palette)
+```
+
+<style>
+div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font-size: 25px;}
+</style>
+<div class = "summary">
+
+Forecast for week `r week(last_month)` of `r lubridate::year(last_month)`: `r format(round(head(fdf_for_plots$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+
+</div>
+
+### AB-
+```{r weekly_model_selection_ABminus, echo = FALSE, results = FALSE}
+# Define the series to be used
+# We want to use 4 years of data. 3 years for the width of the rolling window and we'll let that run for a year.
+segment <- head(tail(weekly$ABminus, 209), 208)
+series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52)
+
+chosen.model <- select_model(wbeginning, series.ts, "weekly")
+modelname <- modelnames[chosen.model]
+```
+
+```{r weekly_fcast_ABminus, echo = FALSE, results = FALSE}
+# Now forecast with the chosen model
+fdf <- chosen_forecast(chosen.model, series.ts, monthly, freq = "weekly")
+```
+
+```{r save_weekly_ABminus, echo = FALSE}
+type <- "ABminus"
+save_forecast(fdf, months = FALSE, modelname, weekly, paste0(WEEKLYDIR, type, ".csv"), reverse_adj)
+```
+
+```{r, weekly_ABminus_fig, fig.align = "center", echo = FALSE}
+draw_forecast(fdf, freq = "weekly", history = weekly, type, modelname, palette)
+```
+
+<style>
+div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font-size: 25px;}
+</style>
+<div class = "summary">
+
+Forecast for week `r week(last_month)` of `r lubridate::year(last_month)`: `r format(round(head(fdf_for_plots$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+
+</div>
+
+### AB+
+```{r weekly_model_selection_ABplus, echo = FALSE, results = FALSE}
+# Define the series to be used
+# We want to use 4 years of data. 3 years for the width of the rolling window and we'll let that run for a year.
+segment <- head(tail(weekly$ABplus, 209), 208)
+series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52)
+
+chosen.model <- select_model(wbeginning, series.ts, "weekly")
+modelname <- modelnames[chosen.model]
+```
+
+```{r weekly_fcast_ABplus, echo = FALSE, results = FALSE}
+# Now forecast with the chosen model
+fdf <- chosen_forecast(chosen.model, series.ts, monthly, freq = "weekly")
+```
+
+```{r save_weekly_ABplus, echo = FALSE}
+type <- "ABplus"
+save_forecast(fdf, months = FALSE, modelname, weekly, paste0(WEEKLYDIR, type, ".csv"), reverse_adj)
+```
+
+```{r, weekly_ABplus_fig, fig.align = "center", echo = FALSE}
+draw_forecast(fdf, freq = "weekly", history = weekly, type, modelname, palette)
+```
+
+<style>
+div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font-size: 25px;}
+</style>
+<div class = "summary">
+
+Forecast for week `r week(last_month)` of `r lubridate::year(last_month)`: `r format(round(head(fdf_for_plots$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+
+</div>
+
+### Platelets
+```{r weekly_model_selection_plat, echo = FALSE, results = FALSE}
+# Define the series to be used
+# We want to use 4 years of data. 3 years for the width of the rolling window and we'll let that run for a year.
+segment <- head(tail(weekly$plat, 209), 208)
+series.ts <- ts(segment, start = decimal_date(wbeginning), frequency = 52)
+
+chosen.model <- select_model(wbeginning, series.ts, "weekly")
+modelname <- modelnames[chosen.model]
+```
+
+```{r weekly_fcast_plat, echo = FALSE, results = FALSE}
+# Now forecast with the chosen model
+fdf <- chosen_forecast(chosen.model, series.ts, monthly, freq = "weekly")
+```
+
+```{r save_weekly_plat, echo = FALSE}
+type <- "plat"
+save_forecast(fdf, months = FALSE, modelname, weekly, paste0(WEEKLYDIR, type, ".csv"), reverse_adj)
+```
+
+```{r, weekly_plat_fig, fig.align = "center", echo = FALSE}
+draw_forecast(fdf, freq = "weekly", history = weekly, type, modelname, palette)
+```
+
+div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font-size: 25px;}
+</style>
+<div class = "summary">
+
+Forecast for week `r week(last_month)` of `r lubridate::year(last_month)`: `r format(round(head(fdf_for_plots$fcast, 1), 0))  # This is to round AND display only whole numbers.` blood bags.
+
+</div>
+
+## Monthly history {.tabset .tabset-fade .tabset-pills}
+
+### All red
+
+```{r red_history, fig.align = "center", echo = FALSE}
+type <- "red"
+draw_history(paste0(HISTORYDIR, type, ".csv"), monthly_real, freq = "monthly", type, palette)
+```
+
+### O-
+```{r Ominus_history, fig.align = "center", echo = FALSE}
+type <- "Ominus"
+draw_history(paste0(HISTORYDIR, type, ".csv"), monthly_real, freq = "monthly", type, palette)
+```
+
+### O+
+```{r Oplus_history, fig.align = "center", echo = FALSE}
+type <- "Oplus"
+draw_history(paste0(HISTORYDIR, type, ".csv"), monthly_real, freq = "monthly", type, palette)
+```
+
+### A-
+```{r Aminus_history, fig.align = "center", echo = FALSE}
+type <- "Aminus"
+draw_history(paste0(HISTORYDIR, type, ".csv"), monthly_real, freq = "monthly", type, palette)
+```
+
+### A+
+```{r Aplus_history, fig.align = "center", echo = FALSE}
+type <- "Aplus"
+draw_history(paste0(HISTORYDIR, type, ".csv"), monthly_real, freq = "monthly", type, palette)
+```
+
+### B-
+```{r Bminus_history, fig.align = "center", echo = FALSE}
+type <- "Bminus"
+draw_history(paste0(HISTORYDIR, type, ".csv"), monthly_real, freq = "monthly", type, palette)
+```
+
+### B+
+```{r Bplus_history, fig.align = "center", echo = FALSE}
+type <- "Bplus"
+draw_history(paste0(HISTORYDIR, type, ".csv"), monthly_real, freq = "monthly", type, palette)
+```
+
+### AB-
+```{r ABminus_history, fig.align = "center", echo = FALSE}
+type <- "ABminus"
+draw_history(paste0(HISTORYDIR, type, ".csv"), monthly_real, freq = "monthly", type, palette)
+```
+
+### AB+
+```{r ABplus_history, fig.align = "center", echo = FALSE}
+type <- "ABplus"
+draw_history(paste0(HISTORYDIR, type, ".csv"), monthly_real, freq = "monthly", type, palette)
+```
+
+### Platelets
+```{r plat_history, fig.align = "center", echo = FALSE}
+type <- "plat"
+draw_history(paste0(HISTORYDIR, type, ".csv"), monthly_real, freq = "monthly", type, palette)
+```
+
+
+## Weekly history {.tabset .tabset-fade .tabset-pills}
+
+### All red
+```{r red_weekly_history, fig.align = "center", echo = FALSE}
+type <- "red"
+draw_history(paste0(WEEKLYDIR, type, ".csv"), weekly, freq = "weekly", type, palette)
+```
+
+### O-
+```{r Ominus_weekly_history, fig.align = "center", echo = FALSE}
+type <- "Ominus"
+draw_history(paste0(WEEKLYDIR, type, ".csv"), weekly, freq = "weekly", type, palette)
+```
+
+### O+
+```{r Oplus_weekly_history, fig.align = "center", echo = FALSE}
+type <- "Oplus"
+draw_history(paste0(WEEKLYDIR, type, ".csv"), weekly, freq = "weekly", type, palette)
+```
+
+### A-
+```{r Aminus_weekly_history, fig.align = "center", echo = FALSE}
+type <- "Aminus"
+draw_history(paste0(WEEKLYDIR, type, ".csv"), weekly, freq = "weekly", type, palette)
+```
+
+### A+
+```{r Aplus_weekly_history, fig.align = "center", echo = FALSE}
+type <- "Aplus"
+draw_history(paste0(WEEKLYDIR, type, ".csv"), weekly, freq = "weekly", type, palette)
+```
+
+### B-
+```{r Bminus_weekly_history, fig.align = "center", echo = FALSE}
+type <- "Bminus"
+draw_history(paste0(WEEKLYDIR, type, ".csv"), weekly, freq = "weekly", type, palette)
+```
+
+### B+
+```{r Bplus_weekly_history, fig.align = "center", echo = FALSE}
+type <- "Bplus"
+draw_history(paste0(WEEKLYDIR, type, ".csv"), weekly, freq = "weekly", type, palette)
+```
+
+### AB-
+```{r ABminus_weekly_history, fig.align = "center", echo = FALSE}
+type <- "ABminus"
+draw_history(paste0(WEEKLYDIR, type, ".csv"), weekly, freq = "weekly", type, palette)
+```
+
+### AB+
+```{r ABplus_weekly_history, fig.align = "center", echo = FALSE}
+type <- "ABplus"
+draw_history(paste0(WEEKLYDIR, type, ".csv"), weekly, freq = "weekly", type, palette)
+```
+
+### Platelets
+```{r plat_weekly_history, fig.align = "center", echo = FALSE}
+type <- "plat"
+draw_history(paste0(WEEKLYDIR, type, ".csv"), weekly, freq = "weekly", type, palette)
 ```

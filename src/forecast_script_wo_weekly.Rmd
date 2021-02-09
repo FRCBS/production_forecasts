@@ -5,9 +5,13 @@ output: html_document
 
 ```{r setup, echo = FALSE}
 # Set working directory
-ROOTDIR <- "~/prodfore" # Your path
+ROOTDIR <- "~/production_forecasts" # Your directory
+DATADIR <- paste0(ROOTDIR, "/data/FACS")
+HISTORYDIR <- paste0(ROOTDIR, "/histories/monthly_") # monthly
+WEEKLYDIR <- paste0(ROOTDIR, "/histories/weekly_") # weekly
+
 knitr::opts_chunk$set(root.dir = ROOTDIR, warning = FALSE, message = FALSE) # No warnings for final output
-knitr::opts_knit$set(root.dir = ROOTDIR) # We need this also?
+knitr::opts_knit$set(root.dir = ROOTDIR, warning = FALSE, message = FALSE)
 
 # Colorblind palette
 # black, orange, sky blue, green,
@@ -36,14 +40,13 @@ source("src/pffunctions.R")
 
 ```{r read_files, include = FALSE}
 # Get all the files
-PATH <- "~/prodfore/data/" # Your data directory
-files <- list.files(path = PATH, pattern = "FAC0091_*")  # Character vector of file names
+files <- list.files(path = DATADIR, pattern = "FAC0091_*")  # Character vector of file names
 
 # Compile a dataframe by going over all files
 dlist <- list()
 for (i in files) {
   # Read a single file to a df called d
-  d <- read.delim(file = paste0(PATH, "/", i), header = FALSE, sep = ";", stringsAsFactors = FALSE, colClasses = 'character')
+  d <- read.delim(file = paste0(DATADIR, "/", i), header = FALSE, sep = ";", stringsAsFactors = FALSE, colClasses = 'character')
   
   if(length(d) == 26){
     d <- d[, !(names(d) %in% c("V10"))]  # The column numbers unfortunately vary between files, so we'll adjust
@@ -126,7 +129,7 @@ all.red <- merge(x = data.frame(date = all.dates),
 # Replace with zeroes
 all.red[is.na(all.red)] <- 0
 # Cut to time after 2014
-all.red <- all.red[all.red$date >= as.Date("2014-01-06"), ]
+all.red <- all.red[all.red$date >= as.Date("2014-01-01"), ]
 
 ###           ###
 #  RED RETURNS  #
@@ -140,7 +143,7 @@ all.red.retrn <- merge(x = data.frame(date = all.dates),
 # Replace with zeroes
 all.red.retrn[is.na(all.red.retrn)] <- 0
 # Cut to time after 2014
-all.red.retrn <- all.red.retrn[all.red.retrn$date >= as.Date("2014-01-06"), ]
+all.red.retrn <- all.red.retrn[all.red.retrn$date >= as.Date("2014-01-01"), ]
 
 
 # Extracting types
@@ -165,7 +168,7 @@ all.plat <- merge(x = data.frame(date = all.dates),
 # Replace with zeroes
 all.plat[is.na(all.plat)] <- 0
 # Cut to time after 2014
-all.plat <- all.plat[all.plat$date >= as.Date("2014-01-06"), ]
+all.plat <- all.plat[all.plat$date >= as.Date("2014-01-01"), ]
 
 ###           ###
 # PLAT RETURNS  #
@@ -178,7 +181,7 @@ all.plat.retrn <- merge(x = data.frame(date = all.dates),
 # Replace with zeroes
 all.plat.retrn[is.na(all.plat.retrn)] <- 0
 # Cut to time after 2014
-all.plat.retrn <- all.plat.retrn[all.plat.retrn$date >= as.Date("2014-01-06"), ]
+all.plat.retrn <- all.plat.retrn[all.plat.retrn$date >= as.Date("2014-01-01"), ]
 ```
 
 ```{r datasets_monthly, include = FALSE, warning = FALSE}
@@ -199,10 +202,10 @@ plat.monthly <- aggregate(pcs ~ month(date) + year(date), data = all.plat, FUN =
 plat.retrn.monthly <- aggregate(pcs ~ month(date) + year(date), data = all.plat.retrn, FUN = sum)
 
 # Dates
-months <- seq(from = as.Date("2014-01-06"), to = max(distr$date), by = "month")
+months <- seq(from = as.Date("2014-01-01"), to = max(distr$date), by = "month")
 
 # Adjustment series
-adj <- as.numeric(bizdays(ts(months, start = decimal_date(as.Date("2014-01-06")), frequency = 12), FinCenter = "Zurich"))
+adj <- as.numeric(bizdays(ts(months, start = decimal_date(as.Date("2014-01-01")), frequency = 12), FinCenter = "Zurich"))
 # scaler <- as.numeric(bizdays(ts(1, start = decimal_date(months[length(months)]), frequency = 12), FinCenter = "Zurich")) This was written to scale a singular forecasted month back to real values, for saving-to-file purposes
 
 reverse_adj <- as.numeric(bizdays(ts(seq(23), start = decimal_date(months[length(months)]), frequency = 12), FinCenter = "Zurich")) # This is the old implementation that used to be fed into the forecasting function. We'll now repurpose it so it can be used both for tabling and plotting.
@@ -247,6 +250,38 @@ last_month <- tail(monthly_real$date, 1) # Not using "today()" as the data may n
 modelnames <- c("SNAIVE", "5-MA", "7-MA", "9-MA", "12-MA", "STL", "ETS", "TBATS", "STLF", "ARIMAX", "DYNREG", "NN", "COMBINED")
 ```
 
+```{r datasets_weekly, include = FALSE}
+# Weekly aggregation is a bit more tricky operation as weekly aggregate gives incorrect results, so we'll use
+# a function of our own
+
+red.weekly <- aggregate_weekly(all.red)
+Ominus.weekly <- aggregate_weekly(Ominus.distr)
+Oplus.weekly <- aggregate_weekly(Oplus.distr)
+Aminus.weekly <- aggregate_weekly(Aminus.distr)
+Aplus.weekly <- aggregate_weekly(Aplus.distr)
+Bminus.weekly <- aggregate_weekly(Bminus.distr)
+Bplus.weekly <- aggregate_weekly(Bplus.distr)
+ABminus.weekly <- aggregate_weekly(ABminus.distr)
+ABplus.weekly <- aggregate_weekly(ABplus.distr)
+plat.weekly <- aggregate_weekly(all.plat)
+
+# Create a master frame
+weekly <- data.frame(week = red.weekly$week,
+                     date = red.weekly$date,
+                     red = red.weekly$pcs,
+                     Ominus = Ominus.weekly$pcs,
+                     Oplus = Oplus.weekly$pcs,
+                     Aminus = Aminus.weekly$pcs,
+                     Aplus = Aplus.weekly$pcs,
+                     Bminus = Bminus.weekly$pcs,
+                     Bplus = Bplus.weekly$pcs,
+                     ABminus = ABminus.weekly$pcs,
+                     ABplus = ABplus.weekly$pcs,
+                     plat = plat.weekly$pcs)
+
+wbeginning <- head(tail(weekly$date, 209), 1) # Define beginning of (weekly) time here
+```
+
 ## 6 month forecast {.tabset .tabset-fade .tabset-pills}
 
 ### All red
@@ -258,13 +293,6 @@ series.ts <- ts(segment, start = decimal_date(beginning), frequency = 12)
 
 chosen.model <- select_model(beginning, series.ts, "monthly")
 modelname <- modelnames[chosen.model]
-
-# We also wish to do this with a sales series (distr - retrn)
-sales.segment <- head(tail(monthly$red.sales, 49), 48)
-sales.ts <- ts(sales.segment, start = decimal_date(beginning), frequency = 12)
-
-chosen.model.sales <- select_model(beginning, sales.ts, "monthly")
-modelname.sales <- modelnames[chosen.model.sales]
 ```
 
 ```{r monthly_fcast_red, echo = FALSE, results = FALSE}
@@ -272,22 +300,20 @@ modelname.sales <- modelnames[chosen.model.sales]
 fdf <- chosen_forecast(chosen.model, series.ts, monthly, freq = "monthly")
 
 # Extended for yearly estimates
-# TODO: Why does this give ever increasing estimates?
 fdf_for_tables <- chosen_forecast_extended(chosen.model, series.ts, monthly, freq = "monthly")
-sales_for_tables <- chosen_forecast_extended(chosen.model.sales, sales.ts, monthly, freq = "monthly")
 
 # Scalings
 fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 fdf_red_for_tables <- fdf_for_tables * reverse_adj # The tables need anything from 6 months to 23 months, so we just scale everything from the extended 
-sales_red_for_tables <- sales_for_tables * reverse_adj
 ```
 
 ```{r save_monthly_red, echo = FALSE}
-save_forecast(fdf, months = TRUE, modelname, monthly, "histories/monthly_red.csv", reverse_adj) # Check pffunctions.R
+type <- "red"
+save_forecast(fdf, months = TRUE, modelname, monthly, paste0(HISTORYDIR, type, ".csv"), reverse_adj) # Check pffunctions.R
 ```
 
 ```{r, monthly_red_fig, fig.align = "center", echo = FALSE}
-draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, "red", modelname, palette) # Check pffunctions.R
+draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, type, modelname, palette) # Check pffunctions.R
 ```
 
 <style>
@@ -319,11 +345,12 @@ fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
 ```{r save_monthly_Ominus, echo = FALSE}
-save_forecast(fdf, months = TRUE, modelname, monthly, "histories/monthly_Ominus.csv", reverse_adj) # Check pffunctions.R
+type <- "Ominus"
+save_forecast(fdf, months = TRUE, modelname, monthly, paste0(HISTORYDIR, type, ".csv"), reverse_adj) # Check pffunctions.R
 ```
 
 ```{r, monthly_Ominus_fig, fig.align = "center", echo = FALSE}
-draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, "Ominus",  modelname, palette) # Check pffunctions.R
+draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, type,  modelname, palette) # Check pffunctions.R
 ```
 
 <style>
@@ -355,11 +382,12 @@ fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
 ```{r save_monthly_Oplus, echo = FALSE}
-save_forecast(fdf, months = TRUE, modelname, monthly, "histories/monthly_Oplus.csv", reverse_adj) # Check pffunctions.R
+type  <- "Oplus"
+save_forecast(fdf, months = TRUE, modelname, monthly, paste0(HISTORYDIR, type, ".csv"), reverse_adj) # Check pffunctions.R
 ```
 
 ```{r, monthly_Oplus_fig, fig.align = "center", echo = FALSE}
-draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, "Oplus",  modelname, palette) # Check pffunctions.R
+draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, type,  modelname, palette) # Check pffunctions.R
 ```
 
 <style>
@@ -391,11 +419,12 @@ fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
 ```{r save_monthly_Aminus, echo = FALSE}
-save_forecast(fdf, months = TRUE, modelname, monthly, "histories/monthly_Aminus.csv", reverse_adj) # Check pffunctions.R
+type <- "Aminus"
+save_forecast(fdf, months = TRUE, modelname, monthly, paste0(HISTORYDIR, type, ".csv"), reverse_adj) # Check pffunctions.R
 ```
 
 ```{r, monthly_Aminus_fig, fig.align = "center", echo = FALSE}
-draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, "Aminus",  modelname, palette) # Check pffunctions.R
+draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, type,  modelname, palette) # Check pffunctions.R
 ```
 
 <style>
@@ -427,11 +456,12 @@ fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
 ```{r save_monthly_Aplus, echo = FALSE}
-save_forecast(fdf, months = TRUE, modelname, monthly, "histories/monthly_Aplus.csv", reverse_adj) # Check pffunctions.R
+type <- "Aplus"
+save_forecast(fdf, months = TRUE, modelname, monthly, paste0(HISTORYDIR, type, ".csv"), reverse_adj) # Check pffunctions.R
 ```
 
 ```{r, monthly_Aplus_fig, fig.align = "center", echo = FALSE}
-draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, "Aplus",  modelname, palette) # Check pffunctions.R
+draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, type,  modelname, palette) # Check pffunctions.R
 ```
 
 <style>
@@ -463,11 +493,12 @@ fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
 ```{r save_monthly_Bminus, echo = FALSE}
-save_forecast(fdf, months = TRUE, modelname, monthly, "histories/monthly_Bminus.csv", reverse_adj) # Check pffunctions.R
+type <- "Bminus"
+save_forecast(fdf, months = TRUE, modelname, monthly, paste0(HISTORYDIR, type, ".csv"), reverse_adj) # Check pffunctions.R
 ```
 
 ```{r, monthly_Bminus_fig, fig.align = "center", echo = FALSE}
-draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, "Bminus",  modelname, palette) # Check pffunctions.R
+draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, type,  modelname, palette) # Check pffunctions.R
 ```
 
 <style>
@@ -499,11 +530,12 @@ fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
 ```{r save_monthly_Bplus, echo = FALSE}
-save_forecast(fdf, months = TRUE, modelname, monthly, "histories/monthly_Bplus.csv", reverse_adj) # Check pffunctions.R
+type <- "Bplus"
+save_forecast(fdf, months = TRUE, modelname, monthly, paste0(HISTORYDIR, type, ".csv"), reverse_adj) # Check pffunctions.R
 ```
 
 ```{r, monthly_Bplus_fig, fig.align = "center", echo = FALSE}
-draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, "Bplus",  modelname, palette) # Check pffunctions.R
+draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, type,  modelname, palette) # Check pffunctions.R
 ```
 
 <style>
@@ -535,11 +567,12 @@ fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
 ```{r save_monthly_ABminus, echo = FALSE}
-save_forecast(fdf, months = TRUE, modelname, monthly, "histories/monthly_ABminus.csv", reverse_adj) # Check pffunctions.R
+type <- "ABminus"
+save_forecast(fdf, months = TRUE, modelname, monthly, paste0(HISTORYDIR, type, ".csv"), reverse_adj) # Check pffunctions.R
 ```
 
 ```{r, monthly_ABminus_fig, fig.align = "center", echo = FALSE}
-draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, "ABminus",  modelname, palette) # Check pffunctions.R
+draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, type,  modelname, palette) # Check pffunctions.R
 ```
 
 <style>
@@ -571,11 +604,12 @@ fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
 ```
 
 ```{r save_monthly_ABplus, echo = FALSE}
-save_forecast(fdf, months = TRUE, modelname, monthly, "histories/monthly_ABplus.csv", reverse_adj) # Check pffunctions.R
+type <- "ABplus"
+save_forecast(fdf, months = TRUE, modelname, monthly, paste0(HISTORYDIR, type, ".csv"), reverse_adj) # Check pffunctions.R
 ```
 
 ```{r, monthly_ABplus_fig, fig.align = "center", echo = FALSE}
-draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, "ABplus",  modelname, palette) # Check pffunctions.R
+draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, type,  modelname, palette) # Check pffunctions.R
 ```
 
 <style>
@@ -596,33 +630,24 @@ series.ts <- ts(segment, start = decimal_date(beginning), frequency = 12)
 
 chosen.model <- select_model(beginning, series.ts, "monthly")
 modelname <- modelnames[chosen.model]
-
-# Same for sales
-sales.segment <- head(tail(monthly$plat.sales, 49), 48)
-sales.ts <- ts(sales.segment, start = decimal_date(beginning), frequency = 12)
-
-chosen.model.sales <- select_model(beginning, sales.ts, "monthly")
-modelname.sales <- modelnames[chosen.model.sales]
 ```
 
 ```{r monthly_fcast_plat, echo = FALSE, results = FALSE}
 # Now forecast with the chosen model
 fdf <- chosen_forecast(chosen.model, series.ts, monthly, freq = "monthly")
 fdf_for_tables <- chosen_forecast_extended(chosen.model, series.ts, monthly, freq = "monthly")
-sales_for_tables <- chosen_forecast_extended(chosen.model.sales, sales.ts, monthly, freq = "monthly")
-
 
 fdf_for_plots <- fdf * reverse_adj[1:6] # We plot 6 months forward
-fdf_pla_for_tables <- fdf_for_tables * reverse_adj # The tables need anything from 6 months to 23 months, so we just scale everything from the extended 
-sales_pla_for_tables <- sales_for_tables * reverse_adj
+fdf_pla_for_tables <- fdf_for_tables * reverse_adj # The tables need anything from 6 months to 23 months, so we just scale everything from the extended
 ```
 
 ```{r save_monthly_plat, echo = FALSE}
-save_forecast(fdf, months = TRUE, modelname, monthly, "histories/monthly_plat.csv", reverse_adj)
+type <- "plat"
+save_forecast(fdf, months = TRUE, modelname, monthly, paste0(HISTORYDIR, type, ".csv"), reverse_adj)
 ```
 
 ```{r, monthly_pla_fig, fig.align = "center", echo = FALSE}
-draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, "plat", modelname, palette)
+draw_forecast(fdf_for_plots, freq = "monthly", monthly_real, type, modelname, palette)
 ```
 <style>
 div.summary { background-color:#e6f0ff; border-radius: 5px; padding: 20px; font-size: 25px;}
@@ -634,72 +659,52 @@ Forecast for `r as.character(lubridate::month(last_month, label = TRUE, abbr = F
 </div>
 ## Tables (Sales)
 ```{r tables, echo = FALSE}
-# First the following table
-#      | realization x months ago ||    forecast for x months   |
-# RED  | 6 | 5 | 4 | 3 | 2 | 1   || CURRENT | 2 | 3 | 4 | 5 | 6 |
-# PLAT | 6 | 5 | 4 | 3 | 2 | 1   || CURRENT | 2 | 3 | 4 | 5 | 6 |
+# First the adaptive monthly table
 
-# This is not very pretty but the only way I know how at the moment
-red_sales_history <- c(monthly_real[monthly_real$date == last_month - months(6), ]$red.sales,
-                       monthly_real[monthly_real$date == last_month - months(5), ]$red.sales,
-                       monthly_real[monthly_real$date == last_month - months(4), ]$red.sales,
-                       monthly_real[monthly_real$date == last_month - months(3), ]$red.sales,
-                       monthly_real[monthly_real$date == last_month - months(2), ]$red.sales,
-                       monthly_real[monthly_real$date == last_month - months(1), ]$red.sales)
+# Get sales history of the current year
+red_sales_history <- c(monthly_real[monthly_real$date >= as.Date(paste0(year(last_month), "-01-01")), ]$red.sales)
+# Remove last month as it will be our first forecast
+red_sales_history <- red_sales_history[1:(length(red_sales_history) - 1)]
 
-red_return_history <- c(monthly_real[monthly_real$date == last_month - months(6), ]$red.ret,
-                        monthly_real[monthly_real$date == last_month - months(5), ]$red.ret,
-                        monthly_real[monthly_real$date == last_month - months(4), ]$red.ret,
-                        monthly_real[monthly_real$date == last_month - months(3), ]$red.ret,
-                        monthly_real[monthly_real$date == last_month - months(2), ]$red.ret,
-                        monthly_real[monthly_real$date == last_month - months(1), ]$red.ret) * -1
+# Same for returns
+red_return_history <- c(monthly_real[monthly_real$date >= as.Date(paste0(year(last_month), "-01-01")), ]$red.ret)
+# We also need them in negative values
+red_return_history <- red_return_history[1:(length(red_return_history) - 1)] * -1
 
-red_history <- c(monthly_real[monthly_real$date == last_month - months(6), ]$red,
-                 monthly_real[monthly_real$date == last_month - months(5), ]$red,
-                 monthly_real[monthly_real$date == last_month - months(4), ]$red,
-                 monthly_real[monthly_real$date == last_month - months(3), ]$red,
-                 monthly_real[monthly_real$date == last_month - months(2), ]$red,
-                 monthly_real[monthly_real$date == last_month - months(1), ]$red)
+# Get distributions history of the current year
+red_history <- c(monthly_real[monthly_real$date >= as.Date(paste0(year(last_month), "-01-01")), ]$red)
+# Remove last month as it will be our first forecast
+red_history <- red_history[1:(length(red_history) - 1)]
 
-plat_sales_history <- c(monthly_real[monthly_real$date == last_month - months(6), ]$plat.sales,
-                       monthly_real[monthly_real$date == last_month - months(5), ]$plat.sales,
-                       monthly_real[monthly_real$date == last_month - months(4), ]$plat.sales,
-                       monthly_real[monthly_real$date == last_month - months(3), ]$plat.sales,
-                       monthly_real[monthly_real$date == last_month - months(2), ]$plat.sales,
-                       monthly_real[monthly_real$date == last_month - months(1), ]$plat.sales)
+# Now platelets
+plat_sales_history <- c(monthly_real[monthly_real$date >= as.Date(paste0(year(last_month), "-01-01")), ]$plat.sales)
+plat_sales_history <- plat_sales_history[1:(length(plat_sales_history) - 1)]
 
-plat_return_history <- c(monthly_real[monthly_real$date == last_month - months(6), ]$plat.ret,
-                        monthly_real[monthly_real$date == last_month - months(5), ]$plat.ret,
-                        monthly_real[monthly_real$date == last_month - months(4), ]$plat.ret,
-                        monthly_real[monthly_real$date == last_month - months(3), ]$plat.ret,
-                        monthly_real[monthly_real$date == last_month - months(2), ]$plat.ret,
-                        monthly_real[monthly_real$date == last_month - months(1), ]$plat.ret) * -1
+plat_return_history <- c(monthly_real[monthly_real$date >= as.Date(paste0(year(last_month), "-01-01")), ]$plat.ret)
+plat_return_history <- plat_return_history[1:(length(plat_return_history) - 1)] * -1
 
-plat_history <- c(monthly_real[monthly_real$date == last_month - months(6), ]$plat,
-                  monthly_real[monthly_real$date == last_month - months(5), ]$plat,
-                  monthly_real[monthly_real$date == last_month - months(4), ]$plat,
-                  monthly_real[monthly_real$date == last_month - months(3), ]$plat,
-                  monthly_real[monthly_real$date == last_month - months(2), ]$plat,
-                  monthly_real[monthly_real$date == last_month - months(1), ]$plat)
+plat_history <- c(monthly_real[monthly_real$date >= as.Date(paste0(year(last_month), "-01-01")), ]$plat)
+plat_history <- plat_history[1:(length(plat_history) - 1)]
 
-# 6 months ahead (counting current month)
-red_fcasts <- round(head(fdf_red_for_tables$fcast, 6), 0)
-red_sales_fcasts <- round(head(sales_red_for_tables$fcast, 6), 0)
-red_return_fcast <- (red_fcasts - red_sales_fcasts) * -1
+# Dynamic returns coefficient
+red_coeff <- 1 - mean(tail(red_return_history/red_history), 6) * -1
+plat_coeff <- 1 - mean(head(plat_return_history/plat_history), 6) * -1
 
-plat_fcasts <- round(head(fdf_pla_for_tables$fcast, 6), 0)
-plat_sales_fcasts <- round(head(sales_pla_for_tables$fcast, 6), 0)
-plat_return_fcast <- (plat_fcasts - plat_sales_fcasts) * -1
+# Implement adaptivity
+if(month(last_month) > 6){
+  red_fcasts <- round(head(fdf_red_for_tables$fcast, 6), 0)
+  plat_fcasts <- round(head(fdf_pla_for_tables$fcast, 6), 0)
 
-# red_future <- c(red_fcasts[1], red_fcasts[2], red_fcasts[3],
-#                 red_fcasts[4], red_fcasts[5], red_fcasts[6])
-# red_sales_future <- c(red_sales_fcasts[1], red_sales_fcasts[2], red_sales_fcasts[3],
-#                       red_sales_fcasts[4], red_sales_fcasts[5], red_sales_fcasts[6])
-# 
-# plat_future <- c(plat_fcasts[1], plat_fcasts[2], plat_fcasts[3],
-#                  plat_fcasts[4], plat_fcasts[5], plat_fcasts[6])
-# plat_sales_future <- c(plat_sales_fcasts[1], plat_sales_fcasts[2], plat_sales_fcasts[3],
-#                        plat_sales_fcasts[4], plat_sales_fcasts[5], plat_sales_fcasts[6])
+} else{
+  red_fcasts <- round(head(fdf_red_for_tables, (13-month(last_month))), 0)
+  plat_fcasts <- round(head(fdf_pla_for_tables$fcast, (13-month(last_month))), 0)
+}
+
+red_return_fcast <- round((1 - red_coeff) * red_fcasts, 0) * -1
+red_sales_fcasts <- round(red_fcasts - red_return_fcast, 0)
+
+plat_return_fcast <- round((1 - plat_coeff) * plat_fcasts, 0) * -1
+plat_sales_fcasts <- round(plat_fcasts - plat_return_fcast, 0)
 
 # Build dataframe for tabling
 df1 <- rbind.data.frame(c(red_sales_history, red_sales_fcasts),
@@ -711,18 +716,16 @@ df1 <- rbind.data.frame(c(red_sales_history, red_sales_fcasts),
 
 rownames(df1) <- c("Red sales", "Red distributed", "Red returned", "Platelet sales", "Platelets distributed", "Platelets returned")
 
-colnames(df1) <- c(paste0("history", "\n", month(last_month - months(6)), "/", year(last_month - months(6))), 
-                   paste0("history", "\n", month(last_month - months(5)), "/", year(last_month - months(5))), 
-                   paste0("history", "\n", month(last_month - months(4)), "/", year(last_month - months(4))),
-                   paste0("history", "\n", month(last_month - months(3)), "/", year(last_month - months(3))),
-                   paste0("history", "\n", month(last_month - months(2)), "/", year(last_month - months(2))), 
-                   paste0("history", "\n", month(last_month - months(1)), "/", year(last_month - months(1))), 
-                   paste0("forecast", "\n", month(last_month), "/", year(last_month)),
-                   paste0("forecast", "\n", month(last_month + months(1)), "/", year(last_month + months(1))),
-                   paste0("forecast", "\n", month(last_month + months(2)), "/", year(last_month + months(2))),
-                   paste0("forecast", "\n", month(last_month + months(3)), "/", year(last_month + months(3))),
-                   paste0("forecast", "\n", month(last_month + months(4)), "/", year(last_month + months(4))),
-                   paste0("forecast", "\n", month(last_month + months(5)), "/", year(last_month + months(5))))
+for(i in 1:length(red_history)){
+  names(df1)[i] <- paste0("history", "\n", i, "/", year(last_month))
+}
+for(i in (length(red_history)+1):ncol(df1)){
+  if(i <= 12){
+    names(df1)[i] <- paste0("forecast", "\n", i, "/", year(last_month))
+  } else{
+    names(df1)[i] <- paste0("forecast", "\n", (i-12), "/", year(last_month)+1)
+  }
+}
 
 # Table it out
 datatable(df1, rownames = TRUE, options = list(autoWidth = TRUE, 
@@ -738,25 +741,25 @@ datatable(df1, rownames = TRUE, options = list(autoWidth = TRUE,
 # PLAT | real | fcast| fcast|
 
 # Sums
-red_sales_last <- sum(subset(monthly_real, format(as.Date(date), "%Y") == year(today()) - 1)$red.sales)
-red_sales_this <- sum(subset(monthly_real, format(as.Date(date), "%Y") == year(today()))$red.sales) + sum(sales_red_for_tables[1:(13 - month(today())), ]$fcast)
-red_sales_next <- sum(sales_red_for_tables[(14 - month(today())):(26 - month(today())), ]$fcast)
+red_sales_last <- sum(subset(monthly_real, format(as.Date(date), "%Y") == year(last_month) - 1)$red.sales)
+red_sales_this <- sum(subset(monthly_real, format(as.Date(date), "%Y") == year(last_month))$red.sales) + sum((fdf_red_for_tables[1:(13 - month(last_month)), ]$fcast * red_coeff))
+red_sales_next <- sum(fdf_red_for_tables[(14 - month(last_month)):(26 - month(last_month)), ]$fcast * red_coeff)
 
-red_last <- sum(subset(monthly_real, format(as.Date(date), "%Y") == year(today()) - 1)$red)
-red_this <- sum(subset(monthly_real, format(as.Date(date), "%Y") == year(today()))$red) + sum(fdf_red_for_tables[1:(13 - month(today())), ]$fcast)
-red_next <- sum(fdf_red_for_tables[(14 - month(today())):(26 - month(today())), ]$fcast)
+red_last <- sum(subset(monthly_real, format(as.Date(date), "%Y") == year(last_month) - 1)$red)
+red_this <- sum(subset(monthly_real, format(as.Date(date), "%Y") == year(last_month))$red) + sum(fdf_red_for_tables[1:(13 - month(last_month)), ]$fcast)
+red_next <- sum(fdf_red_for_tables[(14 - month(last_month)):(26 - month(last_month)), ]$fcast)
 
 red_ret_last <- red_last - red_sales_last
 red_ret_this <- red_this - red_sales_this
 red_ret_next <- red_next - red_sales_next
 
-plat_sales_last <- sum(subset(monthly_real, format(as.Date(date), "%Y") == year(today()) - 1)$plat.sales)
-plat_sales_this <- sum(subset(monthly_real, format(as.Date(date), "%Y") == year(today()))$plat.sales) + sum(sales_pla_for_tables[1:(13 - month(today())), ]$fcast)
-plat_sales_next <- sum(sales_pla_for_tables[(14 - month(today())):(26 - month(today())), ]$fcast)
+plat_sales_last <- sum(subset(monthly_real, format(as.Date(date), "%Y") == year(last_month) - 1)$plat.sales)
+plat_sales_this <- sum(subset(monthly_real, format(as.Date(date), "%Y") == year(last_month))$plat.sales) + sum((fdf_pla_for_tables[1:(13 - month(last_month)), ]$fcast * plat_coeff))
+plat_sales_next <- sum(fdf_pla_for_tables[(14 - month(last_month)):(26 - month(last_month)), ]$fcast * plat_coeff)
 
-plat_last <- sum(subset(monthly_real, format(as.Date(date), "%Y") == year(today()) - 1)$plat)
-plat_this <- sum(subset(monthly_real, format(as.Date(date), "%Y") == year(today()))$plat) + sum(fdf_pla_for_tables[1:(13 - month(today())), ]$fcast)
-plat_next <- sum(fdf_pla_for_tables[(14 - month(today())):(26 - month(today())), ]$fcast)
+plat_last <- sum(subset(monthly_real, format(as.Date(date), "%Y") == year(last_month) - 1)$plat)
+plat_this <- sum(subset(monthly_real, format(as.Date(date), "%Y") == year(last_month))$plat) + sum(fdf_pla_for_tables[1:(13 - month(last_month)), ]$fcast)
+plat_next <- sum(fdf_pla_for_tables[(14 - month(last_month)):(26 - month(last_month)), ]$fcast)
 
 plat_ret_last <- plat_last - plat_sales_last
 plat_ret_this <- plat_this - plat_sales_this
@@ -770,9 +773,9 @@ df2 <- rbind.data.frame(c(red_sales_last, red_sales_this, red_sales_next),
                         c(-plat_ret_last, -plat_ret_this, -plat_ret_next))
 
 rownames(df2) <- c("Red sales", "Red distributed", "Red returned", "Platelet sales", "Platelets distributed", "Platelets returned")
-colnames(df2) <- c(paste0("history\n", year(today()) - 1),
-                   paste0("forecast\n", year(today())),
-                   paste0("forecast\n", year(today()) + 1))
+colnames(df2) <- c(paste0("history\n", year(last_month) - 1),
+                   paste0("forecast\n", year(last_month)),
+                   paste0("forecast\n", year(last_month) + 1))
 
 # Round
 df2 <- round(df2, 0)
@@ -791,51 +794,60 @@ datatable(df2, rownames = TRUE, options = list(autoWidth = TRUE,
 ### All red
 
 ```{r red_history, fig.align = "center", echo = FALSE}
-draw_history("histories/monthly_red.csv", monthly_real, freq = "monthly", "red", palette)
+type <- "red"
+draw_history(paste0(HISTORYDIR, type, ".csv"), monthly_real, freq = "monthly", type, palette)
 ```
 
 ### O-
 ```{r Ominus_history, fig.align = "center", echo = FALSE}
-draw_history("histories/monthly_Ominus.csv", monthly_real, freq = "monthly", "Ominus", palette)
+type <- "Ominus"
+draw_history(paste0(HISTORYDIR, type, ".csv"), monthly_real, freq = "monthly", type, palette)
 ```
 
 ### O+
 ```{r Oplus_history, fig.align = "center", echo = FALSE}
-draw_history("histories/monthly_Oplus.csv", monthly_real, freq = "monthly", "Oplus", palette)
+type <- "Oplus"
+draw_history(paste0(HISTORYDIR, type, ".csv"), monthly_real, freq = "monthly", type, palette)
 ```
 
 ### A-
 ```{r Aminus_history, fig.align = "center", echo = FALSE}
-draw_history("histories/monthly_Aminus.csv", monthly_real, freq = "monthly", "Aminus", palette)
+type <- "Aminus"
+draw_history(paste0(HISTORYDIR, type, ".csv"), monthly_real, freq = "monthly", type, palette)
 ```
 
 ### A+
 ```{r Aplus_history, fig.align = "center", echo = FALSE}
-draw_history("histories/monthly_Aplus.csv", monthly_real, freq = "monthly", "Aplus", palette)
+type <- "Aplus"
+draw_history(paste0(HISTORYDIR, type, ".csv"), monthly_real, freq = "monthly", type, palette)
 ```
 
 ### B-
 ```{r Bminus_history, fig.align = "center", echo = FALSE}
-draw_history("histories/monthly_Bminus.csv", monthly_real, freq = "monthly", "Bminus", palette)
+type <- "Bminus"
+draw_history(paste0(HISTORYDIR, type, ".csv"), monthly_real, freq = "monthly", type, palette)
 ```
 
 ### B+
 ```{r Bplus_history, fig.align = "center", echo = FALSE}
-draw_history("histories/monthly_Bplus.csv", monthly_real, freq = "monthly", "Bplus", palette)
+type <- "Bplus"
+draw_history(paste0(HISTORYDIR, type, ".csv"), monthly_real, freq = "monthly", type, palette)
 ```
 
 ### AB-
 ```{r ABminus_history, fig.align = "center", echo = FALSE}
-draw_history("histories/monthly_ABminus.csv", monthly_real, freq = "monthly", "ABminus", palette)
+type <- "ABminus"
+draw_history(paste0(HISTORYDIR, type, ".csv"), monthly_real, freq = "monthly", type, palette)
 ```
 
 ### AB+
 ```{r ABplus_history, fig.align = "center", echo = FALSE}
-draw_history("histories/monthly_ABplus.csv", monthly_real, freq = "monthly", "ABplus", palette)
+type <- "ABplus"
+draw_history(paste0(HISTORYDIR, type, ".csv"), monthly_real, freq = "monthly", type, palette)
 ```
 
 ### Platelets
 ```{r plat_history, fig.align = "center", echo = FALSE}
-draw_history("histories/monthly_plat.csv", monthly_real, freq = "monthly", "plat", palette)
+type <- "plat"
+draw_history(paste0(HISTORYDIR, type, ".csv"), monthly_real, freq = "monthly", type, palette)
 ```
-
