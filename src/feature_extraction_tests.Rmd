@@ -47,6 +47,9 @@ library(feasts)
 library(tsibble)
 library(dplyr)
 library(zoo)
+library(scales)
+library(grid)
+library(ggbiplot)
 source("pffunctions.R")
 # Set rolling window size in years
 rw_years <- 3
@@ -291,12 +294,44 @@ for(i in 0:nmonths){
   end_date <- end_init + months(i)     # exclusive
   segment <- as_tsibble(ts(monthly$red[monthly$date >= start_date & monthly$date < end_date], 
                 start = c(year(start_date), month(start_date), day(start_date)), frequency = 12))
-  
-  metricvec <- append(metricvec, features(segment, value, features = feat_stl)[[2]])
+  temp <- cbind(features(segment, value, features = feature_set(pkgs = NULL, tags = NULL)), data.frame(endyear = year(end_date)))
+  metricvec <- append(metricvec, temp)
 }
-plot(1:length(metricvec), metricvec)
+```
+
+
+```{r, warning=FALSE}
+metrics <- data.frame(matrix(unlist(metricvec), ncol=49, byrow=TRUE), stringsAsFactors=FALSE)
+colnames(metrics) <- names(metricvec)[1:49]
+
+out_ind <- c()
+for(i in 1:dim(metrics)[2]){
+  out_ind <- append(out_ind, which(metrics[[i]] == boxplot.stats(metrics[[i]])$out))
+}
+nonout_metrics <- metrics[-out_ind, ]
+nonzerovar_metrics <- nonout_metrics[ , apply(nonout_metrics, 2, var, na.rm=TRUE) != 0]
+filtered_metrics <- subset(nonzerovar_metrics, select = -c(seasonal_peak_year, 
+                                                       seasonal_trough_year, 
+                                                       shift_level_index, 
+                                                       shift_var_index, 
+                                                       shift_kl_index, 
+                                                       n_crossing_points, 
+                                                       longest_flat_spot, 
+                                                       endyear))
+```
+
+```{r}
+metrics.pa <- prcomp(filtered_metrics, center = TRUE, scale. = TRUE)
+```
+
+```{r}
+summary(metrics.pa)
 ```
 ```{r}
-plot(monthly$date, monthly$red, "l")
+metrics.pa$rotation
+```
+
+```{r}
+ggbiplot(metrics.pa, choices = 1:2, groups = nonzerovar_metrics$endyear, var.axes = FALSE)
 ```
 
