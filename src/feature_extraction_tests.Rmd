@@ -32,6 +32,7 @@ names(palette) <- c("alpha80", "alpha95", "alphaSeg", "alphaPred", "fill80", "fi
 ```{r imports, message=FALSE, warning=FALSE, echo=FALSE}
 library(forecast)
 library(ggplot2)
+library(ggthemes)
 library(gridExtra)
 library(knitr)
 library(plyr)
@@ -285,7 +286,7 @@ Feature extraction using feasts
 ```{r}
 start_init <- as.Date("2004-01-01")
 end_init <- as.Date("2012-01-01")
-end_of_time <- monthly$date[length(monthly$date)]
+end_of_time <- monthly$date[length(monthly$date)] - months(3)
 nmonths <- 12 * (year(end_of_time) - year(end_init)) + (month(end_of_time) - month(end_init))
 
 metricvec <- c()
@@ -303,6 +304,11 @@ for(i in 0:nmonths){
 ```{r, warning=FALSE}
 metrics <- data.frame(matrix(unlist(metricvec), ncol=49, byrow=TRUE), stringsAsFactors=FALSE)
 colnames(metrics) <- names(metricvec)[1:49]
+metrics <- select(metrics, c("trend_strength", "seasonal_strength_year", "spikiness",
+                             "linearity", "curvature", "diff1_acf1", "diff2_acf1",
+                             "lambda_guerrero", "shift_kl_max", "shift_var_max",
+                             "shift_level_max", "diff1_pacf5", "diff2_pacf5", "season_acf1",
+                             "season_pacf", "var_tiled_var", "stat_arch_lm", "endyear"))
 
 out_ind <- c()
 for(i in 1:dim(metrics)[2]){
@@ -310,15 +316,14 @@ for(i in 1:dim(metrics)[2]){
 }
 nonout_metrics <- metrics[-out_ind, ]
 nonzerovar_metrics <- nonout_metrics[ , apply(nonout_metrics, 2, var, na.rm=TRUE) != 0]
-filtered_metrics <- subset(nonzerovar_metrics, select = -c(seasonal_peak_year, 
-                                                       seasonal_trough_year, 
-                                                       shift_level_index, 
-                                                       shift_var_index, 
-                                                       shift_kl_index, 
-                                                       n_crossing_points, 
-                                                       longest_flat_spot, 
-                                                       endyear))
+filtered_metrics <- subset(nonzerovar_metrics, select = -c(endyear))
 ```
+
+
+tmp <- cor(filtered_metrics)
+tmp[!lower.tri(tmp)] <- 0
+
+noncor_metrics <- filtered_metrics[, !apply(tmp, 2, function(x) any(abs(x) > 0.89))]
 
 ```{r}
 metrics.pa <- prcomp(filtered_metrics, center = TRUE, scale. = TRUE)
@@ -327,11 +332,42 @@ metrics.pa <- prcomp(filtered_metrics, center = TRUE, scale. = TRUE)
 ```{r}
 summary(metrics.pa)
 ```
+
 ```{r}
 metrics.pa$rotation
 ```
 
 ```{r}
 ggbiplot(metrics.pa, choices = 1:2, groups = nonzerovar_metrics$endyear, var.axes = FALSE)
+```
+
+```{r}
+rotations <- metrics.pa$rotation
+top12names <- append(names(rotations[, "PC1"][order(abs(rotations[ , "PC1"]), decreasing = TRUE)[1:6]]), names(rotations[, "PC2"][order(abs(rotations[ , "PC2"]), decreasing = TRUE)[1:6]]))
+```
+
+```{r}
+top12 <- metrics[, top12names]
+plots <- lapply(1:12, FUN = function(x) {
+  ggplot(data = top12) + 
+    geom_line(aes(x = 1:length(top12[, x]), y = top12[ , x]), size = 1.2, color = "midnightblue", inherit.aes = FALSE) +
+    labs(x="Months since origin", y="Value", title = colnames(top12)[x]) +
+    theme_minimal()
+})
+```
+
+```{r}
+plots[[1]]
+plots[[2]]
+plots[[3]]
+plots[[4]]
+plots[[5]]
+plots[[6]]
+plots[[7]]
+plots[[8]]
+plots[[9]]
+plots[[10]]
+plots[[11]] 
+#plots[[12]] # 6th heaviest in PC2 is the same as the 4th heaviest in PC1
 ```
 
