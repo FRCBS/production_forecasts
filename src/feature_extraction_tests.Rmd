@@ -370,4 +370,45 @@ plots[[10]]
 plots[[11]] 
 #plots[[12]] # 6th heaviest in PC2 is the same as the 4th heaviest in PC1
 ```
+```{r}
+w <- summary(metrics.pa)$importance[2, ]
+rots <- abs(metrics.pa$rotation)
+```
+
+```{r}
+scaled_rots <- sweep(rots, 2, colSums(rots), "/")
+reweighted_rots <- sweep(scaled_rots, 2, w, "*")
+feat_weights <- rowSums(reweighted_rots)
+```
+
+```{r}
+ord_weights <- feat_weights[order(feat_weights, decreasing = TRUE)]
+plot(ord_weights)
+```
+```{r}
+ord_weights
+```
+```{r}
+ordnames <- names(ord_weights)
+ordnames
+top12names
+```
+```{r}
+top6 <- metrics[, ordnames[1:6]]
+plots <- lapply(1:6, FUN = function(x) {
+  ggplot(data = top6) + 
+    geom_line(aes(x = 1:length(top6[, x]), y = top6[ , x]), size = 1.2, color = "midnightblue", inherit.aes = FALSE) +
+    labs(x="Months since origin", y="Value", title = colnames(top6)[x]) +
+    theme_minimal()
+})
+```
+
+```{r}
+plots[[1]]
+plots[[2]]
+plots[[3]]
+plots[[4]]
+plots[[5]]
+plots[[6]]
+```
 
