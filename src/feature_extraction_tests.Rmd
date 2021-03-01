@@ -284,8 +284,8 @@ monthly_real <- data.frame(date = months,
 
 Feature extraction using feasts
 ```{r}
-start_init <- as.Date("2004-01-01")
-end_init <- as.Date("2012-01-01")
+start_init <- as.Date("2004-01-01") # segment origin
+end_init <- as.Date("2012-01-01") # segment terminus
 end_of_time <- monthly$date[length(monthly$date)] - months(3)
 nmonths <- 12 * (year(end_of_time) - year(end_init)) + (month(end_of_time) - month(end_init))
 
@@ -410,5 +410,65 @@ plots[[3]]
 plots[[4]]
 plots[[5]]
 plots[[6]]
+```
+
+## Divide series into segments and find means for a couple / handful of features.
+
+```{r}
+series <- select(monthly, c("date", "red"))
+```
+
+```{r}
+df1 <- series[1:66, ]
+df2 <- series[67:132, ]
+df3 <- series[133:199, ]
+equal_three <- list(df1 = df1,
+                    df2 = df2,
+                    df3 = df3)
+```
+
+
+### Let's test this idea with Trend, Seasonality, and Linearity with 3 year sliding window
+
+This might not work conceptually, as the size of the optimal rolling window for NL was around 7 years?
+
+```{r}
+feat_tags <- c("trend_strength", "seasonal_strength_year", "linearity")  # for selection
+feat_names <- c("Trend", "Seasonality (yearly)", "Linearity")            # for plots and tables
+
+# Initialize an empty df
+# feat_df <- data.frame(feature = character(),
+#                       value = numeric(), 
+#                       until = character(), 
+#                       stringsAsFactors = FALSE)
+
+# Iterate list of time periods
+datalist <- list()
+for(i in 1:length(equal_three)){
+  df <- equal_three[[i]]
+  # Define segment as a tsibble object
+  segment <- as_tsibble(ts(df$red, start = c(year(df$date[1]), month(df$date[1]), day(df$date[1])), frequency = 12))
+  
+  # Compute features with feasts
+  feats <- select(features(segment, value, list(feat_stl)), feat_tags)
+  value <- as.numeric(feats) # TODO: check from somewhere if feat selection can be done explicitly
+  feature <- names(feats)
+  until <- rep(paste0(year(df$date[length(df$date)]), "-", month(df$date[length(df$date)])), 3)
+  temp <- data.frame(feature, value, until)
+  datalist[[i]] <- temp
+}
+
+feat_df <- do.call(rbind, datalist)
+
+# Check
+feat_df
+```
+
+```{r}
+# Scale for plotting
+# TODO: scale(feat_df[which(feat_df[, "feature"] == "trend_strength"), ]$value) et cetera
+# Grouped
+ggplot(feat_df, aes(fill = until, y = value, x = feature)) + 
+    geom_bar(position="dodge", stat="identity")
 ```
 
