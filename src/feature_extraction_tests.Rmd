@@ -229,7 +229,6 @@ ABplus.monthly <- aggregate(pcs ~ month(date) + year(date), data = ABplus.distr,
 plat.monthly <- aggregate(pcs ~ month(date) + year(date), data = all.plat, FUN = sum)
 plat.retrn.monthly <- aggregate(pcs ~ month(date) + year(date), data = all.plat.retrn, FUN = sum)
 
-#Reduce returns from returns from deliveries to make numbers actual sales
 red.monthly$pcs <- red.monthly$pcs - red.retrn.monthly$pcs
 plat.monthly$pcs <- plat.monthly$pcs - plat.retrn.monthly$pcs
 
@@ -240,6 +239,7 @@ red.2004$`month(date)` <- as.integer(red.2004$`month(date)`)
 red.2004$`year(date)` <- as.integer(as.character(red.2004$`year(date)`))
 red.2004<- red.2004[order(red.2004$`year(date)`, red.2004$`month(date)`),]
 red.2004$Date<- as.Date(as.yearmon(paste0(red.2004$`year(date)`, '-', red.2004$`month(date)`)))
+#Reduce returns from returns from deliveries to make numbers actual sales
 red.monthly$Date<- as.Date(as.yearmon(paste0(red.monthly$`year(date)`, '-', red.monthly$`month(date)`)))
 
 plat.2004 <- monthly2004[,c("month", "year", "Trombosyyttivalmisteet")]
@@ -428,19 +428,13 @@ equal_three <- list(df1 = df1,
 ```
 
 
-### Let's test this idea with Trend, Seasonality, and Linearity with 3 year sliding window
+### Let's test this idea with Trend, Seasonality, and Linearity
 
 This might not work conceptually, as the size of the optimal rolling window for NL was around 7 years?
 
 ```{r}
 feat_tags <- c("trend_strength", "seasonal_strength_year", "linearity")  # for selection
 feat_names <- c("Trend", "Seasonality (yearly)", "Linearity")            # for plots and tables
-
-# Initialize an empty df
-# feat_df <- data.frame(feature = character(),
-#                       value = numeric(), 
-#                       until = character(), 
-#                       stringsAsFactors = FALSE)
 
 # Iterate list of time periods
 datalist <- list()
@@ -466,9 +460,54 @@ feat_df
 
 ```{r}
 # Scale for plotting
-# TODO: scale(feat_df[which(feat_df[, "feature"] == "trend_strength"), ]$value) et cetera
+feat_df[which(feat_df[, "feature"] == "trend_strength"), ]$value <- scale(feat_df[which(feat_df[, "feature"] == "trend_strength"), ]$value)
+feat_df[which(feat_df[, "feature"] == "seasonal_strength_year"), ]$value <- scale(feat_df[which(feat_df[, "feature"] == "seasonal_strength_year"), ]$value)
+feat_df[which(feat_df[, "feature"] == "linearity"), ]$value <- scale(feat_df[which(feat_df[, "feature"] == "linearity"), ]$value)
+
 # Grouped
 ggplot(feat_df, aes(fill = until, y = value, x = feature)) + 
-    geom_bar(position="dodge", stat="identity")
+  geom_bar(position="dodge", stat="identity") + 
+  theme_minimal() +
+  scale_x_discrete(limits = feat_tags, labels = feat_names) +
+  scale_fill_brewer(palette = "Reds") + # Needs to withstand color blindness, bw printing and photocopy
+  labs(title = "Series features in three equally sized periods", 
+       subtitle = paste0("Data extends from ", 
+                         year(monthly$date[1]), 
+                         " to ",
+                         year(monthly$date[length(monthly$date)]),
+                         ". Feature values centered and scaled to [-1, 1]."),
+       y = "Value", x = "Feature", fill = "Until") +
+  theme(plot.title = element_text(hjust = 0.5), plot.subtitle = element_text(hjust = 0.5))
+```
+```{r}
+beginning <- df1$date[1]
+series.ts <- ts(df1$red, start = c(year(beginning), month(beginning), day(beginning)), frequency = 12)
+selected_model <- select_model(beginning, series.ts, freq = "monthly", rw_years = 3)
 ```
 
+```{r}
+modelnames <- c("SNAIVE", "5-MA", "7-MA", "9-MA", "12-MA", "STL", "ETS", "TBATS", "STLF", "ARIMAX", "DYNREG", "NN", "COMBINED")
+modelnames[selected_model]
+```
+
+```{r}
+beginning <- df2$date[1]
+series.ts <- ts(df2$red, start = c(year(beginning), month(beginning), day(beginning)), frequency = 12)
+selected_model <- select_model(beginning, series.ts, freq = "monthly", rw_years = 3)
+```
+
+```{r}
+modelnames <- c("SNAIVE", "5-MA", "7-MA", "9-MA", "12-MA", "STL", "ETS", "TBATS", "STLF", "ARIMAX", "DYNREG", "NN", "COMBINED")
+modelnames[selected_model]
+```
+
+```{r}
+beginning <- df3$date[1]
+series.ts <- ts(df3$red, start = c(year(beginning), month(beginning), day(beginning)), frequency = 12)
+selected_model <- select_model(beginning, series.ts, freq = "monthly", rw_years = 3)
+```
+
+```{r}
+modelnames <- c("SNAIVE", "5-MA", "7-MA", "9-MA", "12-MA", "STL", "ETS", "TBATS", "STLF", "ARIMAX", "DYNREG", "NN", "COMBINED")
+modelnames[selected_model]
+```
