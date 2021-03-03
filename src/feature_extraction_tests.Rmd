@@ -511,3 +511,74 @@ selected_model <- select_model(beginning, series.ts, freq = "monthly", rw_years 
 modelnames <- c("SNAIVE", "5-MA", "7-MA", "9-MA", "12-MA", "STL", "ETS", "TBATS", "STLF", "ARIMAX", "DYNREG", "NN", "COMBINED")
 modelnames[selected_model]
 ```
+
+## Another idea is to simply display the change in the frequency distribution of selected models over time
+
+For this, we'll need to generate monthly histories throughout the entire series.
+```{r}
+# history <- monthly # variable change so we can use our pre-existing code
+# rw_years <- 3 # ensure 3 yr rolling window
+# type <- "red"
+# 
+# # Our data comprises 199 months.
+# # Reserving a 3 year moving window, we get 163 months to forecast for.
+# N <- length(history$date) - 12 * (rw_years + 1) # Preallocate 163 rows
+# forecast.history <- data.frame(time = rep(as.Date(tail(history$date, (rw_years + 1) * 12)[1]), N),
+#                                model = rep("", N),
+#                                forecast = rep(NA, N),
+#                                upper80 = rep(NA, N),
+#                                upper95 = rep(NA, N),
+#                                lower80 = rep(NA, N),
+#                                lower95 = rep(NA, N),
+#                                stringsAsFactors = F)
+# 
+# pb = txtProgressBar(min = 0, max = N, initial = 0, style = 3) # Progress Bar for fun
+# 
+# for(i in seq(0, (N - 1))){
+#   cutreal <- head(history, -(N - i)) # Erase (N-x) months from real history
+#   beginning <- tail(cutreal$date, (((rw_years + 1) * 12) + 1))[1] # Define beginning of window 
+#   segment <- head(tail(cutreal[, type], (((rw_years + 1) * 12) + 1)), ((rw_years + 1) * 12)) # Define window
+#   series.ts <- ts(segment, start = c(year(beginning), month(beginning), day(beginning)), frequency = 12) # Transform into a ts object
+#   
+#   scale_start <- cutreal$date[length(cutreal$date)]
+#   scaleback <- as.numeric(bizdays(ts(seq(1), 
+#                                      start = c(year(scale_start), month(scale_start), day(scale_start)), 
+#                                      frequency = 12), FinCenter = "Zurich")) # Scaler for saving
+#   
+#   # Forecast
+#   chosen.model <- select_model(beginning, series.ts, freq = "monthly", rw_years) # Choose model
+#   mcast <- chosen_forecast(chosen.model, series.ts, history, freq = "monthly", rw_years) # Output a forecast
+#   missing.fcast <- data.frame(time = tail(cutreal$date, 1), 
+#                               model = modelnames[chosen.model], 
+#                               forecast = mcast$fcast[1] * scaleback,
+#                               upper80 = mcast$upper80[1] * scaleback,
+#                               upper95 = mcast$upper95[1] * scaleback,
+#                               lower80 = mcast$lower80[1] * scaleback,
+#                               lower95 = mcast$lower95[1] * scaleback, stringsAsFactors = FALSE)
+#   forecast.history[(i+1), ] <- missing.fcast
+#   setTxtProgressBar(pb, i) # Update progress bar
+# }
+# 
+# # Save into a csv
+# write.csv(forecast.history, file = "/home/esa/production_forecasts/histories/long_fcast_history.csv", row.names = FALSE)
+```
+
+## Draw frequency plot
+```{r}
+# Load history
+data <- read.csv("/home/esa/production_forecasts/histories/long_fcast_history.csv")
+head(data)
+```
+
+```{r}
+first_half <- data[1:75, 1:2]
+second_half <- data[76:151, 1:2]
+```
+
+```{r}
+ggplot(data = first_half, aes(model)) + geom_histogram(stat = "count") + theme_minimal()
+```
+```{r}
+ggplot(data = second_half, aes(model)) + geom_histogram(stat = "count") + theme_minimal()
+```
+
