@@ -282,6 +282,13 @@ monthly_real <- data.frame(date = months,
                            plat = plat.monthly$pcs)
 ```
 
+# POISTA TÄMÄ SOLU
+```{r}
+# TODO: del
+write.csv(monthly_real, file = "/home/esa/production_forecasts/data/monthly_real_2004.csv", row.names = FALSE)
+```
+
+
 Feature extraction using feasts
 ```{r}
 start_init <- as.Date("2004-01-01") # segment origin
@@ -516,13 +523,13 @@ modelnames[selected_model]
 
 For this, we'll need to generate monthly histories throughout the entire series.
 ```{r}
+# monthly <- read.csv("/home/esa/production_forecasts/data/monthly_2014.csv")
+# monthly$date <- as.Date(monthly$date)
 # history <- monthly # variable change so we can use our pre-existing code
 # rw_years <- 3 # ensure 3 yr rolling window
 # type <- "red"
 # 
-# # Our data comprises 199 months.
-# # Reserving a 3 year moving window, we get 163 months to forecast for.
-# N <- length(history$date) - 12 * (rw_years + 1) # Preallocate 163 rows
+# N <- length(history$date) - 12 * (rw_years + 1) # Preallocate rows
 # forecast.history <- data.frame(time = rep(as.Date(tail(history$date, (rw_years + 1) * 12)[1]), N),
 #                                model = rep("", N),
 #                                forecast = rep(NA, N),
@@ -536,20 +543,20 @@ For this, we'll need to generate monthly histories throughout the entire series.
 # 
 # for(i in seq(0, (N - 1))){
 #   cutreal <- head(history, -(N - i)) # Erase (N-x) months from real history
-#   beginning <- tail(cutreal$date, (((rw_years + 1) * 12) + 1))[1] # Define beginning of window 
+#   beginning <- tail(cutreal$date, (((rw_years + 1) * 12) + 1))[1] # Define beginning of window
 #   segment <- head(tail(cutreal[, type], (((rw_years + 1) * 12) + 1)), ((rw_years + 1) * 12)) # Define window
 #   series.ts <- ts(segment, start = c(year(beginning), month(beginning), day(beginning)), frequency = 12) # Transform into a ts object
-#   
+# 
 #   scale_start <- cutreal$date[length(cutreal$date)]
-#   scaleback <- as.numeric(bizdays(ts(seq(1), 
-#                                      start = c(year(scale_start), month(scale_start), day(scale_start)), 
+#   scaleback <- as.numeric(bizdays(ts(seq(1),
+#                                      start = c(year(scale_start), month(scale_start), day(scale_start)),
 #                                      frequency = 12), FinCenter = "Zurich")) # Scaler for saving
-#   
+# 
 #   # Forecast
 #   chosen.model <- select_model(beginning, series.ts, freq = "monthly", rw_years) # Choose model
 #   mcast <- chosen_forecast(chosen.model, series.ts, history, freq = "monthly", rw_years) # Output a forecast
-#   missing.fcast <- data.frame(time = tail(cutreal$date, 1), 
-#                               model = modelnames[chosen.model], 
+#   missing.fcast <- data.frame(time = tail(cutreal$date, 1),
+#                               model = modelnames[chosen.model],
 #                               forecast = mcast$fcast[1] * scaleback,
 #                               upper80 = mcast$upper80[1] * scaleback,
 #                               upper95 = mcast$upper95[1] * scaleback,
@@ -560,7 +567,7 @@ For this, we'll need to generate monthly histories throughout the entire series.
 # }
 # 
 # # Save into a csv
-# write.csv(forecast.history, file = "/home/esa/production_forecasts/histories/long_fcast_history.csv", row.names = FALSE)
+# write.csv(forecast.history, file = "/home/esa/production_forecasts/histories/long_fcast_history_invtest.csv", row.names = FALSE)
 ```
 
 ## Draw frequency plot
