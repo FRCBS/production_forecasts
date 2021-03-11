@@ -239,7 +239,7 @@ red.2004$`month(date)` <- as.integer(red.2004$`month(date)`)
 red.2004$`year(date)` <- as.integer(as.character(red.2004$`year(date)`))
 red.2004<- red.2004[order(red.2004$`year(date)`, red.2004$`month(date)`),]
 red.2004$Date<- as.Date(as.yearmon(paste0(red.2004$`year(date)`, '-', red.2004$`month(date)`)))
-#Reduce returns from returns from deliveries to make numbers actual sales
+#Reduce returns from deliveries to make numbers actual sales
 red.monthly$Date<- as.Date(as.yearmon(paste0(red.monthly$`year(date)`, '-', red.monthly$`month(date)`)))
 
 plat.2004 <- monthly2004[,c("month", "year", "Trombosyyttivalmisteet")]
@@ -286,6 +286,7 @@ monthly_real <- data.frame(date = months,
 ```{r}
 # TODO: del
 write.csv(monthly_real, file = "/home/esa/production_forecasts/data/monthly_real_2004.csv", row.names = FALSE)
+write.csv(monthly, file = "/home/esa/production_forecasts/data/monthly_2004.csv")
 ```
 
 
