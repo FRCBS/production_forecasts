@@ -1,0 +1,272 @@
+---
+title: "Feature x Model Correlation Tests"
+author: "Esa Turkulainen"
+date: "3/11/2021"
+output: html_document
+---
+
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+# echo "rmarkdown::render('forecast_script_FIN.Rmd', clean=TRUE,output_format='html_document',output_file='results/forecast_script_FIN_20201006.Rmd')" | R --slave
+
+# Set working directory
+ROOTDIR <- "~/blood_demand_forecast_NL/" # Your directory
+DATADIR <- "~/production_forecasts/data/FACS"
+HISTORYDIR <- "~/production_forecasts/histories/" # monthly
+MONTHLYDIR <- paste0(HISTORYDIR, "monthly_") # monthly
+WEEKLYDIR <- paste0(HISTORYDIR, "weekly_") # weekly
+
+knitr::opts_chunk$set(root.dir = ROOTDIR, warning = FALSE, message = FALSE) # No warnings for final output
+knitr::opts_knit$set(root.dir = ROOTDIR, warning = FALSE, message = FALSE)
+
+# Colorblind palette
+# black, orange, sky blue, green,
+# yellow, blue, vermilion, purple
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", 
+                "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+# These colors work server side for now:
+palette <- list(1, 1, 1, 0.7, "royalblue2", "deepskyblue1", "darkred", "darkgreen")
+names(palette) <- c("alpha80", "alpha95", "alphaSeg", "alphaPred", "fill80", "fill95", "colPred", "colData")
+```
+
+```{r imports, message=FALSE, warning=FALSE, echo=FALSE}
+library(forecast)
+library(ggplot2)
+library(gridExtra)
+library(knitr)
+library(dplyr)
+library(plyr)
+library(purrr)
+library(lubridate)
+library(numbers)
+library(data.table)
+library(R.utils)
+library(DT)
+library(feasts)
+library(tsibble)
+library(stringr)
+library(hash)
+library(htmltools)
+source("pffunctions.R")
+```
+
+```{r global_variables}
+rw_years <- 3
+```
+
+Load data
+```{r load_data}
+longform <- read.csv("/home/esa/production_forecasts/data/monthly_2004.csv", 
+                     colClasses = c("NULL", "Date", "numeric", "NULL")) # Adjusted
+long_real <- read.csv("/home/esa/production_forecasts/data/monthly_real_2004.csv", 
+                     colClasses = c("Date", "numeric", "NULL")) # Original
+```
+
+```{r create_model_specific_histories, eval = FALSE}
+history <- longform
+type <- "red"
+modelnames <- c("SNAIVE", "5-MA", "7-MA", "9-MA", "12-MA", "STL", "ETS", "TBATS", "STLF", "ARIMAX", "DYNREG", "NN", "COMBINED")
+
+pb = txtProgressBar(min = 0, max = length(modelnames), initial = 0, style = 3) # Progress Bar for fun
+
+for(j in 1:length(modelnames)){
+  N <- length(history$date) - 12 * (rw_years + 1) # Preallocate rows
+  forecast.history <- data.frame(time = rep(as.Date(tail(history$date, (rw_years + 1) * 12)[1]), N),
+                                 model = rep("", N),
+                                 forecast = rep(NA, N),
+                                 upper80 = rep(NA, N),
+                                 upper95 = rep(NA, N),
+                                 lower80 = rep(NA, N),
+                                 lower95 = rep(NA, N),
+                                 stringsAsFactors = F)
+  
+  for(i in seq(0, (N - 1))){
+  cutreal <- head(history, -(N - i)) # Erase (N-x) months from real history
+  beginning <- tail(cutreal$date, (((rw_years + 1) * 12) + 1))[1] # Define beginning of window
+  segment <- head(tail(cutreal[, type], (((rw_years + 1) * 12) + 1)), ((rw_years + 1) * 12)) # Define window
+  series.ts <- ts(segment, start = c(year(beginning), month(beginning), day(beginning)), frequency = 12) # Transform into a ts object
+  
+  scale_start <- cutreal$date[length(cutreal$date)]
+  scaleback <- as.numeric(bizdays(ts(seq(1),
+                                   start = c(year(scale_start), month(scale_start), day(scale_start)),
+                                   frequency = 12), FinCenter = "Zurich")) # Scaler for saving
+  
+  # Forecast
+  chosen.model <- j
+  mcast <- chosen_forecast(chosen.model, series.ts, history, freq = "monthly", rw_years) # Output a forecast
+  missing.fcast <- data.frame(time = tail(cutreal$date, 1),
+                              model = modelnames[chosen.model],
+                              forecast = mcast$fcast[1] * scaleback,
+                              upper80 = mcast$upper80[1] * scaleback,
+                              upper95 = mcast$upper95[1] * scaleback,
+                              lower80 = mcast$lower80[1] * scaleback,
+                              lower95 = mcast$lower95[1] * scaleback, stringsAsFactors = FALSE)
+  forecast.history[(i+1), ] <- missing.fcast
+
+  }
+  # Save into a csv
+  modelname <- modelnames[j]
+  write.csv(forecast.history, file = paste0("/home/esa/production_forecasts/histories/single_model_histories/", modelname, "_fcast_history.csv"), row.names = FALSE)
+  setTxtProgressBar(pb, j) # Update progress bar
+}
+```
+
+
+Generate additional histories for models not in our system
+
+### ETS family
+```{r also_for_ETS, eval = FALSE}
+history <- longform
+type <- "red"
+
+# List ETSs to try
+ets1 <- "ANN"
+ets2 <- "AAN"
+ets3 <- "AAA"
+ets4 <- "MAM"
+
+# Gather them into a list for iteration
+models <- c(ets1, ets2, ets3, ets4)
+
+pb = txtProgressBar(min = 0, max = length(models), initial = 0, style = 3) # Progress Bar for fun
+
+for(j in 1:length(models)){
+  N <- length(history$date) - 12 * (rw_years + 1) # Preallocate rows
+  forecast.history <- data.frame(time = rep(as.Date(tail(history$date, (rw_years + 1) * 12)[1]), N),
+                                 model = rep("", N),
+                                 forecast = rep(NA, N),
+                                 upper80 = rep(NA, N),
+                                 upper95 = rep(NA, N),
+                                 lower80 = rep(NA, N),
+                                 lower95 = rep(NA, N),
+                                 stringsAsFactors = F)
+  
+  for(i in seq(0, (N - 1))){
+  cutreal <- head(history, -(N - i)) # Erase (N-x) months from real history
+  beginning <- tail(cutreal$date, (((rw_years + 1) * 12) + 1))[1] # Define beginning of window
+  segment <- head(tail(cutreal[, type], (((rw_years + 1) * 12) + 1)), ((rw_years + 1) * 12)) # Define window
+  series.ts <- ts(segment, start = c(year(beginning), month(beginning), day(beginning)), frequency = 12) # Transform into a ts object
+  
+  scale_start <- cutreal$date[length(cutreal$date)]
+  scaleback <- as.numeric(bizdays(ts(seq(1),
+                                   start = c(year(scale_start), month(scale_start), day(scale_start)),
+                                   frequency = 12), FinCenter = "Zurich")) # Scaler for saving
+  start_date <- tail(history$date, (rw_years * 12))[1]
+  
+  # Forecast
+  train <- ts(tail(series.ts, (rw_years * 12)), 
+                start = c(year(start_date), month(start_date), day(start_date)),
+                frequency = 12)  # 3 year window
+  
+  fit <- ets(train, model = models[j])
+  fcast <- forecast(fit, h = 1) # Output a forecast
+  missing.fcast <- data.frame(time = tail(cutreal$date, 1),
+                              model = paste0("ETS(", models[j], ")"),
+                              forecast = as.numeric(fcast$mean) * scaleback,
+                              upper80 = as.numeric(fcast$upper[, 1]) * scaleback,
+                              upper95 = as.numeric(fcast$upper[, 2]) * scaleback,
+                              lower80 = as.numeric(fcast$lower[, 1]) * scaleback,
+                              lower95 = as.numeric(fcast$lower[, 2]) * scaleback, stringsAsFactors = FALSE)
+  forecast.history[(i+1), ] <- missing.fcast
+
+  }
+  # Save into a csv
+  modelname <- models[j]
+  write.csv(forecast.history, file = paste0("/home/esa/production_forecasts/histories/single_model_histories/ETS(", modelname, ")_fcast_history.csv"), row.names = FALSE)
+  setTxtProgressBar(pb, j) # Update progress bar
+}
+```
+
+Load all forecast histories
+```{r load_histories}
+####################
+# Ugly but we avoid all heavy reads and loops
+setwd("/home/esa/production_forecasts/histories/single_model_histories/")
+allfiles <- list.files(pattern = "*.csv") # Get filenames
+fhistories <- allfiles %>% 
+  map_dfc(~fread(., select = "forecast")) # Get data from those files
+allmodels <- strsplit(allfiles, split = "_fcast") %>% # Regex modelnames from filenames
+  map(~.x[1]) %>% # unpack annoying dimensions away
+  unlist()        # unpack annoying dimensions away
+####################
+
+truth <- long_real$red[long_real$date >= "2007-12-01" & long_real$date <= "2020-06-01"]
+fhistories <- (fhistories - truth) / truth
+colnames(fhistories) <- allmodels
+fhistories[, ("truth") := truth]
+fhistories <- as.data.table(scale(fhistories))
+fhistories[, ("date") := seq.Date(as.Date("2007-12-01"), as.Date("2020-06-01"), by = "month")]
+setcolorder(fhistories, neworder = c(19, 1:18))
+```
+
+```{r}
+head(fhistories)
+```
+
+Exctract features for the same period
+```{r}
+start_init <- as.Date("2004-01-01") # segment origin
+end_init <- as.Date("2008-01-01") # segment terminus
+end_of_time <- longform$date[length(longform$date)]
+nmonths <- 12 * (year(end_of_time) - year(end_init)) + (month(end_of_time) - month(end_init))
+
+metricvec <- c()
+for(i in 0:nmonths){
+  start_date <- start_init + months(i)  # inclusive
+  end_date <- end_init + months(i)     # exclusive
+  segment <- as_tsibble(ts(longform$red[longform$date >= start_date & longform$date < end_date], 
+                start = c(year(start_date), month(start_date), day(start_date)), frequency = 12))
+  temp <- cbind(features(segment, value, features = feature_set(pkgs = NULL, tags = NULL)), data.frame(endyear = year(end_date)))
+  metricvec <- append(metricvec, temp)
+}
+```
+
+```{r}
+metrics <- data.frame(scale(matrix(unlist(metricvec), ncol=49, byrow=TRUE)), stringsAsFactors=FALSE)
+colnames(metrics) <- names(metricvec)[1:49]
+```
+
+Combine with forecast errors
+```{r}
+master <- cbind(fhistories, metrics) %>% select(-c(date, zero_run_mean, zero_start_prop, zero_end_prop, endyear))
+```
+
+```{r}
+head(master)
+```
+
+
+Correlation matrix
+```{r}
+cormat <- cor(master)
+melted <- reshape2::melt(cormat)
+```
+
+Plot
+```{r}
+ggplot(data = melted, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+```
+Some exploration
+```{r}
+master[, ("date") := fhistories$date]
+ggplot(master, aes(x = date)) +
+  geom_line(aes(y = truth)) +
+  geom_line(aes(y = smooth(ARIMAX)), color = "red") +
+  geom_line(aes(y = linearity), color = "green") +
+  geom_line(aes(y = smooth(SNAIVE)), color = "blue") +
+  geom_line(aes(y = trend_strength), color = "cyan")
+```
+
+```{r}
+cormat %>%
+  as.data.frame() %>%
+  arrange(ARIMAX)
+
+```
+
+```{r}
+cormat
+```
+
