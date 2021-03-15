@@ -248,22 +248,27 @@ ggplot(data = melted, aes(x = Var1, y = Var2, fill = value)) +
   geom_tile() +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 ```
+
 Some exploration
 ```{r}
+library(wesanderson)
 master[, ("date") := fhistories$date]
 ggplot(master, aes(x = date)) +
-  geom_line(aes(y = truth)) +
-  geom_line(aes(y = smooth(ARIMAX)), color = "red") +
-  geom_line(aes(y = linearity), color = "green") +
-  geom_line(aes(y = smooth(SNAIVE)), color = "blue") +
-  geom_line(aes(y = trend_strength), color = "cyan")
+  geom_line(aes(y = truth, color = "Truth")) +
+  geom_line(aes(y = smooth(ARIMAX), color = "ARIMAX")) +
+  geom_line(aes(y = linearity, color = "Linearity")) +
+  geom_line(aes(y = smooth(STLF), color = "STLF")) +
+  geom_line(aes(y = trend_strength,  color = "Trend")) +
+  theme_minimal() +
+  theme(legend.title = element_blank()) +   # hide legend titles
+  scale_color_manual(values=wes_palette(5, name = "Darjeeling1", type = "continuous")) +
+  labs(x = "Date", y = "Scaled variation")
 ```
 
 ```{r}
 cormat %>%
   as.data.frame() %>%
   arrange(ARIMAX)
-
 ```
 
 ```{r}
