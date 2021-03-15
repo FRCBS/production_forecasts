@@ -206,7 +206,7 @@ head(fhistories)
 Exctract features for the same period
 ```{r}
 start_init <- as.Date("2004-01-01") # segment origin
-end_init <- as.Date("2008-01-01") # segment terminus
+end_init <- as.Date("2007-01-01") # segment terminus
 end_of_time <- longform$date[length(longform$date)]
 nmonths <- 12 * (year(end_of_time) - year(end_init)) + (month(end_of_time) - month(end_init))
 
@@ -226,13 +226,18 @@ metrics <- data.frame(scale(matrix(unlist(metricvec), ncol=49, byrow=TRUE)), str
 colnames(metrics) <- names(metricvec)[1:49]
 ```
 
+```{r}
+head(metrics)
+```
+
+
 Combine with forecast errors
 ```{r}
-master <- cbind(fhistories, metrics) %>% select(-c(date, zero_run_mean, zero_start_prop, zero_end_prop, endyear))
+master <- cbind(fhistories, metrics[13:163, ]) %>% select(-c(date, zero_run_mean, zero_start_prop, zero_end_prop, endyear))
 ```
 
 ```{r}
-head(master)
+tail(master)
 ```
 
 
