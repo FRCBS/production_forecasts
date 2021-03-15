@@ -233,7 +233,7 @@ head(metrics)
 
 Combine with forecast errors
 ```{r}
-master <- cbind(fhistories, metrics[13:163, ]) %>% select(-c(date, zero_run_mean, zero_start_prop, zero_end_prop, endyear))
+master <- cbind(fhistories, metrics[13:163, ]) %>% select(-c(date, zero_run_mean, zero_start_prop, zero_end_prop, nsdiffs, endyear))
 ```
 
 ```{r}
