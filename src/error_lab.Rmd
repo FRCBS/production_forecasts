@@ -2,9 +2,18 @@
 title: "Production Forecasts"
 output: html_document
 ---
-```{r setup, echo = FALSE}
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+# echo "rmarkdown::render('forecast_script_FIN.Rmd', clean=TRUE,output_format='html_document',output_file='results/forecast_script_FIN_20201006.Rmd')" | R --slave
+
 # Set working directory
-knitr::opts_knit$set(root.dir = "/home/esa/production_forecasts") # Working on Ubuntu
+ROOTDIR <- "~/production_forecasts/src/" # Your directory
+DATADIR <- "~/production_forecasts/data/FACS"
+HISTORYDIR <- "~/production_forecasts/histories/" # monthly
+MONTHLYDIR <- paste0(HISTORYDIR, "monthly_") # monthly
+WEEKLYDIR <- paste0(HISTORYDIR, "weekly_") # weekly
+
+knitr::opts_chunk$set(root.dir = ROOTDIR, warning = FALSE, message = FALSE) # No warnings for final output
+knitr::opts_knit$set(root.dir = ROOTDIR, warning = FALSE, message = FALSE)
 
 # Colorblind palette
 # black, orange, sky blue, green,
@@ -12,14 +21,12 @@ knitr::opts_knit$set(root.dir = "/home/esa/production_forecasts") # Working on U
 cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", 
                 "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
-# To use for fills, add
-# scale_fill_manual(values=cbbPalette)
-
-# To use for line and point colors, add
-# scale_colour_manual(values=cbbPalette)
+# These colors work server side for now:
+palette <- list(1, 1, 1, 0.7, "royalblue2", "deepskyblue1", "darkred", "darkgreen")
+names(palette) <- c("alpha80", "alpha95", "alphaSeg", "alphaPred", "fill80", "fill95", "colPred", "colData")
 ```
 
-```{r imports, message = FALSE, echo = FALSE}
+```{r imports, message=FALSE, warning=FALSE, echo=FALSE}
 library(forecast)
 library(ggplot2)
 library(gridExtra)
@@ -30,19 +37,25 @@ library(numbers)
 library(data.table)
 library(R.utils)
 library(DT)
-source("src/pffunctions.R")
+library(stringr)
+library(hash)
+library(htmltools)
+source("pffunctions.R")
+# Set rolling window size in years
+rw_years <- 3
+start_date <- as.Date("2014-01-01")
 ```
+
 
 ```{r read_files, include = FALSE}
 # Get all the files
-PATH <- "/home/esa/production_forecasts/data/FACS/"
-files <- list.files(path = PATH, pattern = "FAC0091_*")  # Character vector of file names
+files <- list.files(path = DATADIR, pattern = "FAC0091_*")  # Character vector of file names
 
 # Compile a dataframe by going over all files
 dlist <- list()
 for (i in files) {
   # Read a single file to a df called d
-  d <- read.delim(file = paste0(PATH, "/", i), header = FALSE, sep = ";", stringsAsFactors = FALSE, colClasses = 'character')
+  d <- read.delim(file = paste0(DATADIR, "/", i), header = FALSE, sep = ";", stringsAsFactors = FALSE, colClasses = 'character')
   
   if(length(d) == 26){
     d <- d[, !(names(d) %in% c("V10"))]  # The column numbers unfortunately vary between files, so we'll adjust
@@ -68,9 +81,9 @@ distr <- P[keep]
 colnames(distr) <- c("date", "product", "quantity", "ABO", "volume", "exp")
 
 # For returns we keep the return date and quantity
-keep <- c("V4", "V7")
+keep <- c("V4", "V5", "V7")
 retrn <- R[keep]
-colnames(retrn) <- c("date", "quantity")
+colnames(retrn) <- c("date", "product", "quantity")
 
 # Datify
 distr$date <- dmy(distr$date); distr$exp <- dmy(distr$exp)
@@ -88,6 +101,7 @@ red.codes <- c("budTR001", "A0071V00", "A0074V00", "A0092VA0", "A0092VB0",
                "E7668V00", "E7673V00", "E4999V00", "E5000V00")
 
 red.distr <- distr[distr$product %in% red.codes, ]
+red.retrn <- retrn[retrn$product %in% red.codes, ]
 
 # Product codes for platelets
 plat.codes <- c("budTR002", "trEnnApu", "A0004V00", "A0005V00", "A0006V00", "A0007V00", "A0008V00",
@@ -105,7 +119,9 @@ plat.codes <- c("budTR002", "trEnnApu", "A0004V00", "A0005V00", "A0006V00", "A00
                 "E7530VB0", "E7531V00", "E7531VA0", "E7531VB0", "E6875VA0")
 
 plat.distr <- distr[distr$product %in% plat.codes, ]
+plat.retrn <- retrn[retrn$product %in% plat.codes, ]
 ```
+
 
 ```{r create_datasets, include = FALSE}
 # Create a full sequence of dates for imputation purposes
@@ -123,18 +139,31 @@ all.red <- merge(x = data.frame(date = all.dates),
 # Replace with zeroes
 all.red[is.na(all.red)] <- 0
 # Cut to time after 2014
-all.red <- all.red[all.red$date >= as.Date("2014-01-06"), ]
+all.red <- all.red[all.red$date >= start_date, ]
 
+###           ###
+#  RED RETURNS  #
+###           ###
+
+all.red.retrn <- aggregate(red.retrn$quantity, by = list(red.retrn$date), sum); colnames(all.red.retrn) <- c("date", "pcs")
+# Merge into a whole set with NAs
+all.red.retrn <- merge(x = data.frame(date = all.dates),
+                 y = all.red.retrn,
+                 all.x = TRUE)
+# Replace with zeroes
+all.red.retrn[is.na(all.red.retrn)] <- 0
+# Cut to time after 2014
+all.red.retrn <- all.red.retrn[all.red.retrn$date >= start_date, ]
 
 # Extracting types
-Ominus.distr <- extract_type(red.distr, "O -")  # This our custom function, see pffunctions.R
-Oplus.distr <- extract_type(red.distr, "O +")
-Aminus.distr <- extract_type(red.distr, "A -")
-Aplus.distr <- extract_type(red.distr, "A +")
-Bminus.distr <- extract_type(red.distr, "B -")
-Bplus.distr <- extract_type(red.distr, "B +")
-ABminus.distr <- extract_type(red.distr, "AB-")
-ABplus.distr <- extract_type(red.distr, "AB+")
+Ominus.distr <- extract_type(red.distr, "O -",start_date)  # This our custom function, see pffunctions.R
+Oplus.distr <- extract_type(red.distr, "O +",start_date)
+Aminus.distr <- extract_type(red.distr, "A -",start_date)
+Aplus.distr <- extract_type(red.distr, "A +",start_date)
+Bminus.distr <- extract_type(red.distr, "B -",start_date)
+Bplus.distr <- extract_type(red.distr, "B +",start_date)
+ABminus.distr <- extract_type(red.distr, "AB-",start_date)
+ABplus.distr <- extract_type(red.distr, "AB+",start_date)
 
 
 ###           ###
@@ -148,89 +177,69 @@ all.plat <- merge(x = data.frame(date = all.dates),
 # Replace with zeroes
 all.plat[is.na(all.plat)] <- 0
 # Cut to time after 2014
-all.plat <- all.plat[all.plat$date >= as.Date("2014-01-06"), ]
+all.plat <- all.plat[all.plat$date >= start_date, ]
+
+###           ###
+# PLAT RETURNS  #
+###           ###
+all.plat.retrn <- aggregate(plat.retrn$quantity, by = list(plat.retrn$date), sum); colnames(all.plat.retrn) <- c("date", "pcs")
+# Merge into a whole set with NAs
+all.plat.retrn <- merge(x = data.frame(date = all.dates),
+                  y = all.plat.retrn,
+                  all.x = TRUE)
+# Replace with zeroes
+all.plat.retrn[is.na(all.plat.retrn)] <- 0
+# Cut to time after 2014
+all.plat.retrn <- all.plat.retrn[all.plat.retrn$date >= start_date, ]
 ```
 
 ```{r datasets_monthly, include = FALSE, warning = FALSE}
 # Aggregate all by months
-red.monthly <- aggregate(pcs ~ month(date) + year(date), data = all.red, FUN = sum)
-Ominus.monthly <- aggregate(pcs ~ month(date) + year(date), data = Ominus.distr, FUN = sum)
-Oplus.monthly <- aggregate(pcs ~ month(date) + year(date), data = Oplus.distr, FUN = sum)
-Aminus.monthly <- aggregate(pcs ~ month(date) + year(date), data = Aminus.distr, FUN = sum)
-Aplus.monthly <- aggregate(pcs ~ month(date) + year(date), data = Aplus.distr, FUN = sum)
-Bminus.monthly <- aggregate(pcs ~ month(date) + year(date), data = Bminus.distr, FUN = sum)
-Bplus.monthly <- aggregate(pcs ~ month(date) + year(date), data = Bplus.distr, FUN = sum)
-ABminus.monthly <- aggregate(pcs ~ month(date) + year(date), data = ABminus.distr, FUN = sum)
-ABplus.monthly <- aggregate(pcs ~ month(date) + year(date), data = ABplus.distr, FUN = sum)
-plat.monthly <- aggregate(pcs ~ month(date) + year(date), data = all.plat, FUN = sum)
+red.monthly <- subset(aggregate(pcs ~ month(date) + year(date), data = all.red, FUN = sum), red.monthly$`year(date)` <= 2019)[1:66, ]
+# red.retrn.monthly <- aggregate(pcs ~ month(date) + year(date), data = all.red.retrn, FUN = sum)
+# 
+# Ominus.monthly <- aggregate(pcs ~ month(date) + year(date), data = Ominus.distr, FUN = sum)
+# Oplus.monthly <- aggregate(pcs ~ month(date) + year(date), data = Oplus.distr, FUN = sum)
+# Aminus.monthly <- aggregate(pcs ~ month(date) + year(date), data = Aminus.distr, FUN = sum)
+# Aplus.monthly <- aggregate(pcs ~ month(date) + year(date), data = Aplus.distr, FUN = sum)
+# Bminus.monthly <- aggregate(pcs ~ month(date) + year(date), data = Bminus.distr, FUN = sum)
+# Bplus.monthly <- aggregate(pcs ~ month(date) + year(date), data = Bplus.distr, FUN = sum)
+# ABminus.monthly <- aggregate(pcs ~ month(date) + year(date), data = ABminus.distr, FUN = sum)
+# ABplus.monthly <- aggregate(pcs ~ month(date) + year(date), data = ABplus.distr, FUN = sum)
+# 
+# plat.monthly <- aggregate(pcs ~ month(date) + year(date), data = all.plat, FUN = sum)
+# plat.retrn.monthly <- aggregate(pcs ~ month(date) + year(date), data = all.plat.retrn, FUN = sum)
 
 # Dates
-months <- seq(from = as.Date("2014-01-06"), to = max(distr$date), by = "month")
+#months <- seq(from = as.Date("2009-01-01"), to = max(distr$date), by = "month")
+months <- seq(from = start_date, to = as.Date("2019-06-01"), by = "month") #This needs to be tuned based on your data set
 
 # Adjustment series
-adj <- as.numeric(bizdays(ts(months, start = decimal_date(as.Date("2014-01-06")), frequency = 12), FinCenter = "Zurich"))
-reverse_adj <- as.numeric(bizdays(ts(seq(6), start = decimal_date(as.Date(tail(months, 1))), frequency = 12), FinCenter = "Zurich"))
+adj <- as.numeric(bizdays(ts(months, 
+                             start = c(year(start_date), month(start_date), day(start_date)), #  c(year, month, day) is apparently the only robust way to do this.
+                             frequency = 12), FinCenter = "Zurich"))
+# scaler <- as.numeric(bizdays(ts(1, start = decimal_date(months[length(months)]), frequency = 12), FinCenter = "Zurich")) This was written to scale a singular forecasted month back to real values, for saving-to-file purposes
+
+end_date <- months[length(months)] # Ugly but around 30 times faster than tail(x, 1)!
+reverse_adj <- as.numeric(bizdays(ts(seq(23), 
+                                     start = c(year(end_date), month(end_date), day(end_date)), 
+                                     frequency = 12), FinCenter = "Zurich")) # This is the old implementation that used to be fed into the forecasting function. We'll now repurpose it so it can be used both for tabling and plotting.
 
 # Create a master frame
 monthly <- data.frame(date = months,
-                      red = red.monthly$pcs/adj,
-                      Ominus = Ominus.monthly$pcs/adj,
-                      Oplus = Oplus.monthly$pcs/adj,
-                      Aminus = Aminus.monthly$pcs/adj,
-                      Aplus = Aplus.monthly$pcs/adj,
-                      Bminus = Bminus.monthly$pcs/adj,
-                      Bplus = Bplus.monthly$pcs/adj,
-                      ABminus = ABminus.monthly$pcs/adj,
-                      ABplus = ABplus.monthly$pcs/adj,
-                      plat = plat.monthly$pcs/adj)
+                      red = red.monthly$pcs/adj)
 
 monthly_real <- data.frame(date = months,
-                           red = red.monthly$pcs,
-                           Ominus = Ominus.monthly$pcs,
-                           Oplus = Oplus.monthly$pcs,
-                           Aminus = Aminus.monthly$pcs,
-                           Aplus = Aplus.monthly$pcs,
-                           Bminus = Bminus.monthly$pcs,
-                           Bplus = Bplus.monthly$pcs,
-                           ABminus = ABminus.monthly$pcs,
-                           ABplus = ABplus.monthly$pcs,
-                           plat = plat.monthly$pcs)
-```
+                           red = red.monthly$pcs)
 
-```{r datasets_weekly, include = FALSE}
-# Weekly aggregation is a bit more tricky operation as weekly aggregate gives incorrect results, so we'll use
-# a function of our own
-
-red.weekly <- aggregate_weekly(all.red)
-Ominus.weekly <- aggregate_weekly(Ominus.distr)
-Oplus.weekly <- aggregate_weekly(Oplus.distr)
-Aminus.weekly <- aggregate_weekly(Aminus.distr)
-Aplus.weekly <- aggregate_weekly(Aplus.distr)
-Bminus.weekly <- aggregate_weekly(Bminus.distr)
-Bplus.weekly <- aggregate_weekly(Bplus.distr)
-ABminus.weekly <- aggregate_weekly(ABminus.distr)
-ABplus.weekly <- aggregate_weekly(ABplus.distr)
-plat.weekly <- aggregate_weekly(all.plat)
-
-# Create a master frame
-weekly <- data.frame(week = red.weekly$week,
-                     startdate = red.weekly$startdate,
-                     red = red.weekly$pcs,
-                     Ominus = Ominus.weekly$pcs,
-                     Oplus = Oplus.weekly$pcs,
-                     Aminus = Aminus.weekly$pcs,
-                     Aplus = Aplus.weekly$pcs,
-                     Bminus = Bminus.weekly$pcs,
-                     Bplus = Bplus.weekly$pcs,
-                     ABminus = ABminus.weekly$pcs,
-                     ABplus = ABplus.weekly$pcs,
-                     plat = plat.weekly$pcs)
+monthly_real <- subset(monthly_real, monthly_real$date <= as.Date("2019-06-01"))
+monthly <- subset(monthly, monthly$date <= as.Date("2019-06-01"))
 ```
 
 # Old models
 ```{r}
 # The old models took all of the unadjusted history and forecasted based on that. To get an accurate benchmark we'll need to erase
-# 18 months from the end of the series, make one prediction, then extend and make a new prediciton, and so forth.
+# 18 months from the end of the series, make one prediction, then extend and make a new prediction, and so forth.
 ets.forecasts <- c()
 stl.forecasts <- c()
 rwf.forecasts <- c()  # This isn't an old forecast, but it's the lower bound baseline
@@ -291,6 +300,32 @@ stl.ad.mape <- abs((validation - stl.ad.forecasts)) / validation * 100
 stl.ad.cmape <- abs(ifelse(test = (validation - stl.ad.forecasts) >= 0, 
                     yes = 2 * (validation - stl.ad.forecasts), 
                     no =  (validation - stl.ad.forecasts))) / validation * 100
+```
+
+
+```{r}
+ma5 <- read.csv("/home/esa/production_forecasts/histories/single_model_histories/5-MA_fcast_history.csv", colClasses = c("Date", "NULL", "numeric", "NULL", "NULL", "NULL", "NULL"))
+ma7 <- read.csv("/home/esa/production_forecasts/histories/single_model_histories/7-MA_fcast_history.csv", colClasses = c("NULL", "NULL", "numeric", "NULL", "NULL", "NULL", "NULL"))
+ma9 <- read.csv("/home/esa/production_forecasts/histories/single_model_histories/9-MA_fcast_history.csv", colClasses = c("NULL", "NULL", "numeric", "NULL", "NULL", "NULL", "NULL"))
+ma12 <- read.csv("/home/esa/production_forecasts/histories/single_model_histories/12-MA_fcast_history.csv", colClasses = c("NULL", "NULL", "numeric", "NULL", "NULL", "NULL", "NULL"))
+armx <- read.csv("/home/esa/production_forecasts/histories/single_model_histories/ARIMAX_fcast_history.csv", colClasses = c("NULL", "NULL", "numeric", "NULL", "NULL", "NULL", "NULL"))
+comb <- read.csv("/home/esa/production_forecasts/histories/single_model_histories/COMBINED_fcast_history.csv", colClasses = c("NULL", "NULL", "numeric", "NULL", "NULL", "NULL", "NULL"))
+dyn <- read.csv("/home/esa/production_forecasts/histories/single_model_histories/DYNREG_fcast_history.csv", colClasses = c("NULL", "NULL", "numeric", "NULL", "NULL", "NULL", "NULL"))
+etsAAA <- read.csv("/home/esa/production_forecasts/histories/single_model_histories/ETS(AAA)_fcast_history.csv", colClasses = c("NULL", "NULL", "numeric", "NULL", "NULL", "NULL", "NULL"))
+etsAAN <- read.csv("/home/esa/production_forecasts/histories/single_model_histories/ETS(AAN)_fcast_history.csv", colClasses = c("NULL", "NULL", "numeric", "NULL", "NULL", "NULL", "NULL"))
+etsANN <- read.csv("/home/esa/production_forecasts/histories/single_model_histories/ETS(ANN)_fcast_history.csv", colClasses = c("NULL", "NULL", "numeric", "NULL", "NULL", "NULL", "NULL"))
+etsMAM <- read.csv("/home/esa/production_forecasts/histories/single_model_histories/ETS(MAM)_fcast_history.csv", colClasses = c("NULL", "NULL", "numeric", "NULL", "NULL", "NULL", "NULL"))
+nn <- read.csv("/home/esa/production_forecasts/histories/single_model_histories/NN_fcast_history.csv", colClasses = c("NULL", "NULL", "numeric", "NULL", "NULL", "NULL", "NULL"))
+snaive <- read.csv("/home/esa/production_forecasts/histories/single_model_histories/SNAIVE_fcast_history.csv", colClasses = c("NULL", "NULL", "numeric", "NULL", "NULL", "NULL", "NULL"))
+stlf <- read.csv("/home/esa/production_forecasts/histories/single_model_histories/STLF_fcast_history.csv", colClasses = c("NULL", "NULL", "numeric", "NULL", "NULL", "NULL", "NULL"))
+tbats <- read.csv("/home/esa/production_forecasts/histories/single_model_histories/TBATS_fcast_history.csv", colClasses = c("NULL", "NULL", "numeric", "NULL", "NULL", "NULL", "NULL"))
+adap <- read.csv("/home/esa/production_forecasts/histories/old_runs/long_fcast_history.csv", colClasses = c("NULL", "NULL", "numeric", "NULL", "NULL", "NULL", "NULL"))
+```
+
+```{r}
+df <- cbind(ma5, ma7, ma9, ma12, armx, comb, dyn, etsAAA, etsAAN, etsANN, etsMAM, nn, snaive, stlf, tbats, adap)
+subdf <- subset(df, df$time <= "2019-06-01" & df$time >= "2014-01-01")
+edf <- (df[, 2:17] - monthly_real$red)
 ```
 
 # Model selection with criticality

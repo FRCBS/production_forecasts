@@ -52,9 +52,6 @@ library(scales)
 library(grid)
 library(ggbiplot)
 source("pffunctions.R")
-# Set rolling window size in years
-rw_years <- 3
-start_date <- as.Date("2014-01-01")
 ```
 
 ## Here we test the hypothesis that the pool of models are so flexible that their forecasts often overlap without much difference in error.
@@ -115,6 +112,7 @@ for(j in 1:length(modelnames)){
   setTxtProgressBar(pb, j) # Update progress bar
 }
 ```
+
 Now load all forecasts into a masterframe (for plotting and analysis).
 ```{r}
 truth <- monthly_real[48:78, 1:2]
