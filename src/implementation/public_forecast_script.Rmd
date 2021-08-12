@@ -1,0 +1,140 @@
+---
+title: "Forecasting Script"
+author: "Esa Turkulainen"
+date: "7/30/2021"
+output: html_document
+---
+
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+# Set working directory
+WDIR <- "DIR/"
+```
+
+```{r imports_and_global, message=FALSE, warning=FALSE, echo=FALSE}
+source("report_functions.R")
+library(forecast)
+library(lubridate)
+library(ggplot2)
+
+# Set (rolling) training window size in years
+RW_YEARS <- 2
+# Set testing period length (in whatever time resolution you use)
+TESTP <- 12
+# For adjustment purposes, are you forecasting on a monthly level?
+MONTHLY <- FALSE
+# Length of forecast horizon
+N <- 4
+# List other possibly useful horizons here
+M <- 12
+```
+
+```{r load_data, message=FALSE, warning=FALSE, echo=FALSE}
+# If your data comes directly from a BI server, you will need to manipulate it here
+# E.g. files <- list.files(path = DATADIR, pattern = "FILE_ID_2022-01-01_*")
+#      for (i in files) { do: compile into a dataframe }  
+
+# If your data comes pre-processed in the desired resolution (e.g. individual instances to daily/weekly/monthly sums)
+# load it here.
+red_weekly <- read.csv("DATADIR/red_weekly.csv", colClasses = c("Date", "numeric"))
+Ominus_weekly <- read.csv("DATADIR/Ominus_weekly.csv", colClasses = c("Date", "numeric"))
+plat_weekly <- read.csv("DATADIR/plat_weekly.csv", colClasses = c("Date", "numeric"))
+# ...
+
+# This script assumes the following data structure
+# |    Date    |  pcs  |
+# | 2022-01-01 |  200  |
+# | 2022-01-08 |  300  |
+# etc...
+
+# If your data is MONTHLY, it is probably affected
+# by the number of workdays in each month. To adjust
+# for this, we can use the bizdays() function from the
+# forecast package:
+if (MONTHLY) {
+    start_date <- red_monthly[1, 1] # For adjusting the series
+    fcast_start_date <- red_monthly[nrow(red_monthly), 1] + days(1) # For adjusting the forecast
+    series_workdays <- as.numeric(bizdays(ts(1:nrow(red_monthly), start = c(year(start_date), month(start_date), day(start_date)),
+                                             frequency = 12), 
+                                          FinCenter = "Zurich")) # Select the most appropriate FinCenter for you
+    fcast_workdays <- as.numeric(bizdays(ts(1:N, start = c(year(start_date), month(start_date), day(start_date)), 
+                                            frequency = 12),
+                                         FinCenter = "Zurich"))
+    # Adjust series
+    series <- cbind(red_monthly[, 1], (red_monthly[, 2] / series_workdays))
+} else {
+    series <- red_weekly
+}
+```
+
+## `r N` year/month/week/day `# Edit section title for your needs` forecast {.tabset .tabset-fade .tabset-pills}
+
+### All red `# These constitute as tabs inside the HTML document, under the upper level section`
+
+```{r red_forecast, echo = FALSE, results = FALSE, message=FALSE, warning=FALSE}
+# Autonomous forecasting utilizes method selection heuristics that look at
+# previous method performance. To reduce the computational burden, historical
+# method performances are saved into a file.
+# 
+# select_method will generate and save 
+# performance history if it doesn't exist.
+# Check report_functions() for heur options.
+selected_method <- select_method(series, history_path = "DATADIR/all_fcasts_history_weekly_red.csv", heur = TESTP, res = "weekly", rw_years = RW_YEARS) 
+
+# The selected method is now used to generate
+# N (user determined number) forecasts into the future
+forecast <- get_forecast(series, selected_method, h = N, res = "weekly", rw_years = 2, alpha = 0.5, path = "DATADIR/all_fcasts_history_weekly_red.csv")
+
+# Again, if your data is MONTHLY, 
+# the adjustment needs to be reversed.
+if (MONTHLY) {
+    forecast <- forecast * fcast_workdays
+}
+
+# Save only the next day/week/month/year forecast into selected forecast history file:
+write.table(head(forecast, 1), file = "DATADIR/weekly_forecasts_red.csv", sep = ",", append = TRUE, row.names = FALSE, col.names = FALSE)
+```
+
+```{r plot_red_forecast, fig.align = "center", echo = FALSE}
+draw_forecast(forecast, series, res = "weekly", product = "RBC", palette = "colorblind")
+```
+
+<style>
+div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font-size: 25px;}
+</style>
+<div class = "summary">
+
+Forecast for week `r as.numeric(week(today()))` of `r year(today())  # Edit these when forecasting something other than weeks.` : `r format(round(forecasts[1, 1], 0))  # This is to round AND display only whole numbers.` blood bags.
+
+</div>
+
+### O-
+
+```{r Ominus_forecast, echo = FALSE, results = FALSE, message=FALSE, warning=FALSE}
+selected_method <- select_method(series, history_path = "DATADIR/all_fcasts_history_weekly_Ominus.csv", heur = TESTP, res = "weekly", rw_years = RW_YEARS) 
+forecast <- get_forecast(series, selected_method, h = N, res = "weekly", rw_years = 2, alpha = 0.5, path = "DATADIR/all_fcasts_history_weekly_Ominus.csv")
+
+if (MONTHLY) {
+    forecast <- forecast * fcast_workdays
+}
+
+write.table(head(forecast, 1), file = "DATADIR/weekly_forecasts_Ominus.csv", sep = ",", append = TRUE, row.names = FALSE, col.names = FALSE)
+```
+
+```{r plot_Ominus_forecast, fig.align = "center", echo = FALSE}
+draw_forecast(forecast, series, res = "weekly", product = "O-", palette = "colorblind")
+```
+
+<style>
+div.summary { background-color::#e6f0ff; border-radius: 5px; padding: 20px; font-size: 25px;}
+</style>
+<div class = "summary">
+
+Forecast for week `r as.numeric(week(today()))` of `r year(today())  # Edit these when forecasting something other than weeks.` : `r format(round(forecasts[1, 1], 0))  # This is to round AND display only whole numbers.` blood bags.
+
+</div>
+
+`To begin another section (for another product class, or time resolution), use`
+
+## `r M` year/month/week/day forecast {.tabset .tabset-fade .tabset-pills}
+
+`Knit into HTML to see view report. Add tables / other if desired.`
