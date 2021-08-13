@@ -315,8 +315,8 @@ select_method <- function(series, path = "~/all_fcasts_history.csv", heur = 12, 
           if (heur == "YOURHEURHERE") {
           }
 
-          if (!(heur %in% c("WAVG", "YOURHEURHERE"))) {
-              stop("I can't recognize this heuristic! Try e.g., heur = 'WAVG' or any integer.")
+          if (!(heur %in% c("wavg", "YOURHEURHERE"))) {
+              stop("I can't recognize this heuristic! Try e.g., heur = 'wavg' or any integer.")
           }
       }
   } else { # If history doesn't exist, generate it
@@ -342,8 +342,8 @@ select_method <- function(series, path = "~/all_fcasts_history.csv", heur = 12, 
           if (heur == "YOURHEURHERE") {
           }
 
-          if (!(heur %in% c("WAVG", "YOURHEURHERE"))) {
-              stop("I can't recognize this heuristic! Try e.g., heur = 'WAVG' or any integer.")
+          if (!(heur %in% c("wavg", "YOURHEURHERE"))) {
+              stop("I can't recognize this heuristic! Try e.g., heur = 'wavg' or any integer.")
           }
       }
     }
