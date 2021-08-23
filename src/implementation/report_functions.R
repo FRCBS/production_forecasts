@@ -38,12 +38,12 @@ MAPE_selection <- function(history, testN) {
   return(selected_col)
 }
 
-wavg_selection <- function(history, alpha) {
+wavg_selection <- function(history, alpha = 0.5) {
   # Get WAVG configuration
   #
   # ARGUMENTS
   # history: a dataframe of method accuracies wo a date column
-  # alpha: coefficient for exp. decay
+  # alpha: coefficient for exp. decay, default 0.5
   #
   # RETURNS
   # A named list: method name, coefs for weighting, order of methods for weighting
@@ -52,7 +52,7 @@ wavg_selection <- function(history, alpha) {
   #        or a named list object with method name, and any other info needed to
   #        run the method.
 
-  alpahavec <- alpha ** (1:13) # 1:(Number of methods)
+  alphavec <- alpha ** (1:13) # 1:(Number of methods)
   last <- history[nrow(history), ]
 
   return(list(method = "wavg", coef = alphavec, order = order(last)))
@@ -309,7 +309,7 @@ select_method <- function(series, path = "~/all_fcasts_history.csv", heur = 12, 
       } else { # If heur is not an int, use specific flags for heuristics
 
           if (heur == "wavg") {
-              return(wavg_selection(acc_history[, -1]))
+              return(wavg_selection(acc_history[, -1], alpha = 0.5))
           }
 
           if (heur == "YOURHEURHERE") {
@@ -320,7 +320,7 @@ select_method <- function(series, path = "~/all_fcasts_history.csv", heur = 12, 
           }
       }
   } else { # If history doesn't exist, generate it
-      generate_acc_history(series, path, res, rw_years)
+      generate_fcast_history(series, path, res, rw_years)
       # And then select as before
       fcast_history <- read.csv(path) # use it
       fcast_history[, 1] <- as.Date(fcast_history[, 1])
@@ -336,7 +336,7 @@ select_method <- function(series, path = "~/all_fcasts_history.csv", heur = 12, 
       } else { # If heur is not an int, use specific flags for heuristics
 
           if (heur == "wavg") {
-              return(wavg_selection(acc_history[, -1]))
+              return(wavg_selection(acc_history[, -1], alpha = 0.5))
           }
 
           if (heur == "YOURHEURHERE") {
@@ -369,9 +369,8 @@ get_accuracies <- function(fcasts, series, metric = "MAPE") {
   series <- out$second
 
   if (metric == "MAPE") {
-    MAPEs <- 100 * abs(series[, -1] - fcasts) / series[, -1]
-    MAPES$date <- series[, 1]
-
+    MAPEs <- 100 * abs(series[, -1] - fcasts[, -1]) / series[, -1]
+    MAPEs <- data.frame(date = series[, 1], MAPEs)
     return(MAPEs)
   }
   if (metric == "something else entirely") {
@@ -412,6 +411,7 @@ get_forecast <- function(series, selected_method, h = 1, res = "weekly", rw_year
   # Get training period
   segment <- tail(series, rw)
   train_start <- segment[1, 1]
+  fcast_date <- segment[nrow(segment), 1] + weeks(1)
   train <- segment[, 2]
 
   # Make train set into a ts object for forecast functions
@@ -462,7 +462,7 @@ get_forecast <- function(series, selected_method, h = 1, res = "weekly", rw_year
   }
   horizon.m <- matrix(, nrow = h, ncol = 11)
   k <- 0
-  for (j in nrow:(nrow + h)) {
+  for (j in nrow:(nrow + h - 1)) {
     k <- k + 1
     if (res == "daily") {
       horizon.m[k,] <- onehotyear[month(train_start + days(j)), ]
@@ -542,28 +542,32 @@ get_forecast <- function(series, selected_method, h = 1, res = "weekly", rw_year
   # Create AVG
   avg <- apply(fcasts, 1, mean)
 
+  # Add to df
+  fcasts$avg <- avg
+
   # Create WAVG, these lines are a bit silly :)
-  if (selected_method$name == "wavg") {
+  if (is.list(selected_method)) { # If method is a list object
+    if (selected_method$name == "wavg") { # and it's a wavg object, USE IT
     scaled_coef <- selected_method$coef / sum(selected_method$coef) # Scale all coefs so they sum to 1
     wavg <- sum(scaled_coef * fcasts[, selected_method$order])
-  } else {
+    }
+  } else { # Otherwise, build it from scratch
       fcast_history <- read.csv(path)
       fcast_history[, 1] <- as.Date(fcast_history[, 1])
       acc_history <- get_accuracies(fcast_history, series)
 
-      wavg_obj <- wavg_selection(acc_history[, -1])
+      wavg_obj <- wavg_selection(acc_history[, -1], alpha = 0.5)
       scaled_coef <- wavg_obj$coef / sum(wavg_obj$coef)
-      wavg <- sum(scaled_coef * fcasts[, selected_method$order])
-    }
-
-  # Compile everything together for saving
-  fcasts$avg <- avg
-  fcasts$wavg <- wavg
-  # fcasts$yourmethod <- yourmethod
+      wavg <- sum(scaled_coef * fcasts[, wavg_obj$order])
+  }
 
   # Save
-  write.csv(fcasts, path, append = TRUE, row.names = FALSE, col.names = FALSE)
-
+  # IF FORECASTS DON'T EXIST ALREADY
+  last_obs <- tail(read.csv(path), 1)[, 1]
+  if (!(last_obs >= fcast_date)) {
+    write.table(data.frame(fcast_date, fcasts[1, ]), path, sep = ",",
+                append = TRUE, row.names = FALSE, col.names = FALSE)
+  }
   # Then return as per selected method
   if (selected_method == "snaive") {
     return(snaive)
@@ -604,12 +608,12 @@ get_forecast <- function(series, selected_method, h = 1, res = "weekly", rw_year
   if (selected_method == "avg") {
     return(avg)
   }
-  if (selected_method$name == "wavg") {
-    return(wavg)
+  if (is.list(selected_method)) {
+    if (selected_method$name == "wavg") {return(wavg)}
   }
 }
 
-draw_forecast <- function(forecast, series, res = "weekly", product = "RBC", palette = "colorblind") {
+draw_forecast <- function(forecast, series, h = 1, res = "weekly", product = "RBC", palette = "colorblind") {
   # Plotting helper for displaying forecasts w/series
   #
   # ARGUMENTS
@@ -626,37 +630,38 @@ draw_forecast <- function(forecast, series, res = "weekly", product = "RBC", pal
     # Colorblind palette
     # black, orange, sky blue, green,
     # yellow, blue, vermilion, purple
-    cbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73",
-                   "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+    palette <- c("#000000", "#E69F00", "#56B4E9", "#009E73",
+                 "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
   } else {
       # Create your own if accessibility is not an issue :)
-      custom_palette <- c("#000000", "#E69F00", "#56B4E9", "#009E73",
-                          "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+      palette <- c("#000000", "#E69F00", "#56B4E9", "#009E73",
+                   "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
     }
 
   if (res == "daily") {
-    daterange <- seq.Date(from = series[1, 1], to = series[nrow(series), 1] + days(dim(forecast)[1]), by = "day")
+    daterange <- seq.Date(from = series[1, 1], to = series[nrow(series), 1] + days(h), by = "day")
   }
   if (res == "weekly") {
-    daterange <- seq.Date(from = series[1, 1], to = series[nrow(series), 1] + weeks(dim(forecast)[1]), by = "weekly")
+    daterange <- seq.Date(from = series[1, 1], to = series[nrow(series), 1] + weeks(h), by = "week")
   }
   if (res == "monthly") {
-    daterange <- seq.Date(from = series[1, 1], to = series[nrow(series), 1] + months(dim(forecast)[1]), by = "month")
+    daterange <- seq.Date(from = series[1, 1], to = series[nrow(series), 1] + months(h), by = "month")
   }
   if (res == "yearly") {
-    daterange <- seq.Date(from = series[1, 1], to = series[nrow(series), 1] + years(dim(forecast)[1]), by = "year")
+    daterange <- seq.Date(from = series[1, 1], to = series[nrow(series), 1] + years(h), by = "year")
   }
-
-  ggplot(data = series, aes(x = date, y = pcs)) +
+  fcast_df <- data.frame(date = tail(daterange, length(forecast)), fcast = forecast)
+  ggplot(data = tail(series, 21), aes(x = date, y = pcs, colour = "Data")) +
     geom_line() +
-    geom_line(aes(x = tail(daterange, dim(forecast)[1]), y = forecast)) +
-    geom_segment(x = series[nrow(series), 1], xend = daterange[nrow(daterange) - dim(forecast)[1]],
-                 y = series[nrow(series), 2], yend = head(forecast, 1),
-                 linetype = "-") +
-    scale_colour_manual(values = cbPalette) +
+    geom_line(data = fcast_df, aes(x = date, y = fcast, colour = "Forecast")) +
+    geom_segment(x = series[nrow(series), 1], xend = daterange[length(daterange) - h + 1],
+                y = series[nrow(series), 2], yend = head(forecast, 1), linetype = "dashed") +
+    scale_colour_manual(values = c(palette[1], palette[7]), labels = c("Data", "Forecast")) +
     theme_minimal() +
     labs(title = paste(product, res, "forecast"),
-         subtitle = paste("Forecast horizon:", dim(forecast)[1]),
-         xlab = "Date",
-         ylab = "Units")
+         subtitle = paste("Forecast horizon:", h),
+         x = "Date",
+         y = "Units",
+         color = "Colour") +
+    scale_x_date(date_labels = "%m/%Y")
 }
