@@ -73,7 +73,7 @@ Ominus_weekly <- read.csv("~/production_forecasts/dummy_data/dummy_weekly_Ominus
 # forecast package:
 if (RES == "monthly") {
     start_date <- red_monthly[1, 1] # For adjusting the series
-    fcast_start_date <- red_monthly[nrow(red_monthly), 1] + days(1) # For adjusting the forecast
+    fcast_start_date <- red_monthly[nrow(red_monthly), 1] + months(1) # For adjusting the forecast
     series_workdays <- as.numeric(bizdays(ts(1:nrow(red_monthly), start = c(year(start_date), month(start_date), day(start_date)),
                                              frequency = 12), 
                                           FinCenter = "Zurich")) # Select the most appropriate FinCenter for you
