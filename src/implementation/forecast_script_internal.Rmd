@@ -1,0 +1,984 @@
+---
+title: "<center>Myyntiennusteraportti</center>"
+pagetitle: Myyntiennusteraportti
+output: 
+  html_document: 
+    css: style.css
+    includes:
+      before_body: header.html
+
+    fig_width: 12
+---
+
+`r # This here sets the background color of the report to "peachy" :)`
+<body style="background-color:#fff5ed;">
+
+```{r setup, echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE}
+knitr::opts_chunk$set(dev.args = list(bg = "transparent")) # this enables transparent bgs for plots/graphics
+options(OutDec = ",") # this changes the number separator from a period to a comma
+# packrat .libPath here
+
+source("~/production_forecasts/src/implementation/report_functions_internal.R") # source our own helper functions
+library(tidyverse) # on our serverside it seems tidyverse needs to be loaded first
+library(data.table)
+library(dplyr)
+library(forecast)
+library(lubridate)
+library(ggplot2)
+library(DT)
+
+# load settings
+source("config.R")
+```
+
+## {.tabset .tabset-fade .tabset-pills} 
+
+```{r RBC_ECON_tab_title, echo = F, results = 'asis', eval = RBC & ECON}
+cat("### Punasolutuotteet")
+```
+
+```{r RBC_ECON_data_read, echo = F, , message = FALSE, warning = FALSE, eval = RBC & ECON}
+# this cell reads new data, updates the daily.csv, and returns a daily series
+# daily: date | sales | deliveries | returns
+PROD <- "RBC" # PROD gets updated to new product when we transition into other products in the cells (if they have eval = TRUE)
+daily <- update_data(INPUT, OUTPUT, PROD)
+```
+
+```{r RBC_ECON_aggdata, echo = F, message = FALSE, warning = FALSE, eval = RBC & ECON}
+data <- set_resolution(daily, RES, at_end = FALSE, ECON, PROD, FIX = T)
+```
+
+```{r RBC_ECON_history_checks, echo = F, message = FALSE, warning = FALSE, eval = RBC & ECON}
+sales_method_history_path <- paste0(OUTPUT, PROD, "_sales_ECON_method_forecasts.csv")
+returns_method_history_path <- paste0(OUTPUT, PROD, "_returns_ECON_method_forecasts.csv") 
+sales_forecasts_path <- paste0(OUTPUT, PROD, "_sales_ECON_forecasts.csv")
+returns_forecasts_path <- paste0(OUTPUT, PROD, "_returns_ECON_forecasts.csv")
+
+if (!file.exists(sales_method_history_path)) { generate_method_history(data, S_R = "S", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(returns_method_history_path)) { generate_method_history(data, S_R = "R", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(sales_forecasts_path)) { simulate_selection_history(data, S_R = "S", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+if (!file.exists(returns_forecasts_path)) { simulate_selection_history(data, S_R = "R", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+```
+
+```{r RBC_ECON_select, echo = F, message = FALSE, warning = FALSE, eval = RBC & ECON}
+sales_selected_method <- select_method(data, PROD, S_R = "S", OUTPUT, ECON, TEST_LEN)
+returns_selected_method <- select_method(data, PROD, S_R = "R", OUTPUT, ECON, TEST_LEN)
+```
+
+```{r RBC_ECON_fcast, eval = RBC & ECON, echo = F, message = FALSE, warning = FALSE}
+sales_forecast <- get_forecast(data, S_R = "S", method = sales_selected_method, hilo = T, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+returns_forecast <- get_forecast(data, S_R = "R", method = returns_selected_method, hilo = F, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+deliveries_forecast <- data.frame(date = sales_forecast$date, forecast = (sales_forecast[, 2] + returns_forecast[, 2]))
+comb_forecast <- sales_forecast %>% left_join(deliveries_forecast, by = "date") %>% left_join(returns_forecast, by = "date")
+colnames(comb_forecast) <- c("date", "sales", "Lo80", "Hi80", "Lo90", "Hi90", "deliveries", "returns")
+```
+
+```{r RBC_ECON_plot, echo=FALSE, fig.align="center", message = FALSE, warning = FALSE, out.width='80%', eval = RBC & ECON}
+draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PROD)
+```
+
+```{r RBC_ECON_acc_expl, echo = FALSE, results = 'asis', eval = ECON, message = FALSE, warning = FALSE}
+cat("<center style='font-size:1vw'>Virheprosentti lasketaan 2 vuoden kuukausisumman ennustustarkkuudesta.</center>")
+```
+
+```{r RBC_ECON_curyear_title, echo = FALSE, results = 'asis', eval = RBC & ECON, message = FALSE, warning = FALSE}
+cat("
+***
+  <style>
+div.tabtitle { font-size: 25px; text-align: center; margin: auto;}
+</style>
+<div class = 'tabtitle'>
+Kuluva vuosi
+</div>
+")
+```
+
+```{r RBC_ECON_CURYEAR_table, R.options = list(width = 100), echo = FALSE, eval = RBC & ECON, message = FALSE, warning = FALSE}
+table_current_year(data, comb_forecast, PROD)
+```
+
+```{r RBC_ECON_5ytitle, echo = FALSE, results = 'asis', eval = RBC & ECON, message = FALSE, warning = FALSE}
+cat("
+<style>
+div.tabtitle { font-size: 25px; text-align: center; margin: auto;}
+</style>
+<div class = 'tabtitle'>
+Viiden vuoden trendiennusteet
+</div>
+
+<style>
+div.subtitle { font-size: 16px; text-align: center; margin: auto;}
+</style>
+<div class = 'subtitle'>
+Myynti
+</div>
+")
+```
+
+```{r RBC_ECON_sales_YEARLY_table, R.options = list(width = 100), echo = FALSE, eval = RBC & ECON, message = FALSE, warning = FALSE}
+table_yearly(data, comb_forecast, PROD, S_R = "S")
+```
+
+```{r RBC_ECON_returns_subtitle, echo = FALSE, results = 'asis', eval = RBC & ECON, message = FALSE, warning = FALSE}
+cat("
+<div class = 'subtitle'>
+Palautukset
+</div>
+")
+```
+
+```{r RBC_ECON_returns_YEARLY_table, R.options = list(width = 100), echo = FALSE, eval = RBC & ECON, message = FALSE, warning = FALSE}
+table_yearly(data, comb_forecast, PROD, S_R = "R")
+```
+
+
+```{r PLAT_ECON_tab_title, echo = F, results = 'asis', eval = PLAT & ECON, message = FALSE, warning = FALSE}
+cat("### Trombosyyttituotteet")
+```
+
+```{r PLAT_ECON_data_read, echo = F, eval = PLAT & ECON, message = FALSE, warning = FALSE}
+# this cell reads new data, updates the daily.csv, and returns a daily series
+# daily: date | sales | deliveries | returns
+PROD <- "PLAT" # PROD gets updated to new product when we transition into other products in the cells (if they have eval = TRUE)
+daily <- update_data(INPUT, OUTPUT, PROD)
+```
+
+```{r PLAT_ECON_aggdata, echo = F, eval = PLAT & ECON, message = FALSE, warning = FALSE}
+data <- set_resolution(daily, RES, at_end = FALSE, ECON, PROD, FIX = T)
+```
+
+```{r PLAT_ECON_history_checks, echo = F, eval = PLAT & ECON, message = FALSE, warning = FALSE}
+sales_method_history_path <- paste0(OUTPUT, PROD, "_sales_ECON_method_forecasts.csv")
+returns_method_history_path <- paste0(OUTPUT, PROD, "_returns_ECON_method_forecasts.csv") 
+sales_forecasts_path <- paste0(OUTPUT, PROD, "_sales_ECON_forecasts.csv")
+returns_forecasts_path <- paste0(OUTPUT, PROD, "_returns_ECON_forecasts.csv")
+
+if (!file.exists(sales_method_history_path)) { generate_method_history(data, S_R = "S", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(returns_method_history_path)) { generate_method_history(data, S_R = "R", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(sales_forecasts_path)) { simulate_selection_history(data, S_R = "S", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+if (!file.exists(returns_forecasts_path)) { simulate_selection_history(data, S_R = "R", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+```
+
+```{r PLAT_ECON_select, echo = F, eval = PLAT & ECON, message = FALSE, warning = FALSE}
+sales_selected_method <- select_method(data, PROD, S_R = "S", OUTPUT, ECON, TEST_LEN)
+returns_selected_method <- select_method(data, PROD, S_R = "R", OUTPUT, ECON, TEST_LEN)
+```
+
+```{r PLAT_ECON_fcast, eval = PLAT & ECON, echo = F, message = FALSE, warning = FALSE, message = FALSE, warning = FALSE}
+sales_forecast <- get_forecast(data, S_R = "S", method = sales_selected_method, hilo = T, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+returns_forecast <- get_forecast(data, S_R = "R", method = returns_selected_method, hilo = F, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+deliveries_forecast <- data.frame(date = sales_forecast$date, forecast = (sales_forecast[, 2] + returns_forecast[, 2]))
+comb_forecast <- sales_forecast %>% left_join(deliveries_forecast, by = "date") %>% left_join(returns_forecast, by = "date")
+colnames(comb_forecast) <- c("date", "sales", "Lo80", "Hi80", "Lo90", "Hi90", "deliveries", "returns")
+```
+
+```{r PLAT_ECON_plot, echo=FALSE, fig.align="center", warning=FALSE, out.width='80%', eval = PLAT & ECON, message = FALSE, warning = FALSE}
+draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PROD)
+```
+
+```{r PLAT_ECON_acc_expl, echo = FALSE, results = 'asis', eval = PLAT & ECON, message = FALSE, warning = FALSE}
+cat("<center style='font-size:1vw'>Virheprosentti lasketaan 2 vuoden kuukausisumman ennustustarkkuudesta.</center>")
+```
+
+```{r PLAT_ECON_curyear_title, echo = FALSE, results = 'asis', eval = PLAT & ECON, message = FALSE, warning = FALSE}
+cat("
+***
+  <style>
+div.tabtitle { font-size: 25px; text-align: center; margin: auto;}
+</style>
+<div class = 'tabtitle'>
+Kuluva vuosi
+</div>
+
+")
+```
+
+```{r PLAT_ECON_CURYEAR_table, R.options = list(width = 100), echo = FALSE, eval = PLAT & ECON, message = FALSE, warning = FALSE}
+table_current_year(data, comb_forecast, PROD)
+```
+
+```{r PLAT_ECON_5ytitle, echo = FALSE, results = 'asis', eval = PLAT & ECON, message = FALSE, warning = FALSE}
+cat("
+<style>
+div.tabtitle { font-size: 25px; text-align: center; margin: auto;}
+</style>
+<div class = 'tabtitle'>
+Viiden vuoden trendiennusteet
+</div>
+
+<style>
+div.subtitle { font-size: 16px; text-align: center; margin: auto;}
+</style>
+<div class = 'subtitle'>
+Myynti
+</div>
+")
+```
+
+```{r PLAT_ECON_sales_YEARLY_table, R.options = list(width = 100), echo = FALSE, eval = PLAT & ECON, message = FALSE, warning = FALSE}
+table_yearly(data, comb_forecast, PROD, S_R = "S")
+```
+
+```{r PLAT_ECON_returns_subtitle, echo = FALSE, results = 'asis', eval = PLAT & ECON, message = FALSE, warning = FALSE}
+cat("
+<div class = 'subtitle'>
+Palautukset
+</div>
+")
+```
+
+```{r PLAT_ECON_returns_YEARLY_table, R.options = list(width = 100), echo = FALSE, eval = PLAT & ECON, message = FALSE, warning = FALSE}
+table_yearly(data, comb_forecast, PROD, S_R = "R")
+```
+
+
+```{r RBC_tab_title, echo = F, results = 'asis', eval = RBC & !(ECON)}
+cat("### Punasolutuotteet")
+```
+
+```{r RBC_data_read, echo = F, , message = FALSE, warning = FALSE, eval = RBC & !(ECON)}
+# this cell reads new data, updates the daily.csv, and returns a daily series
+# daily: date | sales | deliveries | returns
+PROD <- "RBC" # PROD gets updated to new product when we transition into other products in the cells (if they have eval = TRUE)
+daily <- update_data(INPUT, OUTPUT, PROD)
+```
+
+```{r RBC_aggdata, echo = F, message = FALSE, warning = FALSE, eval = RBC & !(ECON)}
+data <- set_resolution(daily, RES, at_end = FALSE, ECON, PROD, FIX = T)
+```
+
+```{r RBC_history_checks, echo = F, message = FALSE, warning = FALSE, eval = RBC & !(ECON)}
+sales_method_history_path <- paste0(OUTPUT, PROD, "_", RES, "_sales_OPER_method_forecasts.csv")
+returns_method_history_path <- paste0(OUTPUT, PROD, "_", RES, "_returns_OPER_method_forecasts.csv") 
+sales_forecasts_path <- paste0(OUTPUT, PROD, "_", RES, "_sales_OPER_forecasts.csv")
+returns_forecasts_path <- paste0(OUTPUT, PROD, "_", RES, "_returns_OPER_forecasts.csv")
+
+if (!file.exists(sales_method_history_path)) { generate_method_history(data, S_R = "S", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(returns_method_history_path)) { generate_method_history(data, S_R = "R", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(sales_forecasts_path)) { simulate_selection_history(data, S_R = "S", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+if (!file.exists(returns_forecasts_path)) { simulate_selection_history(data, S_R = "R", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+```
+
+```{r RBC_select, echo = F, message = FALSE, warning = FALSE, eval = RBC & !(ECON)}
+sales_selected_method <- select_method(data, PROD, S_R = "S", OUTPUT, ECON, TEST_LEN)
+returns_selected_method <- select_method(data, PROD, S_R = "R", OUTPUT, ECON, TEST_LEN)
+```
+
+```{r RBC_fcast, eval = RBC & !(ECON), echo = F, message = FALSE, warning = FALSE}
+sales_forecast <- get_forecast(data, S_R = "S", method = sales_selected_method, hilo = T, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+returns_forecast <- get_forecast(data, S_R = "R", method = returns_selected_method, hilo = F, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+deliveries_forecast <- data.frame(date = sales_forecast$date, forecast = (sales_forecast[, 2] + returns_forecast[, 2]))
+comb_forecast <- sales_forecast %>% left_join(deliveries_forecast, by = "date") %>% left_join(returns_forecast, by = "date")
+colnames(comb_forecast) <- c("date", "sales", "Lo80", "Hi80", "Lo90", "Hi90", "deliveries", "returns")
+```
+
+```{r RBC_plot, echo=FALSE, fig.align="center", message = FALSE, warning = FALSE, out.width='80%', eval = RBC & !(ECON)}
+draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PROD)
+```
+
+```{r RBC_tabletitle, echo = FALSE, results = 'asis', eval = RBC & !(ECON), message = FALSE, warning = FALSE}
+cat("
+***
+  <style>
+div.tabtitle { font-size: 25px; text-align: center; margin: auto;}
+</style>
+<div class = 'tabtitle'>
+Ennusteet
+</div>
+")
+```
+
+```{r RBC_generic_table, R.options = list(width = 100), echo = FALSE, eval = RBC & !(ECON), message = FALSE, warning = FALSE}
+table_generic(comb_forecast, PROD)
+```
+
+
+```{r PLAT_tab_title, echo = F, results = 'asis', eval = PLAT & !(ECON)}
+cat("### Trombosyyttituotteet")
+```
+
+```{r PLAT_data_read, echo = F, , message = FALSE, warning = FALSE, eval = PLAT & !(ECON)}
+# this cell reads new data, updates the daily.csv, and returns a daily series
+# daily: date | sales | deliveries | returns
+PROD <- "PLAT" # PROD gets updated to new product when we transition into other products in the cells (if they have eval = TRUE)
+daily <- update_data(INPUT, OUTPUT, PROD)
+```
+
+```{r PLAT_aggdata, echo = F, message = FALSE, warning = FALSE, eval = PLAT & !(ECON)}
+data <- set_resolution(daily, RES, at_end = FALSE, ECON, PROD, FIX = T)
+```
+
+```{r PLAT_history_checks, echo = F, message = FALSE, warning = FALSE, eval = PLAT & !(ECON)}
+sales_method_history_path <- paste0(OUTPUT, PROD, "_", RES, "_sales_OPER_method_forecasts.csv")
+returns_method_history_path <- paste0(OUTPUT, PROD, "_", RES, "_returns_OPER_method_forecasts.csv") 
+sales_forecasts_path <- paste0(OUTPUT, PROD, "_", RES, "_sales_OPER_forecasts.csv")
+returns_forecasts_path <- paste0(OUTPUT, PROD, "_", RES, "_returns_OPER_forecasts.csv")
+
+if (!file.exists(sales_method_history_path)) { generate_method_history(data, S_R = "S", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(returns_method_history_path)) { generate_method_history(data, S_R = "R", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(sales_forecasts_path)) { simulate_selection_history(data, S_R = "S", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+if (!file.exists(returns_forecasts_path)) { simulate_selection_history(data, S_R = "R", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+```
+
+```{r PLAT_select, echo = F, message = FALSE, warning = FALSE, eval = PLAT & !(ECON)}
+sales_selected_method <- select_method(data, PROD, S_R = "S", OUTPUT, ECON, TEST_LEN)
+returns_selected_method <- select_method(data, PROD, S_R = "R", OUTPUT, ECON, TEST_LEN)
+```
+
+```{r PLAT_fcast, eval = PLAT & !(ECON), echo = F, message = FALSE, warning = FALSE}
+sales_forecast <- get_forecast(data, S_R = "S", method = sales_selected_method, hilo = T, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+returns_forecast <- get_forecast(data, S_R = "R", method = returns_selected_method, hilo = F, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+deliveries_forecast <- data.frame(date = sales_forecast$date, forecast = (sales_forecast[, 2] + returns_forecast[, 2]))
+comb_forecast <- sales_forecast %>% left_join(deliveries_forecast, by = "date") %>% left_join(returns_forecast, by = "date")
+colnames(comb_forecast) <- c("date", "sales", "Lo80", "Hi80", "Lo90", "Hi90", "deliveries", "returns")
+```
+
+```{r PLAT_plot, echo=FALSE, fig.align="center", message = FALSE, warning = FALSE, out.width='80%', eval = PLAT & !(ECON)}
+draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PROD)
+```
+
+```{r PLAT_tabletitle, echo = FALSE, results = 'asis', eval = PLAT & !(ECON), message = FALSE, warning = FALSE}
+cat("
+***
+  <style>
+div.tabtitle { font-size: 25px; text-align: center; margin: auto;}
+</style>
+<div class = 'tabtitle'>
+Ennusteet
+</div>
+")
+```
+
+```{r PLAT_generic_table, R.options = list(width = 100), echo = FALSE, eval = PLAT & !(ECON), message = FALSE, warning = FALSE}
+table_generic(comb_forecast, PROD)
+```
+
+
+```{r O+_tab_title, echo = F, results = 'asis', eval = OPLUS}
+cat("### O+")
+```
+
+```{r O+_data_read, echo = F, , message = FALSE, warning = FALSE, eval = OPLUS}
+# this cell reads new data, updates the daily.csv, and returns a daily series
+# daily: date | sales | deliveries | returns
+PROD <- "O+" # PROD gets updated to new product when we transition into other products in the cells (if they have eval = TRUE)
+daily <- update_data(INPUT, OUTPUT, PROD)
+```
+
+```{r O+_aggdata, echo = F, message = FALSE, warning = FALSE, eval = OPLUS}
+data <- set_resolution(daily, RES, at_end = FALSE, ECON, PROD, FIX = T)
+```
+
+```{r O+_history_checks, echo = F, message = FALSE, warning = FALSE, eval = OPLUS}
+sales_method_history_path <- paste0(OUTPUT, PROD, "_", RES, "_sales_OPER_method_forecasts.csv")
+returns_method_history_path <- paste0(OUTPUT, PROD, "_", RES, "_returns_OPER_method_forecasts.csv") 
+sales_forecasts_path <- paste0(OUTPUT, PROD, "_", RES, "_sales_OPER_forecasts.csv")
+returns_forecasts_path <- paste0(OUTPUT, PROD, "_", RES, "_returns_OPER_forecasts.csv")
+
+if (!file.exists(sales_method_history_path)) { generate_method_history(data, S_R = "S", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(returns_method_history_path)) { generate_method_history(data, S_R = "R", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(sales_forecasts_path)) { simulate_selection_history(data, S_R = "S", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+if (!file.exists(returns_forecasts_path)) { simulate_selection_history(data, S_R = "R", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+```
+
+```{r O+_select, echo = F, message = FALSE, warning = FALSE, eval = OPLUS}
+sales_selected_method <- select_method(data, PROD, S_R = "S", OUTPUT, ECON, TEST_LEN)
+returns_selected_method <- select_method(data, PROD, S_R = "R", OUTPUT, ECON, TEST_LEN)
+```
+
+```{r O+_fcast, eval = OPLUS, echo = F, message = FALSE, warning = FALSE}
+sales_forecast <- get_forecast(data, S_R = "S", method = sales_selected_method, hilo = T, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+returns_forecast <- get_forecast(data, S_R = "R", method = returns_selected_method, hilo = F, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+deliveries_forecast <- data.frame(date = sales_forecast$date, forecast = (sales_forecast[, 2] + returns_forecast[, 2]))
+comb_forecast <- sales_forecast %>% left_join(deliveries_forecast, by = "date") %>% left_join(returns_forecast, by = "date")
+colnames(comb_forecast) <- c("date", "sales", "Lo80", "Hi80", "Lo90", "Hi90", "deliveries", "returns")
+```
+
+```{r O+_plot, echo=FALSE, fig.align="center", message = FALSE, warning = FALSE, out.width='80%', eval = OPLUS}
+draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PROD)
+```
+
+```{r O+_tabletitle, echo = FALSE, results = 'asis', eval = OPLUS & !(ECON), message = FALSE, warning = FALSE}
+cat("
+***
+  <style>
+div.tabtitle { font-size: 25px; text-align: center; margin: auto;}
+</style>
+<div class = 'tabtitle'>
+Ennusteet
+</div>
+")
+```
+
+```{r O+_generic_table, R.options = list(width = 100), echo = FALSE, eval = OPLUS & !(ECON), message = FALSE, warning = FALSE}
+table_generic(comb_forecast, PROD)
+```
+
+
+```{r O-_tab_title, echo = F, results = 'asis', eval = OMINUS}
+cat("### O-")
+```
+
+```{r O-_data_read, echo = F, , message = FALSE, warning = FALSE, eval = OMINUS}
+# this cell reads new data, updates the daily.csv, and returns a daily series
+# daily: date | sales | deliveries | returns
+PROD <- "O-" # PROD gets updated to new product when we transition into other products in the cells (if they have eval = TRUE)
+daily <- update_data(INPUT, OUTPUT, PROD)
+```
+
+```{r O-_aggdata, echo = F, message = FALSE, warning = FALSE, eval = OMINUS}
+data <- set_resolution(daily, RES, at_end = FALSE, ECON, PROD, FIX = T)
+```
+
+```{r O-_history_checks, echo = F, message = FALSE, warning = FALSE, eval = OMINUS}
+sales_method_history_path <- paste0(OUTPUT, PROD, "_", RES, "_sales_OPER_method_forecasts.csv")
+returns_method_history_path <- paste0(OUTPUT, PROD, "_", RES, "_returns_OPER_method_forecasts.csv") 
+sales_forecasts_path <- paste0(OUTPUT, PROD, "_", RES, "_sales_OPER_forecasts.csv")
+returns_forecasts_path <- paste0(OUTPUT, PROD, "_", RES, "_returns_OPER_forecasts.csv")
+
+if (!file.exists(sales_method_history_path)) { generate_method_history(data, S_R = "S", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(returns_method_history_path)) { generate_method_history(data, S_R = "R", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(sales_forecasts_path)) { simulate_selection_history(data, S_R = "S", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+if (!file.exists(returns_forecasts_path)) { simulate_selection_history(data, S_R = "R", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+```
+
+```{r O-_select, echo = F, message = FALSE, warning = FALSE, eval = OMINUS}
+sales_selected_method <- select_method(data, PROD, S_R = "S", OUTPUT, ECON, TEST_LEN)
+returns_selected_method <- select_method(data, PROD, S_R = "R", OUTPUT, ECON, TEST_LEN)
+```
+
+```{r O-_fcast, eval = OMINUS, echo = F, message = FALSE, warning = FALSE}
+sales_forecast <- get_forecast(data, S_R = "S", method = sales_selected_method, hilo = T, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+returns_forecast <- get_forecast(data, S_R = "R", method = returns_selected_method, hilo = F, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+deliveries_forecast <- data.frame(date = sales_forecast$date, forecast = (sales_forecast[, 2] + returns_forecast[, 2]))
+comb_forecast <- sales_forecast %>% left_join(deliveries_forecast, by = "date") %>% left_join(returns_forecast, by = "date")
+colnames(comb_forecast) <- c("date", "sales", "Lo80", "Hi80", "Lo90", "Hi90", "deliveries", "returns")
+```
+
+```{r O-_plot, echo=FALSE, fig.align="center", message = FALSE, warning = FALSE, out.width='80%', eval = OMINUS}
+draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PROD)
+```
+
+```{r O-_tabletitle, echo = FALSE, results = 'asis', eval = OMINUS & !(ECON), message = FALSE, warning = FALSE}
+cat("
+***
+  <style>
+div.tabtitle { font-size: 25px; text-align: center; margin: auto;}
+</style>
+<div class = 'tabtitle'>
+Ennusteet
+</div>
+")
+```
+
+```{r O-_generic_table, R.options = list(width = 100), echo = FALSE, eval = OMINUS & !(ECON), message = FALSE, warning = FALSE}
+table_generic(comb_forecast, PROD)
+```
+
+
+```{r A+_tab_title, echo = F, results = 'asis', eval = APLUS}
+cat("### A+")
+```
+
+```{r A+_data_read, echo = F, , message = FALSE, warning = FALSE, eval = APLUS}
+# this cell reads new data, updates the daily.csv, and returns a daily series
+# daily: date | sales | deliveries | returns
+PROD <- "A+" # PROD gets updated to new product when we transition into other products in the cells (if they have eval = TRUE)
+daily <- update_data(INPUT, OUTPUT, PROD)
+```
+
+```{r A+_aggdata, echo = F, message = FALSE, warning = FALSE, eval = APLUS}
+data <- set_resolution(daily, RES, at_end = FALSE, ECON, PROD, FIX = T)
+```
+
+```{r A+_history_checks, echo = F, message = FALSE, warning = FALSE, eval = APLUS}
+sales_method_history_path <- paste0(OUTPUT, PROD, "_", RES, "_sales_OPER_method_forecasts.csv")
+returns_method_history_path <- paste0(OUTPUT, PROD, "_", RES, "_returns_OPER_method_forecasts.csv") 
+sales_forecasts_path <- paste0(OUTPUT, PROD, "_", RES, "_sales_OPER_forecasts.csv")
+returns_forecasts_path <- paste0(OUTPUT, PROD, "_", RES, "_returns_OPER_forecasts.csv")
+
+if (!file.exists(sales_method_history_path)) { generate_method_history(data, S_R = "S", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(returns_method_history_path)) { generate_method_history(data, S_R = "R", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(sales_forecasts_path)) { simulate_selection_history(data, S_R = "S", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+if (!file.exists(returns_forecasts_path)) { simulate_selection_history(data, S_R = "R", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+```
+
+```{r A+_select, echo = F, message = FALSE, warning = FALSE, eval = APLUS}
+sales_selected_method <- select_method(data, PROD, S_R = "S", OUTPUT, ECON, TEST_LEN)
+returns_selected_method <- select_method(data, PROD, S_R = "R", OUTPUT, ECON, TEST_LEN)
+```
+
+```{r A+_fcast, eval = APLUS, echo = F, message = FALSE, warning = FALSE}
+sales_forecast <- get_forecast(data, S_R = "S", method = sales_selected_method, hilo = T, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+returns_forecast <- get_forecast(data, S_R = "R", method = returns_selected_method, hilo = F, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+deliveries_forecast <- data.frame(date = sales_forecast$date, forecast = (sales_forecast[, 2] + returns_forecast[, 2]))
+comb_forecast <- sales_forecast %>% left_join(deliveries_forecast, by = "date") %>% left_join(returns_forecast, by = "date")
+colnames(comb_forecast) <- c("date", "sales", "Lo80", "Hi80", "Lo90", "Hi90", "deliveries", "returns")
+```
+
+```{r A+_plot, echo=FALSE, fig.align="center", message = FALSE, warning = FALSE, out.width='80%', eval = APLUS}
+draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PROD)
+```
+
+```{r A+_tabletitle, echo = FALSE, results = 'asis', eval = APLUS & !(ECON), message = FALSE, warning = FALSE}
+cat("
+***
+  <style>
+div.tabtitle { font-size: 25px; text-align: center; margin: auto;}
+</style>
+<div class = 'tabtitle'>
+Ennusteet
+</div>
+")
+```
+
+```{r A+_generic_table, R.options = list(width = 100), echo = FALSE, eval = APLUS & !(ECON), message = FALSE, warning = FALSE}
+table_generic(comb_forecast, PROD)
+```
+
+
+```{r A-_tab_title, echo = F, results = 'asis', eval = AMINUS}
+cat("### A-")
+```
+
+```{r A-_data_read, echo = F, , message = FALSE, warning = FALSE, eval = AMINUS}
+# this cell reads new data, updates the daily.csv, and returns a daily series
+# daily: date | sales | deliveries | returns
+PROD <- "A-" # PROD gets updated to new product when we transition into other products in the cells (if they have eval = TRUE)
+daily <- update_data(INPUT, OUTPUT, PROD)
+```
+
+```{r A-_aggdata, echo = F, message = FALSE, warning = FALSE, eval = AMINUS}
+data <- set_resolution(daily, RES, at_end = FALSE, ECON, PROD, FIX = T)
+```
+
+```{r A-_history_checks, echo = F, message = FALSE, warning = FALSE, eval = AMINUS}
+sales_method_history_path <- paste0(OUTPUT, PROD, "_", RES, "_sales_OPER_method_forecasts.csv")
+returns_method_history_path <- paste0(OUTPUT, PROD, "_", RES, "_returns_OPER_method_forecasts.csv") 
+sales_forecasts_path <- paste0(OUTPUT, PROD, "_", RES, "_sales_OPER_forecasts.csv")
+returns_forecasts_path <- paste0(OUTPUT, PROD, "_", RES, "_returns_OPER_forecasts.csv")
+
+if (!file.exists(sales_method_history_path)) { generate_method_history(data, S_R = "S", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(returns_method_history_path)) { generate_method_history(data, S_R = "R", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(sales_forecasts_path)) { simulate_selection_history(data, S_R = "S", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+if (!file.exists(returns_forecasts_path)) { simulate_selection_history(data, S_R = "R", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+```
+
+```{r A-_select, echo = F, message = FALSE, warning = FALSE, eval = AMINUS}
+sales_selected_method <- select_method(data, PROD, S_R = "S", OUTPUT, ECON, TEST_LEN)
+returns_selected_method <- select_method(data, PROD, S_R = "R", OUTPUT, ECON, TEST_LEN)
+```
+
+```{r A-_fcast, eval = AMINUS, echo = F, message = FALSE, warning = FALSE}
+sales_forecast <- get_forecast(data, S_R = "S", method = sales_selected_method, hilo = T, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+returns_forecast <- get_forecast(data, S_R = "R", method = returns_selected_method, hilo = F, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+deliveries_forecast <- data.frame(date = sales_forecast$date, forecast = (sales_forecast[, 2] + returns_forecast[, 2]))
+comb_forecast <- sales_forecast %>% left_join(deliveries_forecast, by = "date") %>% left_join(returns_forecast, by = "date")
+colnames(comb_forecast) <- c("date", "sales", "Lo80", "Hi80", "Lo90", "Hi90", "deliveries", "returns")
+```
+
+```{r A-_plot, echo=FALSE, fig.align="center", message = FALSE, warning = FALSE, out.width='80%', eval = AMINUS}
+draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PROD)
+```
+
+```{r A-_tabletitle, echo = FALSE, results = 'asis', eval = AMINUS & !(ECON), message = FALSE, warning = FALSE}
+cat("
+***
+  <style>
+div.tabtitle { font-size: 25px; text-align: center; margin: auto;}
+</style>
+<div class = 'tabtitle'>
+Ennusteet
+</div>
+")
+```
+
+```{r A-_generic_table, R.options = list(width = 100), echo = FALSE, eval = AMINUS & !(ECON), message = FALSE, warning = FALSE}
+table_generic(comb_forecast, PROD)
+```
+
+
+```{r B+_tab_title, echo = F, results = 'asis', eval = BPLUS}
+cat("### B+")
+```
+
+```{r B+_data_read, echo = F, , message = FALSE, warning = FALSE, eval = BPLUS}
+# this cell reads new data, updates the daily.csv, and returns a daily series
+# daily: date | sales | deliveries | returns
+PROD <- "B+" # PROD gets updated to new product when we transition into other products in the cells (if they have eval = TRUE)
+daily <- update_data(INPUT, OUTPUT, PROD)
+```
+
+```{r B+_aggdata, echo = F, message = FALSE, warning = FALSE, eval = BPLUS}
+data <- set_resolution(daily, RES, at_end = FALSE, ECON, PROD, FIX = T)
+```
+
+```{r B+_history_checks, echo = F, message = FALSE, warning = FALSE, eval = BPLUS}
+sales_method_history_path <- paste0(OUTPUT, PROD, "_", RES, "_sales_OPER_method_forecasts.csv")
+returns_method_history_path <- paste0(OUTPUT, PROD, "_", RES, "_returns_OPER_method_forecasts.csv") 
+sales_forecasts_path <- paste0(OUTPUT, PROD, "_", RES, "_sales_OPER_forecasts.csv")
+returns_forecasts_path <- paste0(OUTPUT, PROD, "_", RES, "_returns_OPER_forecasts.csv")
+
+if (!file.exists(sales_method_history_path)) { generate_method_history(data, S_R = "S", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(returns_method_history_path)) { generate_method_history(data, S_R = "R", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(sales_forecasts_path)) { simulate_selection_history(data, S_R = "S", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+if (!file.exists(returns_forecasts_path)) { simulate_selection_history(data, S_R = "R", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+```
+
+```{r B+_select, echo = F, message = FALSE, warning = FALSE, eval = BPLUS}
+sales_selected_method <- select_method(data, PROD, S_R = "S", OUTPUT, ECON, TEST_LEN)
+returns_selected_method <- select_method(data, PROD, S_R = "R", OUTPUT, ECON, TEST_LEN)
+```
+
+```{r B+_fcast, eval = BPLUS, echo = F, message = FALSE, warning = FALSE}
+sales_forecast <- get_forecast(data, S_R = "S", method = sales_selected_method, hilo = T, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+returns_forecast <- get_forecast(data, S_R = "R", method = returns_selected_method, hilo = F, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+deliveries_forecast <- data.frame(date = sales_forecast$date, forecast = (sales_forecast[, 2] + returns_forecast[, 2]))
+comb_forecast <- sales_forecast %>% left_join(deliveries_forecast, by = "date") %>% left_join(returns_forecast, by = "date")
+colnames(comb_forecast) <- c("date", "sales", "Lo80", "Hi80", "Lo90", "Hi90", "deliveries", "returns")
+```
+
+```{r B+_plot, echo=FALSE, fig.align="center", message = FALSE, warning = FALSE, out.width='80%', eval = BPLUS}
+draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PROD)
+```
+
+```{r B+_tabletitle, echo = FALSE, results = 'asis', eval = BPLUS & !(ECON), message = FALSE, warning = FALSE}
+cat("
+***
+  <style>
+div.tabtitle { font-size: 25px; text-align: center; margin: auto;}
+</style>
+<div class = 'tabtitle'>
+Ennusteet
+</div>
+")
+```
+
+```{r B+_generic_table, R.options = list(width = 100), echo = FALSE, eval = BPLUS & !(ECON), message = FALSE, warning = FALSE}
+table_generic(comb_forecast, PROD)
+```
+
+
+```{r B-_tab_title, echo = F, results = 'asis', eval = BMINUS}
+cat("### B-")
+```
+
+```{r B-_data_read, echo = F, , message = FALSE, warning = FALSE, eval = BMINUS}
+# this cell reads new data, updates the daily.csv, and returns a daily series
+# daily: date | sales | deliveries | returns
+PROD <- "B-" # PROD gets updated to new product when we transition into other products in the cells (if they have eval = TRUE)
+daily <- update_data(INPUT, OUTPUT, PROD)
+```
+
+```{r B-_aggdata, echo = F, message = FALSE, warning = FALSE, eval = BMINUS}
+data <- set_resolution(daily, RES, at_end = FALSE, ECON, PROD, FIX = T)
+```
+
+```{r B-_history_checks, echo = F, message = FALSE, warning = FALSE, eval = BMINUS}
+sales_method_history_path <- paste0(OUTPUT, PROD, "_", RES, "_sales_OPER_method_forecasts.csv")
+returns_method_history_path <- paste0(OUTPUT, PROD, "_", RES, "_returns_OPER_method_forecasts.csv") 
+sales_forecasts_path <- paste0(OUTPUT, PROD, "_", RES, "_sales_OPER_forecasts.csv")
+returns_forecasts_path <- paste0(OUTPUT, PROD, "_", RES, "_returns_OPER_forecasts.csv")
+
+if (!file.exists(sales_method_history_path)) { generate_method_history(data, S_R = "S", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(returns_method_history_path)) { generate_method_history(data, S_R = "R", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(sales_forecasts_path)) { simulate_selection_history(data, S_R = "S", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+if (!file.exists(returns_forecasts_path)) { simulate_selection_history(data, S_R = "R", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+```
+
+```{r B-_select, echo = F, message = FALSE, warning = FALSE, eval = BMINUS}
+sales_selected_method <- select_method(data, PROD, S_R = "S", OUTPUT, ECON, TEST_LEN)
+returns_selected_method <- select_method(data, PROD, S_R = "R", OUTPUT, ECON, TEST_LEN)
+```
+
+```{r B-_fcast, eval = BMINUS, echo = F, message = FALSE, warning = FALSE}
+sales_forecast <- get_forecast(data, S_R = "S", method = sales_selected_method, hilo = T, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+returns_forecast <- get_forecast(data, S_R = "R", method = returns_selected_method, hilo = F, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+deliveries_forecast <- data.frame(date = sales_forecast$date, forecast = (sales_forecast[, 2] + returns_forecast[, 2]))
+comb_forecast <- sales_forecast %>% left_join(deliveries_forecast, by = "date") %>% left_join(returns_forecast, by = "date")
+colnames(comb_forecast) <- c("date", "sales", "Lo80", "Hi80", "Lo90", "Hi90", "deliveries", "returns")
+```
+
+```{r B-_plot, echo=FALSE, fig.align="center", message = FALSE, warning = FALSE, out.width='80%', eval = BMINUS}
+draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PROD)
+```
+
+```{r B-_tabletitle, echo = FALSE, results = 'asis', eval = BMINUS & !(ECON), message = FALSE, warning = FALSE}
+cat("
+***
+  <style>
+div.tabtitle { font-size: 25px; text-align: center; margin: auto;}
+</style>
+<div class = 'tabtitle'>
+Ennusteet
+</div>
+")
+```
+
+```{r B-_generic_table, R.options = list(width = 100), echo = FALSE, eval = BMINUS & !(ECON), message = FALSE, warning = FALSE}
+table_generic(comb_forecast, PROD)
+```
+
+
+```{r AB+_tab_title, echo = F, results = 'asis', eval = ABPLUS}
+cat("### AB+")
+```
+
+```{r AB+_data_read, echo = F, , message = FALSE, warning = FALSE, eval = ABPLUS}
+# this cell reads new data, updates the daily.csv, and returns a daily series
+# daily: date | sales | deliveries | returns
+PROD <- "AB+" # PROD gets updated to new product when we transition into other products in the cells (if they have eval = TRUE)
+daily <- update_data(INPUT, OUTPUT, PROD)
+```
+
+```{r AB+_aggdata, echo = F, message = FALSE, warning = FALSE, eval = ABPLUS}
+data <- set_resolution(daily, RES, at_end = FALSE, ECON, PROD, FIX = T)
+```
+
+```{r AB+_history_checks, echo = F, message = FALSE, warning = FALSE, eval = ABPLUS}
+sales_method_history_path <- paste0(OUTPUT, PROD, "_", RES, "_sales_OPER_method_forecasts.csv")
+returns_method_history_path <- paste0(OUTPUT, PROD, "_", RES, "_returns_OPER_method_forecasts.csv") 
+sales_forecasts_path <- paste0(OUTPUT, PROD, "_", RES, "_sales_OPER_forecasts.csv")
+returns_forecasts_path <- paste0(OUTPUT, PROD, "_", RES, "_returns_OPER_forecasts.csv")
+
+if (!file.exists(sales_method_history_path)) { generate_method_history(data, S_R = "S", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(returns_method_history_path)) { generate_method_history(data, S_R = "R", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(sales_forecasts_path)) { simulate_selection_history(data, S_R = "S", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+if (!file.exists(returns_forecasts_path)) { simulate_selection_history(data, S_R = "R", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+```
+
+```{r AB+_select, echo = F, message = FALSE, warning = FALSE, eval = ABPLUS}
+sales_selected_method <- select_method(data, PROD, S_R = "S", OUTPUT, ECON, TEST_LEN)
+returns_selected_method <- select_method(data, PROD, S_R = "R", OUTPUT, ECON, TEST_LEN)
+```
+
+```{r AB+_fcast, eval = ABPLUS, echo = F, message = FALSE, warning = FALSE}
+sales_forecast <- get_forecast(data, S_R = "S", method = sales_selected_method, hilo = T, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+returns_forecast <- get_forecast(data, S_R = "R", method = returns_selected_method, hilo = F, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+deliveries_forecast <- data.frame(date = sales_forecast$date, forecast = (sales_forecast[, 2] + returns_forecast[, 2]))
+comb_forecast <- sales_forecast %>% left_join(deliveries_forecast, by = "date") %>% left_join(returns_forecast, by = "date")
+colnames(comb_forecast) <- c("date", "sales", "Lo80", "Hi80", "Lo90", "Hi90", "deliveries", "returns")
+```
+
+```{r AB+_plot, echo=FALSE, fig.align="center", message = FALSE, warning = FALSE, out.width='80%', eval = ABPLUS}
+draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PROD)
+```
+
+```{r AB+_tabletitle, echo = FALSE, results = 'asis', eval = ABPLUS & !(ECON), message = FALSE, warning = FALSE}
+cat("
+***
+  <style>
+div.tabtitle { font-size: 25px; text-align: center; margin: auto;}
+</style>
+<div class = 'tabtitle'>
+Ennusteet
+</div>
+")
+```
+
+```{r AB+_generic_table, R.options = list(width = 100), echo = FALSE, eval = ABPLUS & !(ECON), message = FALSE, warning = FALSE}
+table_generic(comb_forecast, PROD)
+```
+
+
+```{r AB-_tab_title, echo = F, results = 'asis', eval = ABMINUS}
+cat("### O-")
+```
+
+```{r AB-_data_read, echo = F, , message = FALSE, warning = FALSE, eval = ABMINUS}
+# this cell reads new data, updates the daily.csv, and returns a daily series
+# daily: date | sales | deliveries | returns
+PROD <- "AB-" # PROD gets updated to new product when we transition into other products in the cells (if they have eval = TRUE)
+daily <- update_data(INPUT, OUTPUT, PROD)
+```
+
+```{r AB-_aggdata, echo = F, message = FALSE, warning = FALSE, eval = ABMINUS}
+data <- set_resolution(daily, RES, at_end = FALSE, ECON, PROD, FIX = T)
+```
+
+```{r AB-_history_checks, echo = F, message = FALSE, warning = FALSE, eval = ABMINUS}
+sales_method_history_path <- paste0(OUTPUT, PROD, "_", RES, "_sales_OPER_method_forecasts.csv")
+returns_method_history_path <- paste0(OUTPUT, PROD, "_", RES, "_returns_OPER_method_forecasts.csv") 
+sales_forecasts_path <- paste0(OUTPUT, PROD, "_", RES, "_sales_OPER_forecasts.csv")
+returns_forecasts_path <- paste0(OUTPUT, PROD, "_", RES, "_returns_OPER_forecasts.csv")
+
+if (!file.exists(sales_method_history_path)) { generate_method_history(data, S_R = "S", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(returns_method_history_path)) { generate_method_history(data, S_R = "R", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(sales_forecasts_path)) { simulate_selection_history(data, S_R = "S", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+if (!file.exists(returns_forecasts_path)) { simulate_selection_history(data, S_R = "R", PROD, RES, ECON, TEST_LEN, OUTPUT) }
+```
+
+```{r AB-_select, echo = F, message = FALSE, warning = FALSE, eval = ABMINUS}
+sales_selected_method <- select_method(data, PROD, S_R = "S", OUTPUT, ECON, TEST_LEN)
+returns_selected_method <- select_method(data, PROD, S_R = "R", OUTPUT, ECON, TEST_LEN)
+```
+
+```{r AB-_fcast, eval = ABMINUS, echo = F, message = FALSE, warning = FALSE}
+sales_forecast <- get_forecast(data, S_R = "S", method = sales_selected_method, hilo = T, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+returns_forecast <- get_forecast(data, S_R = "R", method = returns_selected_method, hilo = F, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON, save = T)
+deliveries_forecast <- data.frame(date = sales_forecast$date, forecast = (sales_forecast[, 2] + returns_forecast[, 2]))
+comb_forecast <- sales_forecast %>% left_join(deliveries_forecast, by = "date") %>% left_join(returns_forecast, by = "date")
+colnames(comb_forecast) <- c("date", "sales", "Lo80", "Hi80", "Lo90", "Hi90", "deliveries", "returns")
+```
+
+```{r AB-_plot, echo=FALSE, fig.align="center", message = FALSE, warning = FALSE, out.width='80%', eval = ABMINUS}
+draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PROD)
+```
+
+```{r AB-_tabletitle, echo = FALSE, results = 'asis', eval = ABMINUS & !(ECON), message = FALSE, warning = FALSE}
+cat("
+***
+  <style>
+div.tabtitle { font-size: 25px; text-align: center; margin: auto;}
+</style>
+<div class = 'tabtitle'>
+Ennusteet
+</div>
+")
+```
+
+```{r AB-_generic_table, R.options = list(width = 100), echo = FALSE, eval = ABMINUS & !(ECON), message = FALSE, warning = FALSE}
+table_generic(comb_forecast, PROD)
+```
+
+
+### Selite
+
+```{r, echo = F, results = 'asis'}
+cat("<h1 style='font-size:200%;'>Käyttöohje</h1>")
+```
+
+<style>
+div.just {text-align: justify;}
+</style>
+<div class="just">
+Tämä on automaattisesti tuotettu myyntiennusteraportti punasolu- ja trombosyyttituotteita varten. Ennusteet rakennetaan VPUTKOOLS2-palvelimella sijaitsevan asetustiedoston asetusten mukaan (esim. ennustettavat tuotteet ja ennusteen pituus).
+
+Tuotesivua voi vaihtaa välilehtipainikkeista. Tuotesivulla ensimmäinen näkymä on viivakaavio, jonka otsikko kertoo ennustettavan tuotteen ja ennusteen aikaresoluution. Alaotsikko kertoo käyttäjälle, mikä on taustalla pyörivän ennustinjärjestelmän keskivirhe ennustushistorian ajalta. Kuvaajan yläosassa ilmoitetaan pienemmällä tekstillä, mikä menetelmä on valittu seuraavien ennusteiden tekoon ja mikä on ollut sen keskivirhe ennustushistorian ajalta. Ennustimen toimintaperiaatteista on kerrottu enemmän alla, mutta tässä riittää tietää, että ennustin valitsee jokaiselle uudelle ennusteelle uuden ennustinmenetelmän menetelmien edellisen N kuukauden ennustustarkkuuden perusteella. N määritetään astetustiedostossa arvolla TEST_LEN.
+
+Kaavion pystyakselilla kulkevat myytyjen tuotteiden kappalemäärät ja vaaka-akselilla aika kuukausittain. Mustalla piirretty viiva näyttää **historiallisen toteuman**, eli ennusteissa käytetyn datan. Jos asetustiedoston "FIX"-parametri on kytketty päälle, kuvaajaan piirtyy "COVID"-korjattu rukattu toteuma, jota ennustinmenetelmät käyttävät myös ennusteissaan. Punainen viiva näyttää, miten järjestelmän ennusteet kulkevat datan rinnalla. Näiden päälle on piirrety myös suoria trendiviivoja, jotka havainnollistavat datan viimeisen viiden vuoden trendin (keltainen) ja mallin tuottaman ennusteen trendin (harmaa). Ennusteille annetaan myös luottamusvälit, jotka on havainnollistettu tummalla ja vaalealla sinisellä. Tummansininen alue kertoo, missä todellinen myynti voi sen aiemman heilahtelun huomioon ottaen tulevaisuudessa sijaita **80 \%** todennäköisyydellä. Vaaleampi sininen rajaa vastaavasti **95 \%** luottamusvälin.
+
+Jos ennustinta käytetään pitemmän aikavälin talousarvioennusteisiin (asetusttiedostossa parametri ECON), ennustetaan kuukausitasolla 5 vuotta eteenpäin. Mallit koulutetaan 2 vuoden kuukausidatalla ja ne valitaan 2 vuoden kuukausisumman ennusteiden tarkkuuden perusteella.
+
+Kaavion alapuolella esitetään taulukkomuodossa toteuma ja ennusteet kuluvalle vuodelle. ECON-tasolla tuotetaan myös kaksi muuta taulukkoa: 5 vuoden vuosiennusteet sekä trendit myynneille ja palautuksille erikseen. Taulukoiden tiedot voidaan kopioida suoraan leikepöydälle painikkeesta "Copy", tallentaa Excel-tiedostoksi ("Excel"), CSV-tiedostoksi ("CSV") ja PDF-tiedostoksi ("PDF").
+
+Raportin oikeassa yläkulmassa olevasta ikonista pääsee ennustimen ja raportin julkisessa Github-säilössä säilytettävään koodikantaan. Tällä julkisella koodilla voi tuottaa vastaavanlaisen raportin. Sieltä ilmenee myös raportin rakennuslogiikka, ennustuksiin käytetyt funktiot ja datan käsittely kaikista uteliaimmille.
+
+```{r, echo = F, results = 'asis'}
+cat("<h1 style='font-size:200%;'>Data</h1>")
+```
+
+Ennustimen käyttämä data tallentuu alun alkujaan yksittäisinä myynti- ja palautustapahtumina, aikaleimattuna ja veriryhmittäin sekä tuotetyypeittäin jaoteltuna AX-ympäristöön, josta se siirretään automaattisesti VPU:n tietovaraston kautta ennustimen palvelimelle. Ennustin erittelee datan haluttuihin tuotteisiin, koostaa yksittäistapahtumista päiväkohtaiset aikasarjat (myynti ja palautukset erikseen) ja tallentaa ne ihmiselle luettavana CSV-tiedostoina palvelimelle. Aina kun ennustin ajetaan, se tarkistaa onko uutta dataa saatavilla ja päivittää tätä tiedostoa.
+
+Jos halutaan kuukausitason ennusteita, ennustin koostaa päivädatan vielä kerran kuukausittaiseksi aikasarjaksi. Aina kun tällaista kuukausitason dataa siirretään ennustuksia rakentaviin funktioihin, suoritetaan samalla taustalla seuraava muunnos:
+
+$$\text{muunnettu arvo} = \frac{\text{kuukauden arvo}}{\text{saman kuukauden arkipäivien määrä}}$$
+Tämän tarkoitus on poistaa aikasarjasta vaihtelua, joka johtuu kuukausien reaalisista pituuksista. Muuntamattomassa aikasarjassa esimerkiksi helmikuun summa on lähes aina muita pienempi, mikä saattaa piilottaa veren tarpeen signaalissa olevaa todellista kausivaihtelua. Ennustus rakennetaan muunnetuilla arvoilla, mutta ne muunnetaan lopuksi aina takaisin kokonaisiksi kuukausisummiksi esittämistä ja tallentamista varten:
+
+$$\text{ennuste} = \frac{\text{muunnosennuste}}{\text{kohdekuukauden arkipäivien määrä}}$$
+Arkipäivien määrän tätä operaatiota varten tarjoaa ennustamiseen tarvittavan `forecast`-paketin funktio `bizdays()`, joka laskee arvion kuukauden arkipäivien määrästä Zürichin talousalueen pörssipäivien mukaan. Tämä ei ole täsmällinen vastine Suomen arkipäiviin (pyhäpäivät voivat poiketa hieman), mutta käytettävissä olevista vaihtoehdoista paras.
+
+Rakentaessaan ennusteita ennustin tallentaa ja päivittää palvelimella myös kokonaista valintaennustushistoriaa kohdetuotteittain sekä jokaisen käytettävissä olevan ennustusmenetelmän omaa historiaa kohdetuotteittain. Ennusteita tehdään siis sekä myyntiaikasarjasta että palautusaikasarjasta. Toimitusaikasarja on myyntiaikasarjan ja palautusaikasarjan summa, ja taulukoitava toimitusennuste on siis myynnin ja palautusten ennusteiden summa. Teoriassa myynnin sijasta voisi ennustaa toimituksia, jolloin myyntiennuste olisi toimitus miinus palautus, mutta koska nyt halutaan _ennustaa myyntiä_, ollaan aikasarjat valittu näin. 
+
+
+```{r, echo = F, results = 'asis'}
+cat("<h1 style='font-size:200%;'>Toimintaperiaate</h1>")
+```
+
+Ennustinta on rakennettu kahdella johtavalla periaatteella: ennustusvalintoihin tarvitaan ihmistä mahdollisimman vähän (autonomia) ja ennustimen on kyettävä silti reagoimaan muutoksiin (adaptiivisuus). Tyypillisesti ennustettaessa valitaan yksi tietty, parhaimmalla tarkkuudella toimiva menetelmä kohdeaikasarjaa varten ja "annetaan sen olla", kunnes joku huomaa, että valittu menetelmä tai malli ei enää suoriudu hyvin ja se täytyy arvioida uudelleen. Tämä järjestelmä ottaa enimmäkseen ohjakset itselleen arvioimalla jatkuvasti **14** eri menetelmän ennustustarkkuuksia ja ennustamalla vain sillä menetelmällä, joka on suoriutunut parhaiten edellisen **N** kuukauden aikana. Tällaista järjestelmää käytettäessä käyttäjän tarvitsee harkita vain sitä, kuinka ketterä ennustin halutaan (kuinka monen kuukauden ajalta menetelmien suoriutumista tarkastellaan: mitä pidempi testijakso, sitä hitaammin ennustin osaa vaihtaa menetelmään ja reagoida muutoksiin), minkälaisella mittarilla tarkkuutta mitataan (raaka virheprosentti vai kenties virhe, joka rankaisee enemmän tarpeen aliarvioimisesta?) ja mitä menetelmiä ennustimella on käytössään. Ennustimen ECON-versiossa on valittu 12 kuukauden testijakso, jotta valittaisiin menetelmiä, jotka ovat säännönmukaisemmin lähellä oikeaa, mutta jotta voidaan reagoida pitkän aikavälin muutoksiin verentarpeessa. Menetelmävalikoima on rakennettu siten, että katetaan tarpeeksi laaja "ratkaisupinta-ala", mutta ei tehdä ennustimen ajamisesta kivuliaan raskasta. Ennustin valitsee menetelmän raa'alla virheprosentilla.
+
+
+```{r, echo = F, results = 'asis'}
+cat("<h1 style='font-size:200%;'>Menetelmät</h1>")
+```
+
+Alla on eritelty kaikkien ennustimen käyttämien menetelmien toimintaperiaatteet.
+
+```{r, echo = F, results = 'asis'}
+cat("<h1 style='font-size:150%;'>Liukuvat keskiarvot</h1>")
+```
+
+Liukuvat keskiarvot ovat ennustimen menetelmävalikoiman yksinkertaisimmat menetelmät. Liukuva keskiarvo otetaan käyttäjän määrittämältä pituudelta välitöntä edeltävää historiaa. Ennustimen käytössä on liukuvat keskiarvot 5, 7, 9 ja 12 kuukaudelta. Liukuvan keskiarvon voi laskea kaavalla:
+
+$$ \hat y_{i+1} = \frac{1}{q}\sum_{j = i-q+1}^{i} y_j, $$
+jossa $\hat y_{i+1}$ on ennuste, $q$ kertoo kuinka monen kuukauden keskiarvo otetaan ja $y_j$ osoittaa näihin kuukausiin. 5 kuukauden liukuvalla keskiarvolla esimerkiksi minkä tahansa joulukuun ennuste olisi saman vuoden heinä-, elo-, syys-, loka- ja marraskuun keskiarvo. Yksinkertaisuutensa vuoksi liukuvat keskiarvot eivät yleensä toimi hyvin aikasarjoissa, joissa on selkeä tunnistettava signaali, mutta pärjäävät muita menetelmiä paremmin kun aikasarja liikkuu satunnaisemmin.
+
+```{r, echo = F, results = 'asis'}
+cat("<h1 style='font-size:150%;'>Kausittainen naivi</h1>")
+```
+
+Naivi ennuste on yksinkertaisin mahdollinen ennuste, sillä ennuste on sama kuin sarjan edellinen arvo. Kausittainen naivi on tästä piirun verran kehittyneempi, sillä kausitettu naivi ennuste on _edellisen kauden vastaava arvo_. Kausinaivin laskukaava vaatii hieman pureskelua:
+
+$$\hat y_{i+h} = y_{i+h - m(k+1)},$$
+mutta kuukausitason datassa kuukauden ennuste on yksinkertaisesti edellisen vuoden saman kuukauden arvo. Ensi tammikuun ennuste on tämän vuoden tammikuun arvo. Kaavan $h$ kertoo kuinka pitkälle ennuste halutaan, $m$ on kauden koko (esim. vuosi) ja $k$ kertoo kuinka monta kokonaista kautta $h$:n sisälle mahtuu. Kausinaivi pärjää hyvin tilanteissa, joissa ennustettava aikasarja käyttäytyy hyvin ennustettavalla kausivaihtelulla.
+
+```{r, echo = F, results = 'asis'}
+cat("<h1 style='font-size:150%;'>Eksponentiaalinen tasoitus</h1>")
+```
+
+Eksponentiaalinen tasoitus tarkoittaa keskiarvon ottamista niin, että datapisteiden paino keskiarvossa heikkenee eksponentiaalisesti mitä kauemmas historiassa kuljetaan. Yksinkertaisimmillaan eksponentiaalinen tasoitus voidaan ilmaista kaavalla:
+
+$$\hat{y}_{i+1} = \alpha y_i + \alpha(1-\alpha) y_{i-1} + \alpha(1-\alpha)^{2} y_{i-2}+ \cdots ,$$
+jossa tasoitusparametri $0 \leq \alpha \leq 1$ määrittää, kuinka nopeasti datapisteiden merkitys keskiarvossa pienenee. Ekspontiaalisen tasoituksen menetelmät ovat suosittuja ennustettaessa aikasarjoja, sillä ne laajentuvat yksinkertaisilla parametrisäädöillä kauden ja trendin huomioon ottaviksi malleiksi. Ennustimen käyttämä eksponentiaalinen menetelmä sovittaa uuden mallin automaattisesti `forecast`-paketin tarjoamalla `ets()`-funktiolla aina kun ennustusta pyydetään. Näin ollen käytetty menetelmä voi nojata (ja todennäköisesti nojaakin) aina uuteen mallimääritykseen jos saatavilla on uutta dataa.
+
+```{r, echo = F, results = 'asis'}
+cat("<h1 style='font-size:150%;'>Kausitettu eksponentiaalinen tasoitus</h1>")
+```
+
+Vaikka ennustimen käyttämä eksponentiaalisen tasoituksen menetelmä osaakin tulkita aikasarjoista kausia automaattisesti, sillä saattaa kestää uudenlaisen kauden löytämisessä muutaman aika-askeleen verran. Tällaista tilannetta varten `forecast`-paketti tarjoaa myös `stl()`-funktiota, joka ensin erottaa aikasarjasta sen kausikomponentin [LOESS-menetelmällä](https://en.wikipedia.org/wiki/Local_regression), syöttää jäljelle jääneen aikasarjan `ets()`-funktioon, ja summaa sen tuottamaan ennusteeseen kausiefektin takaisin. LOESS-hajotelma voidaan suorittaa kaikille aikasarjoille, vaikka varsinaista kautta tai trendiä sarjassa ei olisikaan. Tällöin hajotelma ei ole informatiivinen tai järkevä, mutta hajotelman pakottaminen tilanteessa, jossa ETS-malli ei tunnista vielä kautta (joka kuitenkin on olemassa) voi parantaa ETS-mallin ennusteita. Tilanteissa, joissa aikasarjan kausi on tarpeeksi ilmeinen `ets()`-funktiolle, se tuottaa saman ennusteen kuin `stl()`. 
+
+```{r, echo = F, results = 'asis'}
+cat("<h1 style='font-size:150%;'>Monikausitettu eksponentiaalinen tasoitus</h1>")
+```
+
+Aikasarjassa voi olla (ja usein on) useampia kausia. Tämä on erityisen totta päivä- ja viikkotason datalle, mutta jo kuukausitason aikasarjassa voi olla sekä vuosi- että kvartaalikausi. STL-hajotelma löytää kaikista mahdollisista kausista kuitenkin aina vain merkitsevimmän. Jos `ets()`-funktion tuottamaa mallia haluaa tehostaa useammalla kuin yhdellä potentiaalisella kaudella, on kausihajotelma tehtävä useampaan kertaan. Tätä varten `forecast` tarjoaa funktion `stlf()`, joka tuottaa ennusteen kutsumalla ensin STL-hajotelmaa iteratiivisesti löytääkseen kaikki merkitsevät "jäännekaudet" ja sitten `ets()`-mallintajaa, jonka ennusteeseen kausien efektit summataan.
+
+```{r, echo = F, results = 'asis'}
+cat("<h1 style='font-size:150%;'>ARIMA(X)</h1>")
+```
+
+Eksponentiaalisten tasoitusmenetelmien rinnalla aikasarjaennustusta tehdään usein nk. ARIMA-malleilla, jotka pyrkivät ennustamaan _stationaarisia_ aikasarjoja niiden omaa historiaa regressoiden. ARIMA-mallin osaset ovat AR-osa:
+
+$$ \hat y_{i} = c + \phi_{1}y_{i-1} + \phi_{2}y_{i-2} \\ + \dots + \phi_{p}y_{i-p} + \varepsilon_{i},$$
+joka on käytännössä lineearista regressiota aikasarjan edellisten havaintojen nojalla, sekä MA-osa:
+
+$$\hat y_{i} = c + \varepsilon_i + \theta_{1}\varepsilon_{i-1} + \theta_{2}\varepsilon_{i-2} + \dots + \theta_{q}\varepsilon_{i-q},$$
+joka puolestaan on sarjan keskiarvo $c$ ynnä liukuva keskiarvo aikasarjan kohinasta. Yhdessä nämä muodostavat ns. ARMA-mallin:
+
+$$\hat y_{i} = c + \varepsilon_i +  \phi_{1}y_{i-1} + \cdots + \phi_{p}y_{i-p}
+     \\ + \theta_{1}\varepsilon_{i-1} + \cdots + \theta_{q}\varepsilon_{i-q}.$$
+ 
+ARMA-mallien katsotaan olevan "päteviä" vain, jos aikasarjan liukuva keskiarvo ja varianssi ovat vakioita, eli se on _stationaarinen_. Käytännössä stationaarisuus edellyttää, että aikasarjalla ei ole merkittävää trendiä mallinnettavalla ajalla, eikä sen heilunta kasva tai pienene. Harva luonnollinen aikasarja täyttää nämä ehdot, mutta aikasarjan voi _pakottaa stationaariseksi_ ottamalla siitä erotus itsensä kanssa (aikasarja - yhden askeleen edistetty aikasarja), jolloin mallinnettavaksi jää toteumien välisten erotusten aikasarja. Joskus erotus joudutaan toistamaan pari kertaa, jotta aikasarja saadaan riittävän stationaariseksi. ARIMA-mallien iso I tarkoittaa juuri tätä: ARMA-mallin käyttöä stationaariseksi varmistetussa/pakotetussa aikasarjassa.
+
+ARIMA-malleja voidaan laajentaa myös ulkopuolisilla muuttujilla. Sen sijaan, että malli katsoo ainoastaan mennyttä aikasarjaa, se saa regressioon avukseen myös muuta tietoa. Tällöin viitataan usein ARIMAX-malleihin. Tämä ennustin käyttää ARIMAX-mallia, sillä mallille on tarjottu ulkopuolinen muuttuja: tieto siitä, mikä on kunkin datapisteen kuukausi. Käytännössä mallille on annettu ulkopuolisena tietona käsitys _kausivaiheesta_, mikä voi auttaa kausiefektien tunnistamisessa. Kuriositeettina, formaali muoto kokonaiselle ARIMAX-mallille on:
+
+$$\hat y_{i}= c + \varepsilon_i + \sum_{l=1}^{L}\beta_l x_{l}+\sum_{j=1}^{p} \phi_{j} y_{i-j}+\sum_{j=1}^{q} \theta_{j} \varepsilon_{i-j},$$
+jossa $x_l$ ja $\beta_l$ ovat vastaavasti ARIMA-malliin tuodut ulkopuoliset regressorit ja niiden painot. `forecast`-paketti mahdollistaa ARIMA-mallin automaattisen sovittamisen funktiolla `auto.arima()`.
+
+```{r, echo = F, results = 'asis'}
+cat("<h1 style='font-size:150%;'>Dynaaminen regressio</h1>")
+```
+
+Kun aikasarjoja ennustetaan regressiomalleilla, mallien toimivuutta mitataan usein _jäännösosien keskinäisellä korrelaatiolla_. Jäännösosien keskinäinen korrelaatio kertoo siitä, että aikasarjassa vaikuttaa vielä ilmiö(itä) jo(i)ta regressiomalli ei ole tunnistanut. Vahinko saattaa kuitenkin olla vielä korjattavissa mallintamalla _jäännösosien aikasarjaa erikseen ARIMA-mallilla_. Näin aikasarjan yksinkertaisempi käyttäytyminen saadaan mallinnettua regressiomallilla, joka voi tarjota tietoa valittujen regressorien vaikutussuhteista, ja jäljelle jäävä kompleksisempi käyttäytyminen jää toivottavasti ARIMA-mallin haaviin. Tämä ennustin hyödyntää `forecast`-paketin automaattista lineaarisen regressiomallin sovittajaa `tslm()`, jonka jäännösosiin sovelletaan `auto.arima()`-funktiota lopullisen ennusteen tuottamiseksi.
+
+```{r, echo = F, results = 'asis'}
+cat("<h1 style='font-size:150%;'>TBATS</h1>")
+```
+
+Jos aikasarjan käyttäytymistä voi epäillä tyypillistä monimutkaisemmaksi (esimerkiksi kausien koot eivät välttämättä vastaa odotettuja kokoja ja ne voivat vaihdella ajassa), saattaa olla hyödyksi kokeilla TBATS-malleja (Trigonometric, Box-Cox transformation, ARMA errors, Trend & Seasonal components). Ne rakentavat Box-Cox-muunnetun (normaalisuuspakotus) aikasarjan kausista Fourier-termejä dynaamista harmonista regressiota hyödyntäen ja käyttävät niitä ETS-malleissa, joiden virhetermejä mallinnetaan ARMA-malleilla. TBATS-mallien taustamekanismien formaalien muotojen kirjoittaminen tähän ei ole tarkoituksenmukaista niiden monimutkaisuuden takia, mutta tällainenkin malli sovittuu automaattisesti `forecast`-paketin `tbats()`-funktiolla!
+
+```{r, echo = F, results = 'asis'}
+cat("<h1 style='font-size:150%;'>Neuroverkko</h1>")
+```
+
+ARMA-mallien AR-osa muodostaa ennusteita aikasarjan edellisten havaintojen lineaarikombinaatioilla. Autoregressiiviset neuroverkot (NNAR) perustuvat samaan ideaan: neuroverkon syötekerros lukee aikasarjan menneitä toteumia ja rakentaa arkkitehtuurinsa puitteissa epälineaarisen mallin sarjan käyttäytymisestä. Yksinkertaisimmillaan neuroverkot kuljettavat jokaisen alkuperäisen syötteen erikseen muuttujiin, joiden painoja säädellään sen mukaan, kuinka hyvin sen _edellinen painorakenne_ toimi tarkistusarvon ennustamisessa. Verkkojen kouluttamisen vaativuus ja niiden rakentamien epälineaaristen ratkaisujen luonne riippuu pitkälti verkolle määritetystä kerrosrakenteesta, jonka valinta on toistaiseksi enemmän taidetta kuin tiedettä. Kattavammin neuroverkoista voi lukea [Wikipediasta](https://en.wikipedia.org/wiki/Artificial_neural_network), mutta tämän ennustimen kontekstissa riittää tietää, että `forecast`-paketti mahdollistaan yksinkertaisten, yhden "välikerroksen" neuroverkkojen sovittamisen aikasarjoihin `nnetar()`-funktiolla. Neuroverkot ovat usein tarpeellisia monimutkaisten seuraussuhteiden ja epälineaaristen ratkaisujen löytämisessä, mutta yksikerroksisten verkkojen suorituskyky on usein rajallinen ja riippuu paljon saatavilla olevasta datasta ja datassa esiintyvistä ilmiöistä.
+
+```{r, echo = F, results = 'asis'}
+cat("<h1 style='font-size:150%;'>Metodikeskiarvot</h1>")
+```
+
+Metodikeskiarvo on nimeään seuraten keskiarvo kaikista käytössä olevista menetelmistä. Metodikeskiarvo on hyödyllinen, jos halutaan rajoittaa yksittäisten menetelmien potentiaalisesti suurtakin ennusteheilahtelua, mutta silti hyödyntää tarjottujen mallien "viisautta". Painottamaton metodikeskiarvo on täysin "demokraattinen" äänestys ennusteesta, jossa jokaisen menetelmän arvio painaa yhtä paljon. Painottamaton metodikeskiarvo kärsii, jos mukana on erityisen huonosti pärjääviä menetelmiä, mutta tätä ongelmaa voi paikata painottamalla metodikeskiarvo eri menetelmien viimeaikaisen suoriutumisen perusteella.
+
+Tämä ennustin käyttää sekä painottamatonta, että painotettua metodikeskiarvoa. Painottamaton ilmoitetaan kaaviossa vain "metodikeskiarvona". Painottamaton metodikeskiarvo ottaa keskiarvon kaikista edellä mainittujen menetelmien tarjoamista ennusteista ja tarjoaa tulosta ennusteeksi. Painotettu metodikeskiarvo tarkistaa ensin, miten menetelmät pärjäsivät _viime kuussa_, laittaa menetelmät paremmuusjärjestykseen ja painottaa keskiarvossa niiden nyt tuottamia ennusteita järjestyksessä 50, 25, 12.5, ... prosentilla. Hajotuspainoksi valittiin 0.5, sillä sen eksponenttisarja suppenee nopeasti yhteen ja näin huonoimpien menetelmien paino jää lähes olemattomaksi.
+
+</div>
