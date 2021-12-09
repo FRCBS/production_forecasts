@@ -3,7 +3,7 @@
 
 # Where does your raw data come from? Currently, raw data looks like this: DWSALES_YYYY-MM-DDT######.dat
 # Missä ennustimen raakadata sijaitsee? Raakadata näyttää toistaiseksi tältä: DWSALES_YYYY-MM-DDT######.dat
-INPUT <- "~/prodfore_internal/data/rawdata/"
+INPUT <- "/data/FRCBSdata/ProgesaSales/data/"
 
 # Where do you want to save the aggregate data it needs?
 # Minne ennustimen halutaan tallentavan sen tarvitsemia aggregaattitietoja?
@@ -11,7 +11,7 @@ OUTPUT <- "~/prodfore_internal/data/"
 
 # Should we run the analysis for the Economics Department (or the more short term, operational dept.)
 # Ajetaanko "vain" talousosaston tarvitsemat ennusteet (vai myös lyh. aikavälin operationaaliset)
-ECON <- FALSE
+ECON <- TRUE
 
 # Should we impute for the COVID DIP 2020? CONSIDER THRICE BEFORE ENABLING!!
 # Pitääkö dataa korjailla COVID-dippauksen 2020 osalta? HARKITSE TARKKAAN!!

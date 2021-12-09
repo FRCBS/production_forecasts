@@ -16,9 +16,9 @@ output:
 ```{r setup, echo = FALSE, message = FALSE, warning = FALSE, cache = FALSE}
 knitr::opts_chunk$set(dev.args = list(bg = "transparent")) # this enables transparent bgs for plots/graphics
 options(OutDec = ",") # this changes the number separator from a period to a comma
-# packrat .libPath here
+#.libPaths("packrat/lib/x86_64-pc-linux-gnu/3.6.1/")
 
-source("~/production_forecasts/src/implementation/report_functions_internal.R") # source our own helper functions
+source("~/prodfore_internal/src/report_functions.R") # source our own helper functions
 library(tidyverse) # on our serverside it seems tidyverse needs to be loaded first
 library(data.table)
 library(dplyr)

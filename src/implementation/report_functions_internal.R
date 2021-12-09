@@ -38,7 +38,7 @@ read_DW <- function(INPUT, PROD) {
   }
 
   complete_data <- as.data.frame(rbindlist(file_list, fill = TRUE)) # compile list into a data frame
-
+  complete_data[, 1] <- as.Date(complete_data[, 1])
   # ---
   # data manipulation ----
   # ---
@@ -58,7 +58,7 @@ read_DW <- function(INPUT, PROD) {
       rename(date = Group.1, deliveries = x)
     retur_daily <- aggregate(returns$returns, by = list(returns$date), sum) %>%
       rename(date = Group.1, returns = x)
-
+    
     # Important! Check that the series are continuous (no missing dates). Impute with zeros if needed.
     all_dates <- seq.Date(min(c(deliv_daily$date, retur_daily$date)), max(c(deliv_daily$date, retur_daily$date)), "day")
 
@@ -172,7 +172,7 @@ read_FACS <- function(INPUT, PROD) {
     }
 
     complete_data <- as.data.frame(rbindlist(file_list, fill = TRUE)) # stack a data frame from the list of files
-
+    
     # ---
     # data manipulation ----
     # ---
@@ -305,200 +305,6 @@ read_FACS <- function(INPUT, PROD) {
     out <- data.frame(date = out$date, sales = out$deliveries - out$returns, deliveries = out$deliveries, returns = out$returns) # conform with read_DW output
     return(out)
     }
-
-read_files <- function(input = RAWDATADIR, include_older = FALSE) {
-
-  ######                                ######
-  #     THIS FUNCTION IS UGLY DON'T LOOK     #
-  ######                                ######
-  if (include_older) {
-    # Get all the OLDER files
-    files <- list.files(path = RAWDATADIR, pattern = "FAC0091_*")  # Character vector of file names
-
-    # Compile a dataframe by going over all files
-    dlist <- list()
-    for (i in files) {
-      # Read a single file to a df called d
-      d <- read.delim(file = paste0(RAWDATADIR, "/", i), header = FALSE, sep = ";", stringsAsFactors = FALSE, colClasses = 'character')
-
-      if (length(d) == 26) {
-        d <- d[, !(names(d) %in% c("V10"))]  # The column numbers unfortunately vary between files, so we'll adjust
-        }
-
-      colnames(d) <- c("V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10",
-                       "V11", "V12", "V13", "V14", "V15", "V16", "V17", "V18", "V19", "V20",
-                       "V21", "V22", "V23", "V24", "V25")  # This is done so as to have easier column handling later on
-      dlist[[i]] <- d
-    }
-
-    d <- as.data.frame(rbindlist(dlist, fill = TRUE))
-
-    # Divide into distributions (P) and returns (R)
-    P <- d[d$V1 == "P", ]
-    R <- d[d$V1 == "R", ]
-
-    # For distributions, we'll keep Distribution date, Quantity, ABO type, Volume, Exp date
-    keep <- c("V12", "V14", "V18", "V20", "V22", "V24")
-    distr <- P[keep]
-    colnames(distr) <- c("date", "product", "quantity", "ABO", "volume", "exp")
-
-    # For returns we keep the return date and quantity
-    keep <- c("V4", "V5", "V7")
-    retrn <- R[keep]
-    colnames(retrn) <- c("date", "product", "quantity")
-
-    # Datify
-    distr$date <- dmy(distr$date); distr$exp <- dmy(distr$exp)
-    retrn$date <- dmy(retrn$date)
-
-    # Numerify
-    distr$quantity <- as.numeric(distr$quantity); distr$volume <- as.numeric(distr$volume)
-    retrn$quantity <- as.numeric(retrn$quantity)
-
-    # Product codes for red cell products
-    red_codes <- c("REMOVED", "FROM", "PUBLIC", "VERSION")
-
-    red_distr <- distr[distr$product %in% red_codes, ]
-    red_retrn <- retrn[retrn$product %in% red_codes, ]
-
-    # Product codes for platelets
-    plat_codes <- c("REMOVED", "FROM", "PUBLIC", "VERSION")
-
-    plat_distr <- distr[distr$product %in% plat_codes, ]
-    plat_retrn <- retrn[retrn$product %in% plat_codes, ]
-
-    # Create a full sequence of dates for imputation purposes
-    all_dates <- (seq.Date(min(red_distr$date),
-                           max(red_distr$date),
-                           "day"))
-    ###           ###
-    #   RED CELLS   #
-    ###           ###
-    all_red <- aggregate(red_distr$quantity, by = list(red_distr$date), sum); colnames(all_red) <- c("date", "pcs")
-    # Merge into a whole set with NAs
-    all_red <- merge(x = data.frame(date = all_dates),
-                     y = all_red,
-                     all.x = TRUE)
-    # Replace with zeroes
-    all_red[is.na(all_red)] <- 0
-    # Cut to time after 2014
-    all_red <- all_red[all_red$date >= as.Date("2014-01-01"), ]
-
-    ###           ###
-    #  RED RETURNS  #
-    ###           ###
-
-    all_red_retrn <- aggregate(red_retrn$quantity, by = list(red_retrn$date), sum); colnames(all_red_retrn) <- c("date", "pcs")
-    # Merge into a whole set with NAs
-    all_red_retrn <- merge(x = data.frame(date = all_dates),
-                     y = all_red_retrn,
-                     all.x = TRUE)
-    # Replace with zeroes
-    all_red_retrn[is.na(all_red_retrn)] <- 0
-    # Cut to time after 2014
-    all_red_retrn <- all_red_retrn[all_red_retrn$date >= as.Date("2014-01-01"), ]
-
-    ###           ###
-    #   PLATELETS   #
-    ###           ###
-    all_plat <- aggregate(plat_distr$quantity, by = list(plat_distr$date), sum); colnames(all_plat) <- c("date", "pcs")
-    # Merge into a whole set with NAs
-    all_plat <- merge(x = data.frame(date = all_dates),
-                      y = all_plat,
-                      all.x = TRUE)
-    # Replace with zeroes
-    all_plat[is.na(all_plat)] <- 0
-    # Cut to time after 2014
-    all_plat <- all_plat[all_plat$date >= as.Date("2014-01-01"), ]
-
-    ###           ###
-    # PLAT RETURNS  #
-    ###           ###
-    all_plat_retrn <- aggregate(plat_retrn$quantity, by = list(plat_retrn$date), sum); colnames(all_plat_retrn) <- c("date", "pcs")
-    # Merge into a whole set with NAs
-    all_plat_retrn <- merge(x = data.frame(date = all_dates),
-                      y = all_plat_retrn,
-                      all.x = TRUE)
-    # Replace with zeroes
-    all_plat_retrn[is.na(all_plat_retrn)] <- 0
-    # Cut to time after 2014
-    all_plat_retrn <- all_plat_retrn[all_plat_retrn$date >= as.Date("2014-01-01"), ]
-
-    older_red <- data.frame(date = all_red[, 1], sales = all_red[, 2], deliveries = all_red[, 2] + all_red_retrn[, 2], returns = all_red_retrn[, 2])
-    older_plat <- data.frame(date = all_plat[, 1], sales = all_plat[, 2], deliveries = all_plat[, 2] + all_plat_retrn[, 2], returns = all_plat_retrn[, 2])
-  }
-
-  # Get all the NEWER files
-    files <- list.files(path = input, pattern = "DWSALES_*")  # Character vector of file names
-
-    ## Read, define columns, omit last column
-    dlist <- list()
-    for (i in 1:length(files)) {
-    filename <- files[i]
-    file_content <- fread(paste0(input, filename),
-                          colClasses = c("Date", "numeric", "factor", "character", "character", "NULL"))
-    dlist[[i]] <- file_content
-
-    }
-    data <- as.data.frame(rbindlist(dlist, fill = TRUE)); data$V1 <- as.Date(data$V1)
-    # Dataset filtered by tags
-    red_deliv <- data %>%
-        filter(V5 == "Punasoluvalmiste" & V2 > 0) %>%
-        select(c("date" = V1, "pcs" = V2, "type" = V3)) %>%
-        arrange(date)
-
-    red_retur <- data %>%
-        filter(V5 == "Punasoluvalmiste" & V2 < 0) %>%
-        select(c("date" = V1, "pcs" = V2, "type" = V3)) %>%
-        arrange(date)
-
-    plat_deliv <- data %>%
-        filter(V5 == "Trombosyyttivalmiste" & V2 > 0) %>%
-        select(c("date" = V1, "pcs" = V2, "type" = V3)) %>%
-        arrange(date)
-
-    plat_retur <- data %>%
-        filter(V5 == "Trombosyyttivalmiste" & V2 < 0) %>%
-        select(c("date" = V1, "pcs" = V2, "type" = V3)) %>%
-        arrange(date)
-
-    # Daily aggregation
-    red_deliv_daily <- aggregate(red_deliv$pcs, by = list(red_deliv$date), sum); colnames(red_deliv_daily) <- c("date", "pcs")
-    red_retur_daily <- aggregate(red_retur$pcs, by = list(red_retur$date), sum); colnames(red_retur_daily) <- c("date", "pcs")
-    plat_deliv_daily <- aggregate(plat_deliv$pcs, by = list(plat_deliv$date), sum); colnames(plat_deliv_daily) <- c("date", "pcs")
-    plat_retur_daily <- aggregate(plat_retur$pcs, by = list(plat_retur$date), sum); colnames(plat_retur_daily) <- c("date", "pcs")
-
-    # SALES NUMBER = DELIVERIES - RETURNS
-    # To make sales, we need to ensure equal continuous time windows for deliv and retur series
-    red_temp <- merge(red_deliv_daily, red_retur_daily, by = "date", all.x = TRUE)
-    # Do new merge to ensure intact date series
-    red_m <- merge(red_temp, data.frame(date = seq.Date(min(red_deliv_daily$date), max(red_deliv_daily$date), by = "day")), by = "date", all.y = TRUE)
-    red_m[is.na(red_m)] <- 0
-    red <- red_m %>%
-        transmute(date = date, sales = pcs.x + pcs.y, deliveries = pcs.x, returns = -1 * pcs.y)
-    # Now repeat for plats
-    plat_temp <- merge(plat_deliv_daily, plat_retur_daily, by = "date", all.x = TRUE)
-    # Do new merge to ensure intact date series
-    plat_m <- merge(plat_temp, data.frame(date = seq.Date(min(plat_deliv_daily$date), max(plat_deliv_daily$date), by = "day")), by = "date", all.y = TRUE)
-    plat_m[is.na(plat_m)] <- 0
-    plat <- plat_m %>%
-        transmute(date = date, sales = pcs.x + pcs.y, deliveries = pcs.x, returns = -1 * pcs.y)
-
-    if (include_older) {
-      # APPEND NEWER TO OLDER (AND OVERWRITE IF NEEDED)
-      newer_red_first_date <- red[1, 1]
-      cut_old_red <- older_red %>% filter(date < newer_red_first_date)
-      full_red <- rbind(cut_old_red, red)
-
-      newer_plat_first_date <- plat[1, 1]
-      cut_old_plat <- older_plat %>% filter(date < newer_plat_first_date)
-      full_plat <- rbind(cut_old_plat, plat)
-
-      return(list(red = full_red, plat = full_plat))
-    } else {return(list(red = red, plat = plat))}
-
-
-}
 
 update_data <- function(INPUT, OUTPUT, PROD) {
 
@@ -718,7 +524,7 @@ set_resolution <- function(daily, RES, at_end = FALSE, ECON, PROD, FIX = TRUE) {
     if (RES == "monthly") {
       if (ECON & PROD == "RBC") {
         # Load old data for ECON analysis
-        file_old <- read.table(paste0(OUTPUT, "monthly_from_2004.txt"))[2:121, 2] # From Jan 2004 to Dec 2013
+        file_old <- read.table(paste0(OUTPUT, "monthly_from_2004.txt"), header = TRUE)[2:121, 2] # From Jan 2004 to Dec 2013
         old_daterange <- ceiling_date(seq.Date(from = as.Date("2004-01-01"), along.with = file_old, by = "month"), "month") - days(1)
         old_data <- data.frame(date = old_daterange, sales = as.numeric(file_old), deliveries = as.numeric(file_old), returns = 0)
 
@@ -729,7 +535,7 @@ set_resolution <- function(daily, RES, at_end = FALSE, ECON, PROD, FIX = TRUE) {
       }
       if (ECON & PROD == "PLAT") {
         # Load old data for ECON analysis
-        file_old <- read.table(paste0(OUTPUT, "monthly_from_2004.txt"))[2:121, 3] # From Jan 2004 to Dec 2013
+        file_old <- read.table(paste0(OUTPUT, "monthly_from_2004.txt"), header = TRUE)[2:121, 3] # From Jan 2004 to Dec 2013
         old_daterange <- ceiling_date(seq.Date(from = as.Date("2004-01-01"), along.with = file_old, by = "month"), "month") - days(1)
         old_data <- data.frame(date = old_daterange, sales = as.numeric(file_old), deliveries = as.numeric(file_old), returns = 0)
 
@@ -759,18 +565,18 @@ set_resolution <- function(daily, RES, at_end = FALSE, ECON, PROD, FIX = TRUE) {
     if (RES == "monthly"){
       if (ECON & (PROD == "RBC")) {
         # Load old data for ECON analysis
-        file_old <- read.table(paste0(OUTPUT, "monthly_from_2004.txt"))[2:121, 2] # From Jan 2004 to Dec 2013
+        file_old <- read.table(paste0(OUTPUT, "monthly_from_2004.txt"), header = TRUE)[2:121, 2] # From Jan 2004 to Dec 2013
         old_daterange <- seq.Date(from = as.Date("2004-01-01"), along.with = file_old, by = "month")
         old_data <- data.frame(date = old_daterange, sales = as.numeric(file_old), deliveries = as.numeric(file_old), returns = 0)
 
         agg_raw <- aggregate(cbind(sales, deliveries, returns) ~ month(date) + year(date), data = daily, FUN = sum)
         daterange <- seq.Date(from = daily$date[1], along.with = agg_raw$sales, by = "month")
-
+  
         agg <- rbind(old_data, cbind(date = daterange, agg_raw[, 3:5]))
       }
       if (ECON & (PROD == "PLAT")) {
         # Load old data for ECON analysis
-        file_old <- read.table(paste0(OUTPUT, "monthly_from_2004.txt"))[2:121, 3] # From Jan 2004 to Dec 2013
+        file_old <- read.table(paste0(OUTPUT, "monthly_from_2004.txt"), header = TRUE)[2:121, 3] # From Jan 2004 to Dec 2013
         old_daterange <- seq.Date(from = as.Date("2004-01-01"), along.with = file_old, by = "month")
         old_data <- data.frame(date = old_daterange, sales = as.numeric(file_old), deliveries = as.numeric(file_old), returns = 0)
 
@@ -994,6 +800,7 @@ bootstrap_interval <- function(series, fcast_history, h = 1, sampleN = 10000) {
 }
 
 simulate_selection_history <- function(data, S_R = "S", PROD, RES, ECON, TEST_LEN, OUTPUT) {
+  
   if (ECON) {
     if (S_R == "S") {
       in_suffix <- paste0(PROD, "_sales_ECON_method_forecasts.csv")
@@ -1013,14 +820,16 @@ simulate_selection_history <- function(data, S_R = "S", PROD, RES, ECON, TEST_LE
     }
 
   method_histories <- read.table(paste0(OUTPUT, in_suffix), header = TRUE, sep = ",")
+  method_histories$date <- as.Date(method_histories$date)
 
   depth <- nrow(method_histories) - TEST_LEN
   simulated <- data.frame(date = rep(as.Date("2000-01-01"), depth), method = rep("NaN", depth), forecast = rep(0, depth)) # prepare a df
+  simulated$method <- as.character(simulated$method)
   for (i in 1:depth) {
     method <- select_method(data[data$date <= method_histories$date[i + TEST_LEN - 1], ], PROD, S_R, OUTPUT, ECON, TEST_LEN)
     forecast <- method_histories[(i + TEST_LEN), method]
     date <- method_histories[(i + TEST_LEN), "date"]
-    simulated[i, ] <- c(date, method, forecast)
+    simulated[i, 1] <- date; simulated[i, 2] <- method; simulated[i, 3] <- forecast
   }
 
   write.table(simulated, paste0(OUTPUT, out_suffix), sep = ",", row.names = FALSE, col.names = TRUE)
@@ -1183,7 +992,7 @@ select_method <- function(data, PROD, S_R = "S", OUTPUT, ECON, TEST_LEN) {
   # load history file ----
   # ---
   histories <- read.table(paste0(OUTPUT, PROD, suffix), sep = ",", header = T)
-
+  histories$date <- as.Date(histories$date)
 
   # ---
   # compute accuracies ----
@@ -1273,7 +1082,10 @@ get_forecast <- function(data, S_R = "S", method = "ets", hilo = TRUE, PROD, TRA
         target <- data[, c(1, 4)]
       }
   }
-  if (method == "wavg" | (method %in% c("dynreg", "nn", "avg") & hilo == TRUE)) {file <- read.table(paste0(OUTPUT, suffix), header = TRUE, sep = ",")}
+  if (method == "wavg" | (method %in% c("dynreg", "nn", "avg") & hilo == TRUE)) {
+    file <- read.table(paste0(OUTPUT, suffix), header = TRUE, sep = ",")
+    file[, 1] <- as.Date(file[, 1])
+  }
   if (method %in% c("avg", "wavg")) {avg_these <- c("snaive", "ma5", "ma7", "ma9", "ma12", "ets", "stl", "stlf", "tbats", "arimax", "dynreg", "nn")}
 
 
@@ -1321,13 +1133,13 @@ get_forecast <- function(data, S_R = "S", method = "ets", hilo = TRUE, PROD, TRA
         month.m[j,] <- onehotyear[month(genesis + days(j - 1)), ]
       }
       if (res == "weekly") {
-        month.m[j,] <- onehotyear[month(genesis %w+% weeks(j - 1)), ]
+        month.m[j,] <- onehotyear[month(genesis + weeks(j - 1)), ]
       }
       if (res == "monthly") {
         month.m[j,] <- onehotyear[month(genesis %m+% months(j - 1)), ]
       }
       if (res == "yearly") {
-        month.m[j,] <- onehotyear[month(genesis %y+% years(j - 1)), ]
+        month.m[j,] <- onehotyear[month(genesis + years(j - 1)), ]
       }
     }
     fit <- auto.arima(series, xreg = month.m)}
@@ -1448,9 +1260,16 @@ get_forecast <- function(data, S_R = "S", method = "ets", hilo = TRUE, PROD, TRA
     df[, -1] <- round(df[, -1])
     df[df < 0] <- 0
     }
-
+  
+  # this scales and justifies the bootstrapped hilo
   if (method %in% c("wavg", "avg", "nn", "dynreg") & dim(df)[2] == 6) {
+    # scale
     df[, c(3, 4, 5, 6)] <- df[, c(3, 4, 5, 6)] * df[, 2]/df[1, 2]
+    # justify
+    scaled_int_mid <- mean(as.numeric(df[nrow(df), c(3, 4)]))
+    f_final <- df[nrow(df), 2]
+    diff <- f_final - scaled_int_mid
+    df[, c(3, 4, 5, 6)] <- df[, c(3, 4, 5, 6)] + diff
   }
   # ---
   # save ----
@@ -1522,7 +1341,8 @@ draw_forecast <- function(forecast, data, ECON, OUTPUT, selected_method, RES, PR
       mh_suffix <- paste0(PROD, "_", RES, "_sales_OPER_method_forecasts.csv")
     }
   forecast_history <- read.table(paste0(OUTPUT, fh_suffix), header = TRUE, sep = ",", colClasses = c("Date", "character", NA))[, c(1, 3)] # we use type detection for the numerics (=NA), because, for some reason, it doesn't understand it if we put it in explicitly??
-
+  forecast_history[, 1] <- as.Date(forecast_history[, 1])
+  
   if (PROD == "RBC") {titlefix <- "Punasolut"}
   if (PROD == "PLAT") {titlefix <- "Trombosyytit"}
   if (!(PROD %in% c("RBC", "PLAT"))) {titlefix <- PROD}
@@ -1609,11 +1429,9 @@ draw_forecast <- function(forecast, data, ECON, OUTPUT, selected_method, RES, PR
     geom_ribbon(aes(x = date, ymin = lo95, ymax = hi95), fill = "#D5DBFF") +
     geom_ribbon(aes(x = date, ymin = lo80, ymax = hi80), fill = "#596DD5") +
     geom_line(aes(x = date, y = fcast, colour = "Ennuste"), size = 1.2) +
-    #geom_segment(aes(x = daterange[36], xend = daterange[37],
-    #            y = sales[36], yend = fcast[37]), linetype = "dashed") +
     geom_line(aes(x = date, y = ltrend, colour = "5v trendi (data)"), size = 1.2) +
     geom_line(aes(x = date, y = ftrend, colour = "Mallin trendi"), size = 1.2) +
-    annotate("text", x = mean.Date(daterange), y = max(master_df$hi95, na.rm = T), label = paste0("Valittu menetelmä: ", method, ". Menetelmän keskivirhe: ", method_error, " %."), size = 5) +
+    annotate("text", x = mean.Date(daterange), y = Inf, label = paste0("Valittu menetelmä: ", method, ". Menetelmän keskivirhe: ", method_error, " %."), size = 5, vjust = 2) +
     scale_colour_manual(values = c("Data" = "#000000", "Ennuste" = "#FF6757", "5v trendi (data)" = "#F1D302", "Mallin trendi" = "#E3E3E3")) +
     theme_minimal() +
     labs(title = titl,
