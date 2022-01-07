@@ -3,7 +3,7 @@
 
 # Where does your raw data come from? Currently, raw data looks like this: DWSALES_YYYY-MM-DDT######.dat
 # Missä ennustimen raakadata sijaitsee? Raakadata näyttää toistaiseksi tältä: DWSALES_YYYY-MM-DDT######.dat
-INPUT <- "/data/FRCBSdata/ProgesaSales/data/"
+INPUT <- "~/prodfore_internal/data/rawdata/"
 
 # Where do you want to save the aggregate data it needs?
 # Minne ennustimen halutaan tallentavan sen tarvitsemia aggregaattitietoja?
@@ -26,7 +26,7 @@ if (ECON) {
     # IN YEARS
     # Kuinka monta vuotta ennustinmenetelmät näkevät? Laajempi datasetti on usein parempi, mutta pitkä aikajakso saattaa hidastaa ennustimen kykyä reaoida muutoksiin!
     # VUOSINA
-    TRAIN_LEN <- as.integer(13)
+    TRAIN_LEN <- as.integer(5)
 
     # Length of the period the available methods should be tested against (so they can be selected!)
     # IN MONTHS
@@ -82,7 +82,7 @@ if (ECON) {
     # Mahdolliset: RBC, PLAT, O+, O-, A+, A-, B+, B-, AB+, AB-
     RBC <- TRUE
     PLAT <- TRUE
-    OPLUS <- TRUE
+    OPLUS <- FALSE
     OMINUS <- FALSE
     APLUS <- FALSE
     AMINUS <- FALSE

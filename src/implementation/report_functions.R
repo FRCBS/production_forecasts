@@ -58,7 +58,7 @@ read_DW <- function(INPUT, PROD) {
       rename(date = Group.1, deliveries = x)
     retur_daily <- aggregate(returns$returns, by = list(returns$date), sum) %>%
       rename(date = Group.1, returns = x)
-    
+
     # Important! Check that the series are continuous (no missing dates). Impute with zeros if needed.
     all_dates <- seq.Date(min(c(deliv_daily$date, retur_daily$date)), max(c(deliv_daily$date, retur_daily$date)), "day")
 
@@ -172,7 +172,7 @@ read_FACS <- function(INPUT, PROD) {
     }
 
     complete_data <- as.data.frame(rbindlist(file_list, fill = TRUE)) # stack a data frame from the list of files
-    
+
     # ---
     # data manipulation ----
     # ---
@@ -350,7 +350,7 @@ update_data <- function(INPUT, OUTPUT, PROD) {
           if (DW_data$date[nrow(DW_data)] > last_date) {
             new_data <- DW_data %>%
               filter(date > last_date)
-            write.table(new_data, file = paste0(OUTPUT, PROD, "_daily.csv"), append = T, col.names = F, row.names = F)
+            write.table(new_data, file = paste0(OUTPUT, PROD, "_daily.csv"), sep = ",", append = T, col.names = F, row.names = F)
 
             data <- rbind(file, new_data)
           } else {data <- file}
@@ -384,7 +384,7 @@ update_data <- function(INPUT, OUTPUT, PROD) {
           if (DW_data$date[nrow(DW_data)] > last_date) {
             new_data <- DW_data %>%
               filter(date > last_date)
-            write.table(new_data, file = paste0(OUTPUT, PROD, "_daily.csv"), append = T, col.names = F, row.names = F)
+            write.table(new_data, file = paste0(OUTPUT, PROD, "_daily.csv"), sep = ",", append = T, col.names = F, row.names = F)
 
             data <- rbind(file, new_data)
           } else {data <- file}
@@ -417,7 +417,7 @@ update_data <- function(INPUT, OUTPUT, PROD) {
           if (DW_data$date[nrow(DW_data)] > last_date) {
             new_data <- DW_data %>%
               filter(date > last_date)
-            write.table(new_data, file = paste0(OUTPUT, PROD, "_daily.csv"), append = T, col.names = F, row.names = F)
+            write.table(new_data, file = paste0(OUTPUT, PROD, "_daily.csv"), sep = ",", append = T, col.names = F, row.names = F)
 
             data <- rbind(file, new_data)
           } else {data <- file}
@@ -514,89 +514,51 @@ set_resolution <- function(daily, RES, at_end = FALSE, ECON, PROD, FIX = TRUE) {
   # ---
   # aggregate ----
   # ---
-  if (at_end) { # TODO: consider removing the possibility to have "at end" series
+  if (RES == "weekly"){
+    daily <- daily[6:nrow(daily), ] # begin from a Monday!
+    agg_raw <- aggregate(cbind(sales, deliveries, returns) ~ week(date) + year(date), data = daily, FUN = sum)
+    # Fix the issue with 53rd weeks below: add 53rds to 52nds, remove 53rds
+    agg_raw[seq(52, dim(agg_raw)[1], 53), c(3, 4, 5)] <- agg_raw[seq(52, dim(agg_raw)[1], 53), c(3, 4, 5)] + agg_raw[seq(53, dim(agg_raw)[1], 53), c(3, 4, 5)]
+    agg_fixed <- agg_raw %>% filter(`week(date)` != 53)
+    # Finalize
+    last_monday <- as.Date(paste0(agg_fixed[nrow(agg_fixed), 2], agg_fixed[nrow(agg_fixed), 1], 1), "%Y%U%u")
+    agg <- cbind(date = seq.Date(from = daily$date[1], along.with = agg_fixed[, 1], by = "week"), agg_fixed[, 3:5])
+  }
+  if (RES == "monthly"){
+    if (ECON & (PROD == "RBC")) {
+      # Load old data for ECON analysis
+      file_old <- read.table(paste0(OUTPUT, "monthly_from_2004.txt"), header = TRUE)[2:121, 2] # From Jan 2004 to Dec 2013
+      old_daterange <- seq.Date(from = as.Date("2004-01-01"), along.with = file_old, by = "month")
+      old_data <- data.frame(date = old_daterange, sales = as.numeric(file_old), deliveries = as.numeric(file_old), returns = 0)
 
-    if (RES == "weekly") {
-      agg_raw <- aggregate(cbind(sales, deliveries, returns) ~ week(date) + year(date), data = daily, FUN = sum)
-      daterange <- ceiling_date(seq.Date(from = daily$date[1], along.with = agg_raw$sales, by = "week"), "week")
+      agg_raw <- aggregate(cbind(sales, deliveries, returns) ~ month(date) + year(date), data = daily, FUN = sum)
+      daterange <- seq.Date(from = daily$date[1], along.with = agg_raw$sales, by = "month")
+
+      agg <- rbind(old_data, cbind(date = daterange, agg_raw[, 3:5]))
+    }
+    if (ECON & (PROD == "PLAT")) {
+      # Load old data for ECON analysis
+      file_old <- read.table(paste0(OUTPUT, "monthly_from_2004.txt"), header = TRUE)[2:121, 3] # From Jan 2004 to Dec 2013
+      old_daterange <- seq.Date(from = as.Date("2004-01-01"), along.with = file_old, by = "month")
+      old_data <- data.frame(date = old_daterange, sales = as.numeric(file_old), deliveries = as.numeric(file_old), returns = 0)
+
+      agg_raw <- aggregate(cbind(sales, deliveries, returns) ~ month(date) + year(date), data = daily, FUN = sum)
+      daterange <- seq.Date(from = daily$date[1], along.with = agg_raw$sales, by = "month")
+
+      agg <- rbind(old_data, cbind(date = daterange, agg_raw[, 3:5]))
+    }
+    if (!ECON) {
+      agg_raw <- aggregate(cbind(sales, deliveries, returns) ~ month(date) + year(date), data = daily, FUN = sum)
+      daterange <- seq.Date(from = daily$date[1], along.with = agg_raw$sales, by = "month")
+
       agg <- cbind(date = daterange, agg_raw[, 3:5])
     }
-    if (RES == "monthly") {
-      if (ECON & PROD == "RBC") {
-        # Load old data for ECON analysis
-        file_old <- read.table(paste0(OUTPUT, "monthly_from_2004.txt"), header = TRUE)[2:121, 2] # From Jan 2004 to Dec 2013
-        old_daterange <- ceiling_date(seq.Date(from = as.Date("2004-01-01"), along.with = file_old, by = "month"), "month") - days(1)
-        old_data <- data.frame(date = old_daterange, sales = as.numeric(file_old), deliveries = as.numeric(file_old), returns = 0)
-
-        agg_raw <- aggregate(cbind(sales, deliveries, returns) ~ month(date) + year(date), data = daily, FUN = sum)
-        daterange <- ceiling_date(seq.Date(from = daily$date[1], along.with = agg_raw$sales, by = "month"), "month") - days(1)
-
-        agg <- rbind(old_data, cbind(date = daterange, agg_raw[, 3:5]))
-      }
-      if (ECON & PROD == "PLAT") {
-        # Load old data for ECON analysis
-        file_old <- read.table(paste0(OUTPUT, "monthly_from_2004.txt"), header = TRUE)[2:121, 3] # From Jan 2004 to Dec 2013
-        old_daterange <- ceiling_date(seq.Date(from = as.Date("2004-01-01"), along.with = file_old, by = "month"), "month") - days(1)
-        old_data <- data.frame(date = old_daterange, sales = as.numeric(file_old), deliveries = as.numeric(file_old), returns = 0)
-
-        agg_raw <- aggregate(cbind(sales, deliveries, returns) ~ month(date) + year(date), data = daily, FUN = sum)
-        daterange <- ceiling_date(seq.Date(from = daily$date[1], along.with = agg_raw$sales, by = "month"), "month") - days(1)
-
-        agg <- rbind(old_data, cbind(date = daterange, agg_raw[, 3:5]))
-      }
-      if (!ECON) {
-        agg_raw <- aggregate(cbind(sales, deliveries, returns) ~ month(date) + year(date), data = daily, FUN = sum)
-        daterange <- ceiling_date(seq.Date(from = daily$date[1], along.with = agg_raw$sales, by = "month"), "month") - days(1)
-
-        agg <- cbind(date = daterange, agg_raw[, 3:5])
-      }
-    }
-    if (RES == "yearly") {
-      agg_raw <- aggregate(cbind(sales, deliveries, returns) ~ year(date), data = daily, FUN = sum)
-      daterange <- ceiling_date(seq.Date(from = daily$date[1], along.with = agg_raw$sales, by = "year"), "year") - days(1)
-      agg <- cbind(date = daterange, agg_raw[, 3:4])
-    }
-
-  } else {
-    if (RES == "weekly"){
-      agg_raw <- aggregate(cbind(sales, deliveries, returns) ~ week(date) + year(date), data = daily, FUN = sum)
-      agg <- cbind(date = seq.Date(from = daily$date[1], along.with = agg_raw$sales, by = "week"), agg_raw[, 3:5])
-    }
-    if (RES == "monthly"){
-      if (ECON & (PROD == "RBC")) {
-        # Load old data for ECON analysis
-        file_old <- read.table(paste0(OUTPUT, "monthly_from_2004.txt"), header = TRUE)[2:121, 2] # From Jan 2004 to Dec 2013
-        old_daterange <- seq.Date(from = as.Date("2004-01-01"), along.with = file_old, by = "month")
-        old_data <- data.frame(date = old_daterange, sales = as.numeric(file_old), deliveries = as.numeric(file_old), returns = 0)
-
-        agg_raw <- aggregate(cbind(sales, deliveries, returns) ~ month(date) + year(date), data = daily, FUN = sum)
-        daterange <- seq.Date(from = daily$date[1], along.with = agg_raw$sales, by = "month")
-  
-        agg <- rbind(old_data, cbind(date = daterange, agg_raw[, 3:5]))
-      }
-      if (ECON & (PROD == "PLAT")) {
-        # Load old data for ECON analysis
-        file_old <- read.table(paste0(OUTPUT, "monthly_from_2004.txt"), header = TRUE)[2:121, 3] # From Jan 2004 to Dec 2013
-        old_daterange <- seq.Date(from = as.Date("2004-01-01"), along.with = file_old, by = "month")
-        old_data <- data.frame(date = old_daterange, sales = as.numeric(file_old), deliveries = as.numeric(file_old), returns = 0)
-
-        agg_raw <- aggregate(cbind(sales, deliveries, returns) ~ month(date) + year(date), data = daily, FUN = sum)
-        daterange <- seq.Date(from = daily$date[1], along.with = agg_raw$sales, by = "month")
-
-        agg <- rbind(old_data, cbind(date = daterange, agg_raw[, 3:5]))
-      }
-      if (!ECON) {
-        agg_raw <- aggregate(cbind(sales, deliveries, returns) ~ month(date) + year(date), data = daily, FUN = sum)
-        daterange <- seq.Date(from = daily$date[1], along.with = agg_raw$sales, by = "month")
-
-        agg <- cbind(date = daterange, agg_raw[, 3:5])
-      }
-    }
-    if (RES == "yearly"){
-      agg_raw <- aggregate(cbind(sales, deliveries, returns) ~ year(date), data = daily, FUN = sum)
-      agg <- cbind(date = seq.Date(from = daily$date[1], along.with = agg_raw$sales, by = "year"), agg_raw[, 3:4])
-    }
   }
+  if (RES == "yearly"){
+    agg_raw <- aggregate(cbind(sales, deliveries, returns) ~ year(date), data = daily, FUN = sum)
+    agg <- cbind(date = seq.Date(from = daily$date[1], along.with = agg_raw$sales, by = "year"), agg_raw[, 3:4])
+  }
+
 
   # NB!
   # we never return the last row, as this is the running week/month/year (and may get aggregated before it finishes)
@@ -662,7 +624,7 @@ ensure_window_parity <- function(x, y) {
   return(list(first = x, second = y))
 }
 
-find_trend <- function(data, window_size = 24, out = "vec"){
+find_trend <- function(data, window_size = 24, out = "vec", extend = 0){
   # assumes data is df: date | value
 
   clean <- tail(na.omit(data), window_size)
@@ -671,16 +633,18 @@ find_trend <- function(data, window_size = 24, out = "vec"){
   if (out == "vec") {
     res <- find_resolution(clean[, 1], format = "label")
 
-    if (res == "daily") {scale <- 1; param <- "days"}
-    if (res == "weekly") {scale <- 7; param <- "weeks"}
-    if (res == "monthly") {scale <- 30; param <- "months"}
-    if (res == "yearly") {scale <- 365; param <- "years"}
+    if (res == "daily") {scale <- 1; param <- "day"}
+    if (res == "weekly") {scale <- 7; param <- "week"}
+    if (res == "monthly") {scale <- 30; param <- "month"}
+    if (res == "yearly") {scale <- 365; param <- "year"}
 
-    slopevec <- cumsum(rep(slope * scale, window_size)) - cumsum(rep(slope * scale, window_size))[(floor(window_size/2))]
+    slopevec <- cumsum(rep(slope * scale, (window_size + extend))) - cumsum(rep(slope * scale, (window_size + extend)))[(floor(window_size/2))]
+
     pivot <- mean(clean[, 2])
     trendline <- slopevec + pivot
 
-    return(data.frame(date = clean[, 1], trend = round(trendline)))
+    return(data.frame(date = seq.Date(from = clean[1, 1], length.out = (window_size + extend), by = param), trend = round(trendline)))
+    clean[, 1]
   }
   if (out == "slope") {
     return(slope)
@@ -800,14 +764,18 @@ bootstrap_interval <- function(series, fcast_history, h = 1, sampleN = 10000) {
 }
 
 simulate_selection_history <- function(data, S_R = "S", PROD, RES, ECON, TEST_LEN, OUTPUT) {
-  
+
   if (ECON) {
     if (S_R == "S") {
       in_suffix <- paste0(PROD, "_sales_ECON_method_forecasts.csv")
+      in_alt_suffix <- paste0(PROD, "_sales_ECON_method_point_forecasts.csv")
       out_suffix <- paste0(PROD, "_sales_ECON_forecasts.csv")
+      out_alt_suffix <- paste0(PROD, "_sales_ECON_point_forecasts.csv")
     } else {
         in_suffix <- paste0(PROD, "_returns_ECON_method_forecasts.csv")
+        in_alt_suffix <- paste0(PROD, "_returns_ECON_method_point_forecasts.csv")
         out_suffix <- paste0(PROD, "_returns_ECON_forecasts.csv")
+        out_alt_suffix <- paste0(PROD, "_returns_ECON_point_forecasts.csv")
       }
   } else {
       if (S_R == "S") {
@@ -822,21 +790,43 @@ simulate_selection_history <- function(data, S_R = "S", PROD, RES, ECON, TEST_LE
   method_histories <- read.table(paste0(OUTPUT, in_suffix), header = TRUE, sep = ",")
   method_histories$date <- as.Date(method_histories$date)
 
-  depth <- nrow(method_histories) - TEST_LEN
-  simulated <- data.frame(date = rep(as.Date("2000-01-01"), depth), method = rep("NaN", depth), forecast = rep(0, depth)) # prepare a df
-  simulated$method <- as.character(simulated$method)
-  for (i in 1:depth) {
-    method <- select_method(data[data$date <= method_histories$date[i + TEST_LEN - 1], ], PROD, S_R, OUTPUT, ECON, TEST_LEN)
-    forecast <- method_histories[(i + TEST_LEN), method]
-    date <- method_histories[(i + TEST_LEN), "date"]
-    simulated[i, 1] <- date; simulated[i, 2] <- method; simulated[i, 3] <- forecast
-  }
+  if (ECON) {
+    method_point_histories <- read.table(paste0(OUTPUT, in_alt_suffix), header = TRUE, sep = ",")
+    method_point_histories$date <- as.Date(method_point_histories$date)
 
-  write.table(simulated, paste0(OUTPUT, out_suffix), sep = ",", row.names = FALSE, col.names = TRUE)
+    depth <- nrow(method_histories) - TEST_LEN
+    simulated_p <- data.frame(date = rep(as.Date("2000-01-01"), depth), method = rep("NaN", depth), forecast = rep(0, depth)) # prepare a df
+    simulated_r <- data.frame(date = rep(as.Date("2000-01-01"), depth), method = rep("NaN", depth), forecast = rep(0, depth))
+    simulated_p$method <- as.character(simulated_p$method)
+    simulated_r$method <- as.character(simulated_r$method)
+    for (i in 1:depth) {
+      method <- select_method(data[data$date <= method_histories$date[i + TEST_LEN - 1], ], PROD, S_R, OUTPUT, ECON, TEST_LEN)
+      forecast_p <- method_point_histories[(i + TEST_LEN), method]
+      forecast_r <- method_histories[(i + TEST_LEN), method]
+      date <- method_histories[(i + TEST_LEN), "date"]
+      simulated_p[i, 1] <- date; simulated_p[i, 2] <- method; simulated_p[i, 3] <- forecast_p
+      simulated_r[i, 1] <- date; simulated_r[i, 2] <- method; simulated_r[i, 3] <- forecast_r
+
+    }
+    write.table(simulated_p, paste0(OUTPUT, out_alt_suffix), sep = ",", row.names = FALSE, col.names = TRUE)
+    write.table(simulated_r, paste0(OUTPUT, out_suffix), sep = ",", row.names = FALSE, col.names = TRUE)
+  } else {
+      depth <- nrow(method_histories) - TEST_LEN
+      simulated <- data.frame(date = rep(as.Date("2000-01-01"), depth), method = rep("NaN", depth), forecast = rep(0, depth)) # prepare a df
+      simulated$method <- as.character(simulated$method)
+      for (i in 1:depth) {
+        method <- select_method(data[data$date <= method_histories$date[i + TEST_LEN - 1], ], PROD, S_R, OUTPUT, ECON, TEST_LEN)
+        forecast <- method_histories[(i + TEST_LEN), method]
+        date <- method_histories[(i + TEST_LEN), "date"]
+        simulated[i, 1] <- date; simulated[i, 2] <- method; simulated[i, 3] <- forecast
+      }
+
+      write.table(simulated, paste0(OUTPUT, out_suffix), sep = ",", row.names = FALSE, col.names = TRUE)
+    }
 
 }
 
-generate_method_history <- function(data, S_R, PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT){
+generate_method_history <- function(data, S_R, PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT, ECON_ALT = FALSE, CUSTOM_FILENAME = "method_histories.csv"){
 
   # ---
   # arguments to variables ----
@@ -950,7 +940,19 @@ generate_method_history <- function(data, S_R, PROD, RES, ECON, TRAIN_LEN, HORIZ
 
   savethis <- cbind(master[-1, ], avg = avg[-1], wavg = round(wavg_v)) # prepare for saving
 
-  write.table(savethis, file = paste0(OUTPUT, suffix), sep = ",", row.names = F) # save
+  if (!ECON & ECON_ALT) { # if these TRUE, we are on level 1 of recursion, and we save with custom filename
+    write.table(savethis, file = paste0(OUTPUT, CUSTOM_FILENAME), sep = ",", row.names = F) # save
+  } else {
+      write.table(savethis, file = paste0(OUTPUT, suffix), sep = ",", row.names = F) # save
+    }
+
+  if (ECON & ECON_ALT) { # if we want single month ECON forecasts also
+    if (S_R == "S") {CUSTOM_FILENAME <- paste0(PROD, "_sales_ECON_method_point_forecasts.csv")} else {CUSTOM_FILENAME <- paste0(PROD, "_returns_ECON_method_point_forecasts.csv")}
+    generate_method_history(data, S_R, PROD, RES, ECON = FALSE, TRAIN_LEN,
+                            HORIZON = as.integer(1), OUTPUT, ECON_ALT = TRUE, CUSTOM_FILENAME) # don't create infinite recursion!
+  }
+
+
 }
 
 select_method <- function(data, PROD, S_R = "S", OUTPUT, ECON, TEST_LEN) {
@@ -1260,7 +1262,7 @@ get_forecast <- function(data, S_R = "S", method = "ets", hilo = TRUE, PROD, TRA
     df[, -1] <- round(df[, -1])
     df[df < 0] <- 0
     }
-  
+
   # this scales and justifies the bootstrapped hilo
   if (method %in% c("wavg", "avg", "nn", "dynreg") & dim(df)[2] == 6) {
     # scale
@@ -1286,7 +1288,13 @@ get_forecast <- function(data, S_R = "S", method = "ets", hilo = TRUE, PROD, TRA
           tobesaved <- data.frame(date = fdate, method = method, forecast = rollfcast)
           write.table(tobesaved, file = savepath, append = T, sep = ",", col.names = F, row.names = F)
         }
-
+        savepath <- paste0(OUTPUT, PROD, "_sales_ECON_point_forecasts.csv")
+        file <- read.table(savepath, header = T, sep = ","); file[, 1] <- as.Date(file[, 1])
+        if (file[nrow(file), 1] < df[1, 1]) {
+          fcast <- df[1, 2]
+          tobesaved <- data.frame(date = fdate, method = method, forecast = fcast)
+          write.table(tobesaved, file = savepath, append = T, sep = ",", col.names = F, row.names = F)
+        }
       } else {
           savepath <- paste0(OUTPUT, PROD, "_returns_ECON_forecasts.csv")
           file <- read.table(savepath, header = T, sep = ","); file[, 1] <- as.Date(file[, 1])
@@ -1294,6 +1302,13 @@ get_forecast <- function(data, S_R = "S", method = "ets", hilo = TRUE, PROD, TRA
             datasum <- sum(tail(data[, 4], 23))
             rollfcast <- datasum + df[1, 2]
             tobesaved <- data.frame(date = fdate, method = method, forecast = rollfcast)
+            write.table(tobesaved, file = savepath, append = T, sep = ",", col.names = F, row.names = F)
+          }
+          savepath <- paste0(OUTPUT, PROD, "_returns_ECON_point_forecasts.csv")
+          file <- read.table(savepath, header = T, sep = ","); file[, 1] <- as.Date(file[, 1])
+          if (file[nrow(file), 1] < df[1, 1]) {
+            fcast <- df[1, 2]
+            tobesaved <- data.frame(date = fdate, method = method, forecast = fcast)
             write.table(tobesaved, file = savepath, append = T, sep = ",", col.names = F, row.names = F)
           }
         }
@@ -1315,10 +1330,8 @@ get_forecast <- function(data, S_R = "S", method = "ets", hilo = TRUE, PROD, TRA
               write.table(tobesaved, file = savepath, append = T, sep = ",", col.names = F, row.names = F)
             }
           }
-
       }
   }
-
 
   # ---
   # return ----
@@ -1333,16 +1346,23 @@ draw_forecast <- function(forecast, data, ECON, OUTPUT, selected_method, RES, PR
   # variables from arguments ----
   # ---
   if (ECON) { # load selected forecast history
-    fh_suffix <- paste0(PROD, "_sales_ECON_forecasts.csv")
-    mh_suffix <- paste0(PROD, "_sales_ECON_method_forecasts.csv")
+    #fh_suffix <- paste0(PROD, "_sales_ECON_forecasts.csv")
+    pfh_suffix <- paste0(PROD, "_sales_ECON_point_forecasts.csv") # this for error calc
+    #mh_suffix <- paste0(PROD, "_sales_ECON_method_forecasts.csv")
+    pmh_suffix <- paste0(PROD, "_sales_ECON_method_point_forecasts.csv") # this for error calc
     forecast <- head(forecast, -12) # there is 12 months too much for plotting purposes in ECON
   } else {
       fh_suffix <- paste0(PROD, "_", RES, "_sales_OPER_forecasts.csv")
       mh_suffix <- paste0(PROD, "_", RES, "_sales_OPER_method_forecasts.csv")
     }
-  forecast_history <- read.table(paste0(OUTPUT, fh_suffix), header = TRUE, sep = ",", colClasses = c("Date", "character", NA))[, c(1, 3)] # we use type detection for the numerics (=NA), because, for some reason, it doesn't understand it if we put it in explicitly??
-  forecast_history[, 1] <- as.Date(forecast_history[, 1])
-  
+  if (ECON) {
+    forecast_history <- read.table(paste0(OUTPUT, pfh_suffix), header = TRUE, sep = ",", colClasses = c("Date", "character", NA))[, c(1, 3)] # we use type detection for the numerics (=NA), because, for some reason, it doesn't understand it if we put it in explicitly??
+    forecast_history[, 1] <- as.Date(forecast_history[, 1])
+  } else {
+      forecast_history <- read.table(paste0(OUTPUT, fh_suffix), header = TRUE, sep = ",", colClasses = c("Date", "character", NA))[, c(1, 3)] # we use type detection for the numerics (=NA), because, for some reason, it doesn't understand it if we put it in explicitly??
+      forecast_history[, 1] <- as.Date(forecast_history[, 1])
+    }
+
   if (PROD == "RBC") {titlefix <- "Punasolut"}
   if (PROD == "PLAT") {titlefix <- "Trombosyytit"}
   if (!(PROD %in% c("RBC", "PLAT"))) {titlefix <- PROD}
@@ -1361,7 +1381,11 @@ draw_forecast <- function(forecast, data, ECON, OUTPUT, selected_method, RES, PR
   if (selected_method == "nn") {method <- "neuroverkko"; coln <- 13}
   if (selected_method == "avg") {method <- "metodikeskiarvo"; coln <- 14}
   if (selected_method == "wavg") {method <- "painotettu metodikeskiarvo"; coln <- 15}
-  method_history <- read.table(paste0(OUTPUT, mh_suffix), header = TRUE, sep = ",")[, c(1, coln)]; method_history[, 1] <- as.Date(method_history[, 1])
+  if (ECON) {
+    method_history <- read.table(paste0(OUTPUT, pmh_suffix), header = TRUE, sep = ",")[, c(1, coln)]; method_history[, 1] <- as.Date(method_history[, 1])
+  } else {
+      method_history <- read.table(paste0(OUTPUT, mh_suffix), header = TRUE, sep = ",")[, c(1, coln)]; method_history[, 1] <- as.Date(method_history[, 1])
+    }
   if (RES == "daily") {
     past_length <- 365
     h <- tail(data[, 1], past_length)
@@ -1371,15 +1395,15 @@ draw_forecast <- function(forecast, data, ECON, OUTPUT, selected_method, RES, PR
     daterange <- seq.Date(from = h[1], length.out = (length(h) + nrow(forecast)), by = "day")
   }
   if (RES == "weekly") {
-    past_length <- 6 * 52
+    past_length <- 52
     h <- tail(data[, 1], past_length)
-    data_trend_len_long <- 156
+    data_trend_len_long <- 26
     fcast_trend_len <- nrow(forecast)
     titl <- paste0(titlefix, ", ", nrow(forecast), " viikon ennuste")
     daterange <- seq.Date(from = h[1], length.out = (length(h) + nrow(forecast)), by = "week")
   }
   if (RES == "monthly") {
-    past_length <- 10 * 12
+    past_length <- 5 * 12
     h <- tail(data[, 1], past_length)
     data_trend_len_long <- 60
     fcast_trend_len <- nrow(forecast)
@@ -1398,10 +1422,6 @@ draw_forecast <- function(forecast, data, ECON, OUTPUT, selected_method, RES, PR
 
   daterange_df <- data.frame(date = daterange) # So that we can left_join everything
   series_v <- tail(data[, c(1, 2)], past_length) # cut to view
-  if (ECON) { # scaleback the 24mo ROLLSUMS
-    forecast_history[, -1] <- forecast_history[, -1] / 24
-    method_history[, -1] <- method_history[, -1] / 24
-  }
 
   master_df <- daterange_df %>%
     left_join(series_v, by = "date") %>%
@@ -1410,9 +1430,9 @@ draw_forecast <- function(forecast, data, ECON, OUTPUT, selected_method, RES, PR
     left_join(method_history, by = "date")
 
   colnames(master_df) <- c("date", "sales", "fcast", "lo80", "hi80", "lo95", "hi95", "fhistory", "mhistory")
-  master_df$fcast <- coalesce(master_df$fcast, master_df$fhistory)
+  master_df$fcast <- coalesce(master_df$fcast, as.numeric(master_df$fhistory))
 
-  trend_l <- find_trend(master_df[, c(1, 2)], window_size = data_trend_len_long)
+  trend_l <- find_trend(master_df[, c(1, 2)], window_size = data_trend_len_long, extend = nrow(forecast))
   trend_f <- find_trend(master_df[, c(1, 3)], window_size = fcast_trend_len)
 
   master_df <- master_df %>%
@@ -1422,7 +1442,6 @@ draw_forecast <- function(forecast, data, ECON, OUTPUT, selected_method, RES, PR
 
   past_error <- round(mean(get_errors(master_df[, c("date", "sales")], master_df[, c("date", "fhistory")])[, 2], na.rm = T), 2)
   method_error <- round(mean(get_errors(master_df[, c("date", "sales")], master_df[, c("date", "mhistory")])[, 2], na.rm = T), 2)
-
 
   ggplot(data = master_df) +
     geom_line(aes(x = date, y = sales, colour = "Data"), size = 1.2) +
@@ -1463,14 +1482,21 @@ table_current_year <- function(data, comb_forecast, PROD) {
     spread(date, deliveries) %>%
     select(data_part$date); rownames(rotated_data) <- c("Toimitukset", "Palautukset", "Myynti")
   fcast_part <- comb_forecast[, c(1, 2, 7, 8)] %>% filter(year(date) == last_year_in_data) %>% mutate(date = paste0("Ennuste\n", month(date), "/", year(date)))
-  colnames(fcast_part) <- c("date", "sales", "deliveries", "returns")
-  rotated_fcast <- fcast_part %>%
-    gather(sales, deliveries, -date) %>%
-    spread(date, deliveries) %>%
-    select(fcast_part$date); rownames(rotated_fcast) <- c("Toimitukset", "Palautukset", "Myynti")
-  this_year_df <- cbind(rotated_data, rotated_fcast)
-  sums <- c(sum(this_year_df[1, ]), sum(this_year_df[2, ]), sum(this_year_df[3, ]))
-  this_year_table <- cbind(this_year_df, Yhteensä = sums)
+  if (dim(fcast_part)[1] != 0) {
+    colnames(fcast_part) <- c("date", "sales", "deliveries", "returns")
+    rotated_fcast <- fcast_part %>%
+      gather(sales, deliveries, -date) %>%
+      spread(date, deliveries) %>%
+      select(fcast_part$date); rownames(rotated_fcast) <- c("Toimitukset", "Palautukset", "Myynti")
+    this_year_df <- cbind(rotated_data, rotated_fcast)
+    sums <- c(sum(this_year_df[1, ]), sum(this_year_df[2, ]), sum(this_year_df[3, ]))
+    this_year_table <- cbind(this_year_df, Yhteensä = sums)
+  } else {
+      this_year_df <- rotated_data
+      sums <- c(sum(this_year_df[1, ]), sum(this_year_df[2, ]), sum(this_year_df[3, ]))
+      this_year_table <- cbind(this_year_df, Yhteensä = sums)
+    }
+
   datatable(this_year_table, rownames = TRUE, filter = "none", extensions = 'Buttons', options = list(pageLength = 5,
                                                                                                       scrollX = T,
                                                                                                       dom = 'tB',
