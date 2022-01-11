@@ -58,8 +58,8 @@ returns_method_history_path <- paste0(OUTPUT, PROD, "_returns_ECON_method_foreca
 sales_forecasts_path <- paste0(OUTPUT, PROD, "_sales_ECON_forecasts.csv")
 returns_forecasts_path <- paste0(OUTPUT, PROD, "_returns_ECON_forecasts.csv")
 
-if (!file.exists(sales_method_history_path)) { generate_method_history(data, S_R = "S", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT, ECON_ALT = TRUE) }
-if (!file.exists(returns_method_history_path)) { generate_method_history(data, S_R = "R", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT, ECON_ALT = TRUE) }
+if (!file.exists(sales_method_history_path)) { generate_method_history(data, S_R = "S", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(returns_method_history_path)) { generate_method_history(data, S_R = "R", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
 if (!file.exists(sales_forecasts_path)) { simulate_selection_history(data, S_R = "S", PROD, RES, ECON, TEST_LEN, OUTPUT) }
 if (!file.exists(returns_forecasts_path)) { simulate_selection_history(data, S_R = "R", PROD, RES, ECON, TEST_LEN, OUTPUT) }
 ```
@@ -87,6 +87,22 @@ cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maali
 
 ```{r RBC_ECON_acc_expl, echo = FALSE, results = 'asis', eval = RBC & ECON, message = FALSE, warning = FALSE}
 cat("<center style='font-size:1vw'>Virheprosentti lasketaan 2 vuoden kuukausisumman ennustustarkkuudesta.</center>")
+```
+
+```{r RBC_ECON_LASTYEAR_title, echo = FALSE, results = 'asis', eval = RBC & ECON, message = FALSE, warning = FALSE}
+cat("
+***
+  <style>
+div.tabtitle { font-size: 25px; text-align: center; margin: auto;}
+</style>
+<div class = 'tabtitle'>
+Edellinen vuosi
+</div>
+")
+```
+
+```{r RBC_ECON_LASTYEAR_table, R.options = list(width = 100), echo = FALSE, eval = RBC & ECON, message = FALSE, warning = FALSE}
+table_previous_year(data, PROD)
 ```
 
 ```{r RBC_ECON_curyear_title, echo = FALSE, results = 'asis', eval = RBC & ECON, message = FALSE, warning = FALSE}
@@ -161,8 +177,8 @@ returns_method_history_path <- paste0(OUTPUT, PROD, "_returns_ECON_method_foreca
 sales_forecasts_path <- paste0(OUTPUT, PROD, "_sales_ECON_forecasts.csv")
 returns_forecasts_path <- paste0(OUTPUT, PROD, "_returns_ECON_forecasts.csv")
 
-if (!file.exists(sales_method_history_path)) { generate_method_history(data, S_R = "S", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT, ECON_ALT = TRUE) }
-if (!file.exists(returns_method_history_path)) { generate_method_history(data, S_R = "R", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT, ECON_ALT = TRUE) }
+if (!file.exists(sales_method_history_path)) { generate_method_history(data, S_R = "S", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
+if (!file.exists(returns_method_history_path)) { generate_method_history(data, S_R = "R", PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT) }
 if (!file.exists(sales_forecasts_path)) { simulate_selection_history(data, S_R = "S", PROD, RES, ECON, TEST_LEN, OUTPUT) }
 if (!file.exists(returns_forecasts_path)) { simulate_selection_history(data, S_R = "R", PROD, RES, ECON, TEST_LEN, OUTPUT) }
 ```
@@ -190,6 +206,22 @@ cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maali
 
 ```{r PLAT_ECON_acc_expl, echo = FALSE, results = 'asis', eval = PLAT & ECON, message = FALSE, warning = FALSE}
 cat("<center style='font-size:1vw'>Virheprosentti lasketaan 2 vuoden kuukausisumman ennustustarkkuudesta.</center>")
+```
+
+```{r PLAT_ECON_LASTYEAR_title, echo = FALSE, results = 'asis', eval = PLAT & ECON, message = FALSE, warning = FALSE}
+cat("
+***
+  <style>
+div.tabtitle { font-size: 25px; text-align: center; margin: auto;}
+</style>
+<div class = 'tabtitle'>
+Edellinen vuosi
+</div>
+")
+```
+
+```{r PLAT_ECON_LASTYEAR_table, R.options = list(width = 100), echo = FALSE, eval = PLAT & ECON, message = FALSE, warning = FALSE}
+table_previous_year(data, PROD)
 ```
 
 ```{r PLAT_ECON_curyear_title, echo = FALSE, results = 'asis', eval = PLAT & ECON, message = FALSE, warning = FALSE}
@@ -288,6 +320,10 @@ colnames(comb_forecast) <- c("date", "sales", "Lo80", "Hi80", "Lo90", "Hi90", "d
 draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PROD)
 ```
 
+```{r RBC_FIX_expl, echo = FALSE, results = 'asis', eval = RBC & FIX & !(ECON), message = FALSE, warning = FALSE}
+cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
+```
+
 ```{r RBC_tabletitle, echo = FALSE, results = 'asis', eval = RBC & !(ECON), message = FALSE, warning = FALSE}
 cat("
 ***
@@ -303,7 +339,6 @@ Ennusteet
 ```{r RBC_generic_table, R.options = list(width = 100), echo = FALSE, eval = RBC & !(ECON), message = FALSE, warning = FALSE}
 table_generic(comb_forecast, PROD)
 ```
-
 
 ```{r PLAT_tab_title, echo = F, results = 'asis', eval = PLAT & !(ECON)}
 cat("### Trombosyyttituotteet")
@@ -349,6 +384,10 @@ colnames(comb_forecast) <- c("date", "sales", "Lo80", "Hi80", "Lo90", "Hi90", "d
 draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PROD)
 ```
 
+```{r PLAT_FIX_expl, echo = FALSE, results = 'asis', eval = PLAT & FIX & !(ECON), message = FALSE, warning = FALSE}
+cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
+```
+
 ```{r PLAT_tabletitle, echo = FALSE, results = 'asis', eval = PLAT & !(ECON), message = FALSE, warning = FALSE}
 cat("
 ***
@@ -364,7 +403,6 @@ Ennusteet
 ```{r PLAT_generic_table, R.options = list(width = 100), echo = FALSE, eval = PLAT & !(ECON), message = FALSE, warning = FALSE}
 table_generic(comb_forecast, PROD)
 ```
-
 
 ```{r O+_tab_title, echo = F, results = 'asis', eval = OPLUS}
 cat("### O+")
@@ -410,6 +448,10 @@ colnames(comb_forecast) <- c("date", "sales", "Lo80", "Hi80", "Lo90", "Hi90", "d
 draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PROD)
 ```
 
+```{r O+_FIX_expl, echo = FALSE, results = 'asis', eval = OPLUS & FIX & !(ECON), message = FALSE, warning = FALSE}
+cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
+```
+
 ```{r O+_tabletitle, echo = FALSE, results = 'asis', eval = OPLUS & !(ECON), message = FALSE, warning = FALSE}
 cat("
 ***
@@ -425,7 +467,6 @@ Ennusteet
 ```{r O+_generic_table, R.options = list(width = 100), echo = FALSE, eval = OPLUS & !(ECON), message = FALSE, warning = FALSE}
 table_generic(comb_forecast, PROD)
 ```
-
 
 ```{r O-_tab_title, echo = F, results = 'asis', eval = OMINUS}
 cat("### O-")
@@ -469,6 +510,10 @@ colnames(comb_forecast) <- c("date", "sales", "Lo80", "Hi80", "Lo90", "Hi90", "d
 
 ```{r O-_plot, echo=FALSE, fig.align="center", message = FALSE, warning = FALSE, out.width='80%', eval = OMINUS}
 draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PROD)
+```
+
+```{r O-_FIX_expl, echo = FALSE, results = 'asis', eval = OMINUS & FIX & !(ECON), message = FALSE, warning = FALSE}
+cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
 ```
 
 ```{r O-_tabletitle, echo = FALSE, results = 'asis', eval = OMINUS & !(ECON), message = FALSE, warning = FALSE}
@@ -532,6 +577,10 @@ colnames(comb_forecast) <- c("date", "sales", "Lo80", "Hi80", "Lo90", "Hi90", "d
 draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PROD)
 ```
 
+```{r A+_FIX_expl, echo = FALSE, results = 'asis', eval = APLUS & FIX & !(ECON), message = FALSE, warning = FALSE}
+cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
+```
+
 ```{r A+_tabletitle, echo = FALSE, results = 'asis', eval = APLUS & !(ECON), message = FALSE, warning = FALSE}
 cat("
 ***
@@ -591,6 +640,10 @@ colnames(comb_forecast) <- c("date", "sales", "Lo80", "Hi80", "Lo90", "Hi90", "d
 
 ```{r A-_plot, echo=FALSE, fig.align="center", message = FALSE, warning = FALSE, out.width='80%', eval = AMINUS}
 draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PROD)
+```
+
+```{r A-_FIX_expl, echo = FALSE, results = 'asis', eval = AMINUS & FIX & !(ECON), message = FALSE, warning = FALSE}
+cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
 ```
 
 ```{r A-_tabletitle, echo = FALSE, results = 'asis', eval = AMINUS & !(ECON), message = FALSE, warning = FALSE}
@@ -654,6 +707,10 @@ colnames(comb_forecast) <- c("date", "sales", "Lo80", "Hi80", "Lo90", "Hi90", "d
 draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PROD)
 ```
 
+```{r B+_FIX_expl, echo = FALSE, results = 'asis', eval = BPLUS & FIX & !(ECON), message = FALSE, warning = FALSE}
+cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
+```
+
 ```{r B+_tabletitle, echo = FALSE, results = 'asis', eval = BPLUS & !(ECON), message = FALSE, warning = FALSE}
 cat("
 ***
@@ -713,6 +770,10 @@ colnames(comb_forecast) <- c("date", "sales", "Lo80", "Hi80", "Lo90", "Hi90", "d
 
 ```{r B-_plot, echo=FALSE, fig.align="center", message = FALSE, warning = FALSE, out.width='80%', eval = BMINUS}
 draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PROD)
+```
+
+```{r B-_FIX_expl, echo = FALSE, results = 'asis', eval = BMINUS & FIX & !(ECON), message = FALSE, warning = FALSE}
+cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
 ```
 
 ```{r B-_tabletitle, echo = FALSE, results = 'asis', eval = BMINUS & !(ECON), message = FALSE, warning = FALSE}
@@ -776,6 +837,10 @@ colnames(comb_forecast) <- c("date", "sales", "Lo80", "Hi80", "Lo90", "Hi90", "d
 draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PROD)
 ```
 
+```{r AB+_FIX_expl, echo = FALSE, results = 'asis', eval = ABPLUS & FIX & !(ECON), message = FALSE, warning = FALSE}
+cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
+```
+
 ```{r AB+_tabletitle, echo = FALSE, results = 'asis', eval = ABPLUS & !(ECON), message = FALSE, warning = FALSE}
 cat("
 ***
@@ -837,6 +902,10 @@ colnames(comb_forecast) <- c("date", "sales", "Lo80", "Hi80", "Lo90", "Hi90", "d
 draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PROD)
 ```
 
+```{r AB-_FIX_expl, echo = FALSE, results = 'asis', eval = ABMINUS & FIX & !(ECON), message = FALSE, warning = FALSE}
+cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
+```
+
 ```{r AB-_tabletitle, echo = FALSE, results = 'asis', eval = ABMINUS & !(ECON), message = FALSE, warning = FALSE}
 cat("
 ***
@@ -866,13 +935,13 @@ div.just {text-align: justify;}
 <div class="just">
 Tämä on automaattisesti tuotettu myyntiennusteraportti punasolu- ja trombosyyttituotteita varten. Ennusteet rakennetaan VPUTKOOLS2-palvelimella sijaitsevan asetustiedoston asetusten mukaan (esim. ennustettavat tuotteet ja ennusteen pituus).
 
-Tuotesivua voi vaihtaa välilehtipainikkeista. Tuotesivulla ensimmäinen näkymä on viivakaavio, jonka otsikko kertoo ennustettavan tuotteen ja ennusteen aikaresoluution. Alaotsikko kertoo käyttäjälle, mikä on taustalla pyörivän ennustinjärjestelmän keskivirhe ennustushistorian ajalta. Kuvaajan yläosassa ilmoitetaan pienemmällä tekstillä, mikä menetelmä on valittu seuraavien ennusteiden tekoon ja mikä on ollut sen keskivirhe ennustushistorian ajalta. Ennustimen toimintaperiaatteista on kerrottu enemmän alla, mutta tässä riittää tietää, että ennustin valitsee jokaiselle uudelle ennusteelle uuden ennustinmenetelmän menetelmien edellisen N kuukauden ennustustarkkuuden perusteella. N määritetään astetustiedostossa arvolla TEST_LEN.
+Tuotesivua voi vaihtaa välilehtipainikkeista. Tuotesivulla ensimmäinen näkymä on viivakaavio, jonka otsikko kertoo ennustettavan tuotteen ja ennusteen aikaresoluution. Alaotsikko kertoo käyttäjälle, mikä on taustalla pyörivän ennustinjärjestelmän keskivirhe ennustushistorian ajalta. Kuvaajan yläosassa ilmoitetaan pienemmällä tekstillä, mikä menetelmä on valittu seuraavien ennusteiden tekoon ja mikä on ollut sen keskivirhe ennustushistorian ajalta. Ennustimen toimintaperiaatteista on kerrottu enemmän alla, mutta tässä riittää tietää, että ennustin valitsee jokaiselle uudelle ennusteelle uuden ennustinmenetelmän menetelmien edellisen N viikon/kuukauden/vuoden ennustustarkkuuden perusteella. N määritetään astetustiedostossa arvolla TEST_LEN.
 
-Kaavion pystyakselilla kulkevat myytyjen tuotteiden kappalemäärät ja vaaka-akselilla aika kuukausittain. Mustalla piirretty viiva näyttää **historiallisen toteuman**, eli ennusteissa käytetyn datan. Jos asetustiedoston "FIX"-parametri on kytketty päälle, kuvaajaan piirtyy "COVID"-korjattu rukattu toteuma, jota ennustinmenetelmät käyttävät myös ennusteissaan. Punainen viiva näyttää, miten järjestelmän ennusteet kulkevat datan rinnalla. Näiden päälle on piirrety myös suoria trendiviivoja, jotka havainnollistavat datan viimeisen viiden vuoden trendin (keltainen) ja mallin tuottaman ennusteen trendin (harmaa). Ennusteille annetaan myös luottamusvälit, jotka on havainnollistettu tummalla ja vaalealla sinisellä. Tummansininen alue kertoo, missä todellinen myynti voi sen aiemman heilahtelun huomioon ottaen tulevaisuudessa sijaita **80 \%** todennäköisyydellä. Vaaleampi sininen rajaa vastaavasti **95 \%** luottamusvälin.
+Kaavion pystyakselilla kulkevat myytyjen tuotteiden kappalemäärät ja vaaka-akselilla aika viikoittain/kuukausittain/vuosittain. Mustalla piirretty viiva näyttää **historiallisen toteuman**, eli ennusteissa käytetyn datan. Jos asetustiedoston "FIX"-parametri on kytketty päälle, kuvaajaan piirtyy "COVID"-korjattu rukattu toteuma, jota ennustinmenetelmät käyttävät myös ennusteissaan. Punainen viiva näyttää, miten järjestelmän ennusteet kulkevat datan rinnalla. Näiden päälle on piirrety myös suoria trendiviivoja, jotka havainnollistavat datan viimeisen viiden vuoden trendin (keltainen) ja mallin tuottaman ennusteen trendin (harmaa). Ennusteille annetaan myös luottamusvälit, jotka on havainnollistettu tummalla ja vaalealla sinisellä. Tummansininen alue kertoo, missä todellinen myynti voi sen aiemman heilahtelun huomioon ottaen tulevaisuudessa sijaita **80 \%** todennäköisyydellä. Vaaleampi sininen rajaa vastaavasti **95 \%** luottamusvälin.
 
 Jos ennustinta käytetään pitemmän aikavälin talousarvioennusteisiin (asetusttiedostossa parametri ECON), ennustetaan kuukausitasolla 5 vuotta eteenpäin. Mallit koulutetaan 2 vuoden kuukausidatalla ja ne valitaan 2 vuoden kuukausisumman ennusteiden tarkkuuden perusteella.
 
-Kaavion alapuolella esitetään taulukkomuodossa toteuma ja ennusteet kuluvalle vuodelle. ECON-tasolla tuotetaan myös kaksi muuta taulukkoa: 5 vuoden vuosiennusteet sekä trendit myynneille ja palautuksille erikseen. Taulukoiden tiedot voidaan kopioida suoraan leikepöydälle painikkeesta "Copy", tallentaa Excel-tiedostoksi ("Excel"), CSV-tiedostoksi ("CSV") ja PDF-tiedostoksi ("PDF").
+Kaavion alapuolella esitetään taulukkomuodossa toteuma ja ennusteet kuluvalle vuodelle. ECON-tasolla tuotetaan myös kolme muuta taulukkoa: viime vuoden toteuma, ennusteet ja ennusteiden virheet, sekä 5 vuoden vuosiennusteet ja trendit myynneille ja palautuksille erikseen. Taulukoiden tiedot voidaan kopioida suoraan leikepöydälle painikkeesta "Copy", tallentaa Excel-tiedostoksi ("Excel"), CSV-tiedostoksi ("CSV") ja PDF-tiedostoksi ("PDF").
 
 Raportin oikeassa yläkulmassa olevasta ikonista pääsee ennustimen ja raportin julkisessa Github-säilössä säilytettävään koodikantaan. Tällä julkisella koodilla voi tuottaa vastaavanlaisen raportin. Sieltä ilmenee myös raportin rakennuslogiikka, ennustuksiin käytetyt funktiot ja datan käsittely kaikista uteliaimmille.
 
@@ -890,6 +959,8 @@ Tämän tarkoitus on poistaa aikasarjasta vaihtelua, joka johtuu kuukausien reaa
 $$\text{ennuste} = \frac{\text{muunnosennuste}}{\text{kohdekuukauden arkipäivien määrä}}$$
 Arkipäivien määrän tätä operaatiota varten tarjoaa ennustamiseen tarvittavan `forecast`-paketin funktio `bizdays()`, joka laskee arvion kuukauden arkipäivien määrästä Zürichin talousalueen pörssipäivien mukaan. Tämä ei ole täsmällinen vastine Suomen arkipäiviin (pyhäpäivät voivat poiketa hieman), mutta käytettävissä olevista vaihtoehdoista paras.
 
+Viikkoennusteita varten rakennetaan viikkosarja, mutta tällaista säätöä ei tehdä, sillä viikot ovat kaikki 7 päivää.
+
 Rakentaessaan ennusteita ennustin tallentaa ja päivittää palvelimella myös kokonaista valintaennustushistoriaa kohdetuotteittain sekä jokaisen käytettävissä olevan ennustusmenetelmän omaa historiaa kohdetuotteittain. Ennusteita tehdään siis sekä myyntiaikasarjasta että palautusaikasarjasta. Toimitusaikasarja on myyntiaikasarjan ja palautusaikasarjan summa, ja taulukoitava toimitusennuste on siis myynnin ja palautusten ennusteiden summa. Teoriassa myynnin sijasta voisi ennustaa toimituksia, jolloin myyntiennuste olisi toimitus miinus palautus, mutta koska nyt halutaan _ennustaa myyntiä_, ollaan aikasarjat valittu näin. 
 
 
@@ -897,7 +968,7 @@ Rakentaessaan ennusteita ennustin tallentaa ja päivittää palvelimella myös k
 cat("<h1 style='font-size:200%;'>Toimintaperiaate</h1>")
 ```
 
-Ennustinta on rakennettu kahdella johtavalla periaatteella: ennustusvalintoihin tarvitaan ihmistä mahdollisimman vähän (autonomia) ja ennustimen on kyettävä silti reagoimaan muutoksiin (adaptiivisuus). Tyypillisesti ennustettaessa valitaan yksi tietty, parhaimmalla tarkkuudella toimiva menetelmä kohdeaikasarjaa varten ja "annetaan sen olla", kunnes joku huomaa, että valittu menetelmä tai malli ei enää suoriudu hyvin ja se täytyy arvioida uudelleen. Tämä järjestelmä ottaa enimmäkseen ohjakset itselleen arvioimalla jatkuvasti **14** eri menetelmän ennustustarkkuuksia ja ennustamalla vain sillä menetelmällä, joka on suoriutunut parhaiten edellisen **N** kuukauden aikana. Tällaista järjestelmää käytettäessä käyttäjän tarvitsee harkita vain sitä, kuinka ketterä ennustin halutaan (kuinka monen kuukauden ajalta menetelmien suoriutumista tarkastellaan: mitä pidempi testijakso, sitä hitaammin ennustin osaa vaihtaa menetelmään ja reagoida muutoksiin), minkälaisella mittarilla tarkkuutta mitataan (raaka virheprosentti vai kenties virhe, joka rankaisee enemmän tarpeen aliarvioimisesta?) ja mitä menetelmiä ennustimella on käytössään. Ennustimen ECON-versiossa on valittu 12 kuukauden testijakso, jotta valittaisiin menetelmiä, jotka ovat säännönmukaisemmin lähellä oikeaa, mutta jotta voidaan reagoida pitkän aikavälin muutoksiin verentarpeessa. Menetelmävalikoima on rakennettu siten, että katetaan tarpeeksi laaja "ratkaisupinta-ala", mutta ei tehdä ennustimen ajamisesta kivuliaan raskasta. Ennustin valitsee menetelmän raa'alla virheprosentilla.
+Ennustinta on rakennettu kahdella johtavalla periaatteella: ennustusvalintoihin tarvitaan ihmistä mahdollisimman vähän (autonomia) ja ennustimen on kyettävä silti reagoimaan muutoksiin (adaptiivisuus). Tyypillisesti ennustettaessa valitaan yksi tietty, parhaimmalla tarkkuudella toimiva menetelmä kohdeaikasarjaa varten ja "annetaan sen olla", kunnes joku huomaa, että valittu menetelmä tai malli ei enää suoriudu hyvin ja se täytyy arvioida uudelleen. Tämä järjestelmä ottaa enimmäkseen ohjakset itselleen arvioimalla jatkuvasti **14** eri menetelmän ennustustarkkuuksia ja ennustamalla vain sillä menetelmällä, joka on suoriutunut parhaiten edellisen **N** viikon/kuukauden/vuoden aikana. Tällaista järjestelmää käytettäessä käyttäjän tarvitsee harkita vain sitä, kuinka ketterä ennustin halutaan (kuinka monen kuukauden ajalta menetelmien suoriutumista tarkastellaan: mitä pidempi testijakso, sitä hitaammin ennustin osaa vaihtaa menetelmään ja reagoida muutoksiin), minkälaisella mittarilla tarkkuutta mitataan (raaka virheprosentti vai kenties virhe, joka rankaisee enemmän tarpeen aliarvioimisesta?) ja mitä menetelmiä ennustimella on käytössään. Ennustimen ECON-versiossa on valittu 12 kuukauden testijakso, jotta valittaisiin menetelmiä, jotka ovat säännönmukaisemmin lähellä oikeaa, mutta jotta voidaan reagoida pitkän aikavälin muutoksiin verentarpeessa. Menetelmävalikoima on rakennettu siten, että katetaan tarpeeksi laaja "ratkaisupinta-ala", mutta ei tehdä ennustimen ajamisesta kivuliaan raskasta. Ennustin valitsee menetelmän raa'alla virheprosentilla.
 
 
 ```{r, echo = F, results = 'asis'}

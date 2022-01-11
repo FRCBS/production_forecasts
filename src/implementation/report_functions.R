@@ -644,7 +644,7 @@ find_trend <- function(data, window_size = 24, out = "vec", extend = 0){
     trendline <- slopevec + pivot
 
     return(data.frame(date = seq.Date(from = clean[1, 1], length.out = (window_size + extend), by = param), trend = round(trendline)))
-    clean[, 1]
+    #clean[, 1]
   }
   if (out == "slope") {
     return(slope)
@@ -826,17 +826,19 @@ simulate_selection_history <- function(data, S_R = "S", PROD, RES, ECON, TEST_LE
 
 }
 
-generate_method_history <- function(data, S_R, PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT, ECON_ALT = FALSE, CUSTOM_FILENAME = "method_histories.csv"){
+generate_method_history <- function(data, S_R, PROD, RES, ECON, TRAIN_LEN, HORIZON, OUTPUT){
 
   # ---
   # arguments to variables ----
   # ---
   if (ECON) {
     if (S_R == "S") {
-      suffix <- paste0(PROD, "_sales_ECON_method_forecasts.csv")
+      rsuffix <- paste0(PROD, "_sales_ECON_method_forecasts.csv")
+      suffix <- paste0(PROD, "_sales_ECON_method_point_forecasts.csv")
       target <- data[, c(1, 2)]
     } else {
-        suffix <- paste0(PROD, "_returns_ECON_method_forecasts.csv")
+        rsuffix <- paste0(PROD, "_returns_ECON_method_forecasts.csv")
+        suffix <- paste0(PROD, "_returns_ECON_method_point_forecasts.csv")
         target <- data[, c(1, 4)]
       }
     HORIZON <- as.integer(24) # this is different than normal ECON functionality (where HORIZON=60), because our method selection benchmark is "sum of next 24 months"
@@ -899,60 +901,83 @@ generate_method_history <- function(data, S_R, PROD, RES, ECON, TRAIN_LEN, HORIZ
   # generate forecasts ----
   # ---
   methods <- c("snaive", "ma5", "ma7", "ma9", "ma12", "ets", "stl", "stlf", "tbats", "arimax", "dynreg", "nn")
+  method_rfs <- list()
   method_fs <- list()
   for (i_m in 1:length(methods)) { # iterate over all methods
+    rforecasts <- c()
     forecasts <- c()
     for (i in 1:fdepth) { # and all available data
-      window <- i:(train_len + i - 1)
-      cdata <- data[window, ]
-      fcast <- get_forecast(cdata, S_R, method = methods[i_m], hilo = F, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON)
-      if (ECON) { # ECON needs 24mo rolling sums (fcasts)
-        forecasts[i] <- sum(fcast[, 2])
-      } else { # others are just single-point forecasts
-          forecasts[i] <- fcast[1, 2]
-        }
+        window <- i:(train_len + i - 1)
+        cdata <- data[window, ]
+        fcast <- get_forecast(cdata, S_R, method = methods[i_m], hilo = F, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON)
+
+        rforecasts[i] <- sum(fcast[, 2])
+        forecasts[i] <- fcast[1, 2]
     }
+    method_rfs[[i_m]] <- rforecasts
     method_fs[[i_m]] <- forecasts
   }
 
-  master_fs <- t(do.call(rbind, method_fs))
-  master <- data.frame(date = forecast_dates, master_fs); colnames(master) <- c("date", methods)
-  avg <- round(rowMeans(master_fs)) # create avg
+  if (ECON) { # ECON needs rolling sums in addition to point forecasts
+    master_rfs <- t(do.call(rbind, method_rfs))
+    rmaster <- data.frame(date = forecast_dates, master_rfs); colnames(rmaster) <- c("date", methods)
+    ravg <- round(rowMeans(master_rfs)) # create avg for rolling
 
-  # create wavg
-  if (ECON) { # ECON needs 24mo rolling sums (data)
+    master_fs <- t(do.call(rbind, method_fs))
+    master <- data.frame(date = forecast_dates, master_fs); colnames(master) <- c("date", methods)
+    avg <- round(rowMeans(master_fs)) # create avg
+
+    # create wavg for rolling
     rollsums <- c()
     dates <- seq.Date(from = target[24, 1], length.out = (nrow(target) - 24), by = "month")
-    for (i in 1:(nrow(target) - 24)){
+    for (i in 1:(nrow(target) - 24)) {
       rollsums[i] <- sum(target[i:(i + 23), 2])
     }
-    target <- data.frame(date = dates, value = rollsums)
-  }
+    rtarget <- data.frame(date = dates, value = rollsums)
 
-  acc_history <- get_errors(target, master)
-  wavg_obj <- wavg_selection(acc_history[, -1], alpha = 0.5, single = FALSE) # this gets us everything we need
-  wavg_v <- c()
-  fs <- master[, -1]
-  for (i in 1:(nrow(fs) - 1)) {
-    wavg <- sum(wavg_obj$coef * fs[(i + 1), wavg_obj$order[i, ]])
-    wavg_v[i] <- wavg
-  }
-
-  savethis <- cbind(master[-1, ], avg = avg[-1], wavg = round(wavg_v)) # prepare for saving
-
-  if (!ECON & ECON_ALT) { # if these TRUE, we are on level 1 of recursion, and we save with custom filename
-    write.table(savethis, file = paste0(OUTPUT, CUSTOM_FILENAME), sep = ",", row.names = F) # save
-  } else {
-      write.table(savethis, file = paste0(OUTPUT, suffix), sep = ",", row.names = F) # save
+    racc_history <- get_errors(rtarget, rmaster)
+    rwavg_obj <- wavg_selection(racc_history[, -1], alpha = 0.5, single = FALSE) # this gets us everything we need
+    rwavg_v <- c()
+    rfs <- rmaster[, -1]
+    for (i in 1:(nrow(rfs) - 1)) {
+      rwavg <- sum(rwavg_obj$coef * rfs[(i + 1), rwavg_obj$order[i, ]])
+      rwavg_v[i] <- rwavg
+    }
+    # create wavg for point fcasts
+    acc_history <- get_errors(target, master)
+    wavg_obj <- wavg_selection(acc_history[, -1], alpha = 0.5, single = FALSE) # this gets us everything we need
+    wavg_v <- c()
+    fs <- master[, -1]
+    for (i in 1:(nrow(rfs) - 1)) {
+      wavg <- sum(wavg_obj$coef * fs[(i + 1), wavg_obj$order[i, ]])
+      wavg_v[i] <- wavg
     }
 
-  if (ECON & ECON_ALT) { # if we want single month ECON forecasts also
-    if (S_R == "S") {CUSTOM_FILENAME <- paste0(PROD, "_sales_ECON_method_point_forecasts.csv")} else {CUSTOM_FILENAME <- paste0(PROD, "_returns_ECON_method_point_forecasts.csv")}
-    generate_method_history(data, S_R, PROD, RES, ECON = FALSE, TRAIN_LEN,
-                            HORIZON = as.integer(1), OUTPUT, ECON_ALT = TRUE, CUSTOM_FILENAME) # don't create infinite recursion!
-  }
+    rsavethis <- cbind(rmaster[-1, ], avg = ravg[-1], wavg = round(rwavg_v)) # prepare for saving (rolling)
+    savethis <- cbind(master[-1, ], avg = avg[-1], wavg = round(wavg_v)) # prepare for saving
 
+    write.table(rsavethis, file = paste0(OUTPUT, rsuffix), sep = ",", row.names = F) # save
+    write.table(savethis, file = paste0(OUTPUT, suffix), sep = ",", row.names = F) # save
+  } else {
+      # we use those parts of the code that don't do rolling
 
+      master_fs <- t(do.call(rbind, method_fs))
+      master <- data.frame(date = forecast_dates, master_fs); colnames(master) <- c("date", methods)
+      avg <- round(rowMeans(master_fs)) # create avg
+
+      # create wavg for point fcasts
+      acc_history <- get_errors(target, master)
+      wavg_obj <- wavg_selection(acc_history[, -1], alpha = 0.5, single = FALSE) # this gets us everything we need
+      wavg_v <- c()
+      fs <- master[, -1]
+      for (i in 1:(nrow(rfs) - 1)) {
+        wavg <- sum(wavg_obj$coef * fs[(i + 1), wavg_obj$order[i, ]])
+        wavg_v[i] <- wavg
+
+      savethis <- cbind(master[-1, ], avg = avg[-1], wavg = round(wavg_v)) # prepare for saving
+      write.table(savethis, file = paste0(OUTPUT, suffix), sep = ",", row.names = F) # save
+      }
+    }
 }
 
 select_method <- function(data, PROD, S_R = "S", OUTPUT, ECON, TEST_LEN) {
@@ -1459,6 +1484,7 @@ draw_forecast <- function(forecast, data, ECON, OUTPUT, selected_method, RES, PR
          y = "Tuotetta",
          color = "Väri") +
     scale_x_date(date_labels = "%m/%Y") +
+    #coord_cartesian(ylim = c((mean(series_v[, 2] * 0.5)), (mean(series_v[, 2]) * 1.5))) +
     theme(text = element_text(size = 20),
       panel.background = element_rect(fill = "transparent"), # bg of the panel
       plot.background = element_rect(fill = "transparent", color = NA), # bg of the plot
@@ -1469,30 +1495,86 @@ draw_forecast <- function(forecast, data, ECON, OUTPUT, selected_method, RES, PR
     )
 }
 
+table_previous_year <- function(data, PROD) {
+  # This table is currently ECON specific, so we hardcode everything
+
+  fhistory_path <- paste0(OUTPUT, PROD, "_sales_ECON_point_forecasts.csv")
+  fhistory <- read.csv(fhistory_path, sep = ",")
+
+  if (PROD == "RBC") {prefix <- "Punasolut"}
+  if (PROD == "PLAT") {prefix <- "Trombosyytit"}
+
+  last_year_in_data <- year(data[nrow(data), 1])
+  last_month_in_data <- month(data[nrow(data), 1])
+  if (last_month_in_data == 12) {previous_year <- last_year_in_data} else {previous_year <- last_year_in_data - 1}
+
+  data_part <- data[, c(1, 2)] %>% filter(year(date) == previous_year) %>% mutate(date = paste0(month(date), "/", year(date)))
+  fcast_part <- fhistory[, c(1, 3)] %>% filter(year(date) == previous_year)
+  raw_diff <- fcast_part[, 2] - data_part[, 2]
+  pdiff <- 100 * (fcast_part[, 2] - data_part[, 2]) / data_part[, 2]
+
+  datasum <- sum(data_part[, 2])
+  fcastsum <- sum(fcast_part[, 2])
+  rawdiffsum <- sum(raw_diff)
+  pdiffavg <- round(mean(abs(pdiff)), 2)
+
+  m <- t(cbind(data_part[2], fcast_part[2], raw_diff, round(pdiff, 2))); rownames(m) <- c("Totetuma", "Ennuste", "Abs. virhe", "Virhe%")
+  table <- cbind(m, c(datasum, fcastsum, rawdiffsum, pdiffavg)); colnames(table) <- c(data_part[, 1], "Yhteensä/k.a.")
+
+  datatable(table, rownames = TRUE, filter = "none", extensions = 'Buttons', options = list(pageLength = 5,
+                                                                                                      scrollX = T,
+                                                                                                      dom = 'tB',
+                                                                                                      buttons = list("copy",
+                                                                                                                     list(extend = "excel",
+                                                                                                                          filename = paste0(prefix, "_TE_", last_year_in_data),
+                                                                                                                          title = paste0(prefix, " | Toteuma ja ennuste | ", last_year_in_data)),
+                                                                                                                     list(extend = "csv",
+                                                                                                                          filename = paste0(prefix, "_TE_", last_year_in_data)),
+                                                                                                                     list(extend = "pdf",
+                                                                                                                          filename = paste0(prefix, "_TE_", last_year_in_data),
+                                                                                                                          title = paste0(prefix, " | Toteuma ja ennuste | ", last_year_in_data),
+                                                                                                                          pageSize = "LEGAL",
+                                                                                                                          orientation = "landscape")),
+                                                                                                      fixedColumns = list(leftColumns = 1)))
+}
+
+
 table_current_year <- function(data, comb_forecast, PROD) {
 
   if (PROD == "RBC") {prefix <- "Punasolut"}
   if (PROD == "PLAT") {prefix <- "Trombosyytit"}
-  if (PROD %in% c("O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-")) {prefix <- PROD}
 
   last_year_in_data <- year(data[nrow(data), 1])
-  data_part <- data %>% filter(year(date) == last_year_in_data) %>% mutate(date = paste0("Data\n", month(date), "/", year(date)))
-  rotated_data <- data_part %>%
-    gather(sales, deliveries, -date) %>%
-    spread(date, deliveries) %>%
-    select(data_part$date); rownames(rotated_data) <- c("Toimitukset", "Palautukset", "Myynti")
-  fcast_part <- comb_forecast[, c(1, 2, 7, 8)] %>% filter(year(date) == last_year_in_data) %>% mutate(date = paste0("Ennuste\n", month(date), "/", year(date)))
-  if (dim(fcast_part)[1] != 0) {
-    colnames(fcast_part) <- c("date", "sales", "deliveries", "returns")
-    rotated_fcast <- fcast_part %>%
+  last_month_in_data <- month(data[nrow(data), 1])
+  if (last_month_in_data != 12) {
+    data_part <- data %>% filter(year(date) == last_year_in_data) %>% mutate(date = paste0("Data\n", month(date), "/", year(date)))
+    rotated_data <- data_part %>%
       gather(sales, deliveries, -date) %>%
       spread(date, deliveries) %>%
-      select(fcast_part$date); rownames(rotated_fcast) <- c("Toimitukset", "Palautukset", "Myynti")
-    this_year_df <- cbind(rotated_data, rotated_fcast)
-    sums <- c(sum(this_year_df[1, ]), sum(this_year_df[2, ]), sum(this_year_df[3, ]))
-    this_year_table <- cbind(this_year_df, Yhteensä = sums)
+      select(data_part$date); rownames(rotated_data) <- c("Toimitukset", "Palautukset", "Myynti")
+    fcast_part <- comb_forecast[, c(1, 2, 7, 8)] %>% filter(year(date) == last_year_in_data) %>% mutate(date = paste0("Ennuste\n", month(date), "/", year(date)))
+    if (dim(fcast_part)[1] != 0) {
+      colnames(fcast_part) <- c("date", "sales", "deliveries", "returns")
+      rotated_fcast <- fcast_part %>%
+        gather(sales, deliveries, -date) %>%
+        spread(date, deliveries) %>%
+        select(fcast_part$date); rownames(rotated_fcast) <- c("Toimitukset", "Palautukset", "Myynti")
+      this_year_df <- cbind(rotated_data, rotated_fcast)
+      sums <- c(sum(this_year_df[1, ]), sum(this_year_df[2, ]), sum(this_year_df[3, ]))
+      this_year_table <- cbind(this_year_df, Yhteensä = sums)
   } else {
       this_year_df <- rotated_data
+      sums <- c(sum(this_year_df[1, ]), sum(this_year_df[2, ]), sum(this_year_df[3, ]))
+      this_year_table <- cbind(this_year_df, Yhteensä = sums)
+    }
+  } else {
+      fcast_part <- comb_forecast[, c(1, 2, 7, 8)] %>% filter(year(date) == (last_year_in_data + 1)) %>% mutate(date = paste0("Ennuste\n", month(date), "/", year(date)))
+      colnames(fcast_part) <- c("date", "sales", "deliveries", "returns")
+      rotated_fcast <- fcast_part %>%
+        gather(sales, deliveries, -date) %>%
+        spread(date, deliveries) %>%
+        select(fcast_part$date); rownames(rotated_fcast) <- c("Toimitukset", "Palautukset", "Myynti")
+      this_year_df <- rotated_fcast
       sums <- c(sum(this_year_df[1, ]), sum(this_year_df[2, ]), sum(this_year_df[3, ]))
       this_year_table <- cbind(this_year_df, Yhteensä = sums)
     }
@@ -1519,7 +1601,6 @@ table_yearly <- function(data, forecast, PROD, S_R = "S"){
 
   if (PROD == "RBC") {prefix <- "Punasolut"}
   if (PROD == "PLAT") {prefix <- "Trombosyytit"}
-  if (PROD %in% c("O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-")) {prefix <- PROD}
 
   if (S_R == "S") {
     infix <- "myynti"
@@ -1534,16 +1615,17 @@ table_yearly <- function(data, forecast, PROD, S_R = "S"){
 
   dataslope <- find_trend(data, window_size = 60, out = "slope") * 30
   dtrend <- data.frame(date = forecast$date, value = round(cumsum(rep(dataslope, 72)) + data[nrow(data), 2]))
-  ftrend  <- find_trend(forecast, window_size = nrow(forecast), out = "vec")
+
+  # dtrend can go to negatives if the downward trend is sharp (likely with platelets)
+  # fix this
+  dtrend[which(dtrend[, 2] < 0), 2] <- 0
 
   colnames(forecast) <- c("date", "value")
-  colnames(ftrend) <- c("date", "value")
 
   agg_f <- aggregate(value ~ year(date), data = forecast, FUN = sum)
   agg_dt <- aggregate(value ~ year(date), data = dtrend, FUN = sum)
-  agg_ft <- aggregate(value ~ year(date), data = ftrend, FUN = sum)
-  agg_df <- data.frame(year = agg_f[-1, 1], dtrend = agg_dt[-1, 2], fcast = agg_f[-1, 2], ftrend = agg_ft[-1, 2])
-  tabled <- t(agg_df[, 2:4]); colnames(tabled) <- agg_df[, 1]; rownames(tabled) <- c("Datan trendi (5v)", "Ennuste", "Ennusteen trendi")
+  agg_df <- data.frame(year = agg_f[-1, 1], dtrend = agg_dt[-1, 2], fcast = agg_f[-1, 2])
+  tabled <- t(agg_df[, 2:3]); colnames(tabled) <- agg_df[, 1]; rownames(tabled) <- c("Datan trendi (5v)", "Ennuste")
 
   if (agg_f[nrow(agg_f), 1] > (year(data[nrow(data), 1]) + 5)) {tabled <- tabled[, -dim(tabled)[2]]} # if we go over 5 years, cut the last column
 
