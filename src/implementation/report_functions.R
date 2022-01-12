@@ -973,10 +973,9 @@ generate_method_history <- function(data, S_R, PROD, RES, ECON, TRAIN_LEN, HORIZ
       for (i in 1:(nrow(rfs) - 1)) {
         wavg <- sum(wavg_obj$coef * fs[(i + 1), wavg_obj$order[i, ]])
         wavg_v[i] <- wavg
-
+      }
       savethis <- cbind(master[-1, ], avg = avg[-1], wavg = round(wavg_v)) # prepare for saving
       write.table(savethis, file = paste0(OUTPUT, suffix), sep = ",", row.names = F) # save
-      }
     }
 }
 
@@ -1627,7 +1626,10 @@ table_yearly <- function(data, forecast, PROD, S_R = "S"){
   agg_df <- data.frame(year = agg_f[-1, 1], dtrend = agg_dt[-1, 2], fcast = agg_f[-1, 2])
   tabled <- t(agg_df[, 2:3]); colnames(tabled) <- agg_df[, 1]; rownames(tabled) <- c("Datan trendi (5v)", "Ennuste")
 
-  if (agg_f[nrow(agg_f), 1] > (year(data[nrow(data), 1]) + 5)) {tabled <- tabled[, -dim(tabled)[2]]} # if we go over 5 years, cut the last column
+  if (dim(tabled)[2] > 5) {tabled <- tabled[, -dim(tabled)[2]]} # if we go over 5 years, cut the last column
+
+  # THIS WAS THE PREVIOUS WAY TO DO IT, BUT IT WAS BUGGY. PRESERVED FOR POSTERITY.
+  #if (agg_f[nrow(agg_f), 1] > (year(data[nrow(data), 1]) + 5)) {tabled <- tabled[, -dim(tabled)[2]]}
 
   datatable(tabled, rownames = TRUE, filter = "none", extensions = 'Buttons', options = list(pageLength = 5,
                                                                                              scrollX = T,

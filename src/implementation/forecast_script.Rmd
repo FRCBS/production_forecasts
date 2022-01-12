@@ -82,11 +82,11 @@ draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PR
 ```
 
 ```{r RBC_ECON_FIX_expl, echo = FALSE, results = 'asis', eval = RBC & FIX & ECON, message = FALSE, warning = FALSE}
-cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
+cat("<center style='font-size:8pt'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
 ```
 
 ```{r RBC_ECON_acc_expl, echo = FALSE, results = 'asis', eval = RBC & ECON, message = FALSE, warning = FALSE}
-cat("<center style='font-size:1vw'>Virheprosentti lasketaan 2 vuoden kuukausisumman ennustustarkkuudesta.</center>")
+cat("<center style='font-size:8pt'>Virheprosentti lasketaan 2 vuoden kuukausisumman ennustustarkkuudesta.</center>")
 ```
 
 ```{r RBC_ECON_LASTYEAR_title, echo = FALSE, results = 'asis', eval = RBC & ECON, message = FALSE, warning = FALSE}
@@ -201,11 +201,11 @@ draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PR
 ```
 
 ```{r PLAT_ECON_FIX_expl, echo = FALSE, results = 'asis', eval = PLAT & FIX & ECON, message = FALSE, warning = FALSE}
-cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
+cat("<center style='font-size:8pt'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
 ```
 
 ```{r PLAT_ECON_acc_expl, echo = FALSE, results = 'asis', eval = PLAT & ECON, message = FALSE, warning = FALSE}
-cat("<center style='font-size:1vw'>Virheprosentti lasketaan 2 vuoden kuukausisumman ennustustarkkuudesta.</center>")
+cat("<center style='font-size:8pt'>Virheprosentti lasketaan 2 vuoden kuukausisumman ennustustarkkuudesta.</center>")
 ```
 
 ```{r PLAT_ECON_LASTYEAR_title, echo = FALSE, results = 'asis', eval = PLAT & ECON, message = FALSE, warning = FALSE}
@@ -321,7 +321,7 @@ draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PR
 ```
 
 ```{r RBC_FIX_expl, echo = FALSE, results = 'asis', eval = RBC & FIX & !(ECON), message = FALSE, warning = FALSE}
-cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
+cat("<center style='font-size:8pt'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
 ```
 
 ```{r RBC_tabletitle, echo = FALSE, results = 'asis', eval = RBC & !(ECON), message = FALSE, warning = FALSE}
@@ -385,7 +385,7 @@ draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PR
 ```
 
 ```{r PLAT_FIX_expl, echo = FALSE, results = 'asis', eval = PLAT & FIX & !(ECON), message = FALSE, warning = FALSE}
-cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
+cat("<center style='font-size:8pt'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
 ```
 
 ```{r PLAT_tabletitle, echo = FALSE, results = 'asis', eval = PLAT & !(ECON), message = FALSE, warning = FALSE}
@@ -449,7 +449,7 @@ draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PR
 ```
 
 ```{r O+_FIX_expl, echo = FALSE, results = 'asis', eval = OPLUS & FIX & !(ECON), message = FALSE, warning = FALSE}
-cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
+cat("<center style='font-size:8pt'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
 ```
 
 ```{r O+_tabletitle, echo = FALSE, results = 'asis', eval = OPLUS & !(ECON), message = FALSE, warning = FALSE}
@@ -513,7 +513,7 @@ draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PR
 ```
 
 ```{r O-_FIX_expl, echo = FALSE, results = 'asis', eval = OMINUS & FIX & !(ECON), message = FALSE, warning = FALSE}
-cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
+cat("<center style='font-size:8pt'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
 ```
 
 ```{r O-_tabletitle, echo = FALSE, results = 'asis', eval = OMINUS & !(ECON), message = FALSE, warning = FALSE}
@@ -578,7 +578,7 @@ draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PR
 ```
 
 ```{r A+_FIX_expl, echo = FALSE, results = 'asis', eval = APLUS & FIX & !(ECON), message = FALSE, warning = FALSE}
-cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
+cat("<center style='font-size:8pt'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
 ```
 
 ```{r A+_tabletitle, echo = FALSE, results = 'asis', eval = APLUS & !(ECON), message = FALSE, warning = FALSE}
@@ -643,7 +643,7 @@ draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PR
 ```
 
 ```{r A-_FIX_expl, echo = FALSE, results = 'asis', eval = AMINUS & FIX & !(ECON), message = FALSE, warning = FALSE}
-cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
+cat("<center style='font-size:8pt'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
 ```
 
 ```{r A-_tabletitle, echo = FALSE, results = 'asis', eval = AMINUS & !(ECON), message = FALSE, warning = FALSE}
@@ -708,7 +708,7 @@ draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PR
 ```
 
 ```{r B+_FIX_expl, echo = FALSE, results = 'asis', eval = BPLUS & FIX & !(ECON), message = FALSE, warning = FALSE}
-cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
+cat("<center style='font-size:8pt'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
 ```
 
 ```{r B+_tabletitle, echo = FALSE, results = 'asis', eval = BPLUS & !(ECON), message = FALSE, warning = FALSE}
@@ -773,7 +773,7 @@ draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PR
 ```
 
 ```{r B-_FIX_expl, echo = FALSE, results = 'asis', eval = BMINUS & FIX & !(ECON), message = FALSE, warning = FALSE}
-cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
+cat("<center style='font-size:8pt'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
 ```
 
 ```{r B-_tabletitle, echo = FALSE, results = 'asis', eval = BMINUS & !(ECON), message = FALSE, warning = FALSE}
@@ -838,7 +838,7 @@ draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PR
 ```
 
 ```{r AB+_FIX_expl, echo = FALSE, results = 'asis', eval = ABPLUS & FIX & !(ECON), message = FALSE, warning = FALSE}
-cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
+cat("<center style='font-size:8pt'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
 ```
 
 ```{r AB+_tabletitle, echo = FALSE, results = 'asis', eval = ABPLUS & !(ECON), message = FALSE, warning = FALSE}
@@ -903,7 +903,7 @@ draw_forecast(sales_forecast, data, ECON, OUTPUT, sales_selected_method, RES, PR
 ```
 
 ```{r AB-_FIX_expl, echo = FALSE, results = 'asis', eval = ABMINUS & FIX & !(ECON), message = FALSE, warning = FALSE}
-cat("<center style='font-size:1vw'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
+cat("<center style='font-size:8pt'>Dataa on korvattu 2020 kevään osalta (maalis-kesä, 2019 kevään datalla) COVID-pandemian aiheuttamien poikkeusolojen ja joidenkin datansyöttövirheiden takia.</center>")
 ```
 
 ```{r AB-_tabletitle, echo = FALSE, results = 'asis', eval = ABMINUS & !(ECON), message = FALSE, warning = FALSE}
