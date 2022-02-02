@@ -33,12 +33,16 @@ read_DW <- function(INPUT, PROD) {
   file_list <- list()
   for (i in 1:length(filenames)) {
   filename <- filenames[i] # get filename
-  file_content <- fread(paste0(INPUT, filename), colClasses = c("Date", "numeric", "factor", "character", "character", "NULL")) # read file
+  file_content <- fread(paste0(INPUT, filename), colClasses = c("Date", "numeric", "factor", "character", "character", "character")) # read file
   file_list[[i]] <- file_content # add to list
   }
 
   complete_data <- as.data.frame(rbindlist(file_list, fill = TRUE)) # compile list into a data frame
   complete_data[, 1] <- as.Date(complete_data[, 1])
+
+  # Drop internal customers and customer columns (no longer needed)
+  complete_data <- complete_data[-which(as.numeric(complete_data$V6) < 1000), 1:5] # internal customer numbers are <1000
+
   # ---
   # data manipulation ----
   # ---
@@ -176,6 +180,10 @@ read_FACS <- function(INPUT, PROD) {
     # ---
     # data manipulation ----
     # ---
+
+    # Drop internal customers
+    complete_data <- complete_data[-which(as.numeric(complete_data$V25) < 1000), ] # there are lots of NA values, but we don't touch those here
+
 
     complete_re <- complete_data %>% # recode for easier handling and less code redundancy
       mutate(V20 = recode(V20, "O +" = "O+", "O -" = "O-", "A +" = "A+", "A -" = "A-", "B +" = "B+", "B -" = "B-"))
@@ -948,7 +956,7 @@ generate_method_history <- function(data, S_R, PROD, RES, ECON, TRAIN_LEN, HORIZ
     wavg_obj <- wavg_selection(acc_history[, -1], alpha = 0.5, single = FALSE) # this gets us everything we need
     wavg_v <- c()
     fs <- master[, -1]
-    for (i in 1:(nrow(rfs) - 1)) {
+    for (i in 1:(nrow(fs) - 1)) {
       wavg <- sum(wavg_obj$coef * fs[(i + 1), wavg_obj$order[i, ]])
       wavg_v[i] <- wavg
     }
@@ -970,7 +978,7 @@ generate_method_history <- function(data, S_R, PROD, RES, ECON, TRAIN_LEN, HORIZ
       wavg_obj <- wavg_selection(acc_history[, -1], alpha = 0.5, single = FALSE) # this gets us everything we need
       wavg_v <- c()
       fs <- master[, -1]
-      for (i in 1:(nrow(rfs) - 1)) {
+      for (i in 1:(nrow(fs) - 1)) {
         wavg <- sum(wavg_obj$coef * fs[(i + 1), wavg_obj$order[i, ]])
         wavg_v[i] <- wavg
       }
@@ -1483,7 +1491,6 @@ draw_forecast <- function(forecast, data, ECON, OUTPUT, selected_method, RES, PR
          y = "Tuotetta",
          color = "Väri") +
     scale_x_date(date_labels = "%m/%Y") +
-    #coord_cartesian(ylim = c((mean(series_v[, 2] * 0.5)), (mean(series_v[, 2]) * 1.5))) +
     theme(text = element_text(size = 20),
       panel.background = element_rect(fill = "transparent"), # bg of the panel
       plot.background = element_rect(fill = "transparent", color = NA), # bg of the plot
