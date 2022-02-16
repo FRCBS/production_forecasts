@@ -19,13 +19,6 @@ enddate <- forecasts$date[length(forecasts$date) - 1]
 real_cut <- subset(real, date >= startdate & date <= enddate)
 fcast_cut <- subset(forecasts, date >= startdate & date <= enddate)
 
-# Refactor method names for unity in Transfusion graphics
-# fcast_cut$method <- mapvalues(fcast_cut$method, c("ma12", "ma9", "ma7", "ma5", "snaive", "stl", "ets",
-#                                                   "arimax", "dynreg", "combined", "stlf", "tbats", "nn"),
-#                                                 c("12-MA", "9-MA", "7-MA", "5-MA", "SNAIVE", "STL", "ETS",
-#                                                   "ARIMAX", "DYNREG", "AVG", "STLF", "TBATS", "NN"))
-
-
 # Create dataframe for plotting
 plot_df <- data.frame(date = real_cut$date,
                       real = real_cut$pcs,

@@ -55,7 +55,7 @@ ggplot(plotdata, aes(x = date, y = pcs)) +
 
 dev.off()
 
-# Compare performances at peaks
+# Compare individual method performances at peaks
 forecasts <- read.csv(paste0(LOADPATH, "indv_method_forecasts_real.csv"))
 forecasts$date <- as.Date(forecasts$date)
 
@@ -67,7 +67,53 @@ APEs <- abs(forecasts[, -1] - real[, -1]) / real[, -1]; APEs <- cbind(date = rea
 atpeaks <- APEs %>%
     filter(date %in% pnv$date)
 
-names(atpeaks[-1])[apply(atpeaks[, -1], 1, which.min)]
+# Compare AutoN method performances at peaks
+# Load all
+f1 <- read.csv(paste0(LOADPATH, "val1_fcasts_real.csv"), colClasses = c("Date", "factor", "numeric", "numeric"))
+f3 <- read.csv(paste0(LOADPATH, "val3_fcasts_real.csv"), colClasses = c("Date", "factor", "numeric", "numeric"))
+f6 <- read.csv(paste0(LOADPATH, "val6_fcasts_real.csv"), colClasses = c("Date", "factor", "numeric", "numeric"))
+f12 <- read.csv(paste0(LOADPATH, "val12_fcasts_real.csv"), colClasses = c("Date", "factor", "numeric", "numeric"))
+f18 <- read.csv(paste0(LOADPATH, "val18_fcasts_real.csv"), colClasses = c("Date", "factor", "numeric", "numeric"))
+f24 <- read.csv(paste0(LOADPATH, "val24_fcasts_real.csv"), colClasses = c("Date", "factor", "numeric", "numeric"))
 
-# TODO: Apply to AutoN also
-# TODO: Compute means for everybody
+# Create W.AVG using apes
+alpha <- 0.5
+alphavec <- c()
+for (k in 1:15) {
+  alphavec[k] <- 0.5**k
+}
+w.avg <- c()
+for (i in 1:(dim(forecasts)[1] - 1)) {
+  w.avg[i] <- sum(alphavec * forecasts[, 2:16][(i + 1), order(APEs[i, 1:15])])
+}
+
+# Combine
+fN <- f1[, c(1, 3)] %>%
+    left_join(f3[, c(1, 3)], by = "date") %>%
+    left_join(f6[, c(1, 3)], by = "date") %>%
+    left_join(f12[, c(1, 3)], by = "date") %>%
+    left_join(f18[, c(1, 3)], by = "date") %>%
+    left_join(f24[, c(1, 3)], by = "date")
+colnames(fN) <- c("date", "f1", "f3", "f6", "f12", "f18", "f24")
+fN$wavg <- w.avg
+
+out <- ensure.window.parity(weekly, fN)
+real <- out$first
+forecasts <- out$second
+
+APEs <- abs(forecasts[, -1] - real[, -1]) / real[, -1]; APEs <- cbind(date = real$date, APEs)
+atpeaks_fN <- APEs %>%
+    filter(date %in% pnv$date)
+
+master <- atpeaks %>%
+    left_join(atpeaks_fN, by = "date")
+
+# Now get means and test for significance
+master_narm <- na.omit(master)
+means <- colMeans(master_narm[, -1])
+sig_mat <- as.data.frame(all_vs_all_ttest(master_narm[, -1]))
+sig_mat[upper.tri(sig_mat, diag = TRUE)] <- NA
+
+# Find significant
+sigs <- which(sig_mat <= 0.05, arr.ind = T)
+sdf <- data.frame(x = colnames(sig_mat[, sigs[, 2]]), y = row.names(sig_mat[sigs[, 1], ]))

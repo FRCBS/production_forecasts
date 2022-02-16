@@ -90,3 +90,20 @@ val_errors_auto <- function(auto, val.self, val.levels) {
     }
     return(c(rep(NA, nNA), res))
 }
+
+all_vs_all_ttest <- function(numeric_df) {
+    # From http://www.sthda.com/english/wiki/matrix-of-student-t-test
+    # Apparently this is one of the fastest ways??
+    mat <- as.matrix(numeric_df)
+    n <- ncol(mat)
+    p.mat <- matrix(NA, n, n)
+    diag(p.mat) <- 1
+    for (i in 1:(n - 1)) {
+        for (j in (i + 1):n) {
+            test <- t.test(mat[, i], mat[, j])
+            p.mat[i, j] <- p.mat[j, i] <- test$p.value
+        }
+    }
+    colnames(p.mat) <- rownames(p.mat) <- colnames(mat)
+    return(signif(p.mat, 4))
+}
