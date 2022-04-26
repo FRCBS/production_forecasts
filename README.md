@@ -1,5 +1,5 @@
 # production_forecasts
-This repository contains R scripts and R Markdown scripts used to generate results in the paper: "Robust autonomous method for blood demand forecasting" by Esa V. Turkulainen, Merel L. Wemelsfelder, Mart P. Janssen, and Mikko Arvas. Submitted for review: August 2021.
+This repository contains R scripts and R Markdown scripts used to generate results in the paper: ["Robust autonomous method for blood demand forecasting"]( https://doi.org/10.1111/trf.16870) by Esa V. Turkulainen, Merel L. Wemelsfelder, Mart P. Janssen, and Mikko Arvas. Transfusion 2022.
 
 ## Folders
 
