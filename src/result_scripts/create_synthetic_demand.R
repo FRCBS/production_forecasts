@@ -22,14 +22,15 @@
 ## ---------------------------
 
 # Set working directory and paths
-setwd("~/DIR/")
-LOADPATH <- paste0(getwd(), "/data/")
+setwd("~/prodfore_publ/")
+LOADPATH <- paste0(getwd(), "/data/daily_red.csv")
 SAVEPATH <- paste0(getwd(), "/results/")
 
 # Load helper functions and required packages
-source(paste0(getwd(), "src/helper_functions.R"))
+source(paste0(getwd(), "/src/helper_functions.R"))
 library(ggplot2)
 library(forecast)
+library(lubridate)
 
 # Load data (resolution: daily)
 daily <- read.csv(LOADPATH)
@@ -46,15 +47,20 @@ mon <- daily[(1 + wday_shift):nrow(daily), ]
 wdaynum <- as.POSIXlt(mon[nrow(mon), 1])$wday
 wday_shift <- ifelse(wdaynum == 7, 0, (wdaynum - 1))
 monsun <- mon[1:(nrow(mon) - wday_shift), ]
-
-# Impute near zeros with last week's corresponding value
-# KNOW YOUR DATA BEFORE IMPUTING/DROPPING
+#
+# # Impute near zeros with last week's corresponding value
+# # KNOW YOUR DATA BEFORE IMPUTING/DROPPING
 for (i in 1:nrow(monsun)) {
     ifelse(monsun$pcs[i] == 0, monsun$pcs[i] <- monsun$pcs[i - 7], monsun$pcs[i] <- monsun$pcs[i])
 }
 
 # Aggregate FROM daily TO weekly
-weekly <- daily_to_weekly(series)
+weekly <- daily_to_weekly(monsun)
+
+# If value under 2000, add 1000 (anomaly fix)
+for (i in 1:nrow(weekly)) {
+    ifelse(weekly$pcs[i] < 2000, weekly$pcs[i] <- (weekly$pcs[i] + 1000), weekly$pcs[i] <- weekly$pcs[i])
+}
 
 # Now save weekly demand into a file for further analyses
 write.csv(weekly, paste0(SAVEPATH, "weekly_real.csv"), row.names = FALSE)

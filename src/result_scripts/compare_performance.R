@@ -24,25 +24,26 @@
 ## ---------------------------
 
 # Set working directory and paths
-setwd("~/DIR/")
-LOADPATH <- paste0(getwd(), "/data/")
+setwd("~/prodfore_publ/")
+LOADPATH <- paste0(getwd(), "/results/")
 SAVEPATH <- paste0(getwd(), "/results/")
 
 # Load helper functions and required packages
-source(paste0(getwd(), "src/helper_functions.R"))
+source(paste0(getwd(), "/src/helper_functions.R"))
 library(ggplot2)
 library(forecast)
 library(lubridate)
+library(nnfor)
 
 # Load data
 weekly <- read.csv(paste0(LOADPATH, "weekly_real.csv"), colClasses = c("Date", "numeric"))
-synweekly <- read.csv(paste0(LOADPATH, "weekly_synthetic.csv"), colClasses = c("Date", "numeric"))
+weekly.sim <- read.csv(paste0(LOADPATH, "weekly_synthetic.csv"), colClasses = c("Date", "numeric"))
 
 # Backtest forecast histories first on synthetic data
-RUNSYNAGAIN = FALSE # TRUE -> Generate results; FALSE -> Load results
+RUNSYNAGAIN = TRUE # TRUE -> Generate results; FALSE -> Load results
 if (RUNSYNAGAIN) {
     # Set (rolling) training window size. 105 weeks is the minimum for these methods.
-    rw <- 105
+    rw <- 155
 
     # Prepare any methods for saving
     snaive <- c()
@@ -57,111 +58,121 @@ if (RUNSYNAGAIN) {
     arimax <- c()
     dynreg <- c()
     nn <- c()
+    mlp <- c()
+    elm <- c()
 
     for (i in 0:(nrow(weekly.sim) - rw - 1)) {
-    train_start <- weekly.sim$date[1 + i]
-    train <- subset(weekly.sim$pcs, weekly.sim$date >= train_start & weekly.sim$date <= train_start + weeks(rw - 1))
+      train_start <- weekly.sim$date[1 + i]
+      train <- subset(weekly.sim$pcs, weekly.sim$date >= train_start & weekly.sim$date <= train_start + weeks(rw - 1))
 
-    test_date <- weekly.sim$date[rw + 1 + i]
+      test_date <- weekly.sim$date[rw + 1 + i]
 
-    # Make train set into a ts object for forecast functions
-    train_ts <- ts(train, start = c(year(train_start), month(train_start), day(train_start)), frequency = 52)
+      # Make train set into a ts object for forecast functions
+      train_ts <- ts(train, start = c(year(train_start), month(train_start)), frequency = 52)
 
-    # Create xregs for ARIMAX
-    nrow <- length(train)
-    onehotyear <- matrix(c(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                           0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                           0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-                           0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
-                           0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
-                           0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
-                           0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
-                           0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0,
-                           0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0,
-                           0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
-                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-                         ncol = 11,
-                         byrow = TRUE)
+      # Create xregs for ARIMAX
+      nrow <- length(train)
+      onehotyear <- matrix(c(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                             0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                             0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+                             0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+                             0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+                             0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
+                             0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+                             0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+                             0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0,
+                             0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+                             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+                             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+                           ncol = 11,
+                           byrow = TRUE)
 
-    month.m <- matrix(, nrow = nrow, ncol = 11)
-    for (j in 1:nrow) {
-      month.m[j,] <- onehotyear[month(start_date + weeks(j - 1)), ]
-    }
-    horizon.m <- matrix(, nrow = 1, ncol = 11)
-    k <- 0
-    for (j in nrow:nrow) {
-      k <- k + 1
-      horizon.m[k,] <- onehotyear[month(start_date + weeks(j)), ]
-    }
+      month.m <- matrix(, nrow = nrow, ncol = 11)
+      for (j in 1:nrow) {
+        month.m[j,] <- onehotyear[month(train_start + weeks(j - 1)), ]
+      }
+      horizon.m <- matrix(, nrow = 1, ncol = 11)
+      k <- 0
+      for (j in nrow:nrow) {
+        k <- k + 1
+        horizon.m[k,] <- onehotyear[month(train_start + weeks(j)), ]
+      }
 
-    # Seasonal naive
-    fit <- snaive(train_ts)
-    snaive[i + 1] <- as.numeric(forecast(fit, h = 1)$mean)
+      # Seasonal naive
+      fit <- snaive(train_ts)
+      snaive[i + 1] <- as.numeric(forecast(fit, h = 1)$mean)
 
-    # MA5
-    fit <- ma(train_ts, order = 5)
-    ma5[i + 1] <- as.numeric(forecast(fit, h = 1)$mean)
+      # MA5
+      fit <- ma(train_ts, order = 5)
+      ma5[i + 1] <- as.numeric(forecast(fit, h = 1)$mean)
 
-    # MA7
-    fit <- ma(train_ts, order = 7)
-    ma7[i + 1] <- as.numeric(forecast(fit, h = 1)$mean)
+      # MA7
+      fit <- ma(train_ts, order = 7)
+      ma7[i + 1] <- as.numeric(forecast(fit, h = 1)$mean)
 
-    # MA9
-    fit <- ma(train_ts, order = 9)
-    ma9[i + 1] <- as.numeric(forecast(fit, h = 1)$mean)
+      # MA9
+      fit <- ma(train_ts, order = 9)
+      ma9[i + 1] <- as.numeric(forecast(fit, h = 1)$mean)
 
-    # M12
-    fit <- ma(train_ts, order = 12)
-    ma12[i + 1] <- as.numeric(forecast(fit, h = 1)$mean)
+      # M12
+      fit <- ma(train_ts, order = 12)
+      ma12[i + 1] <- as.numeric(forecast(fit, h = 1)$mean)
 
-    # TBATS
-    fit <- tbats(train_ts)
-    tbats[i + 1] <- as.numeric(forecast(fit, h = 1)$mean)
+      # TBATS
+      fit <- tbats(train_ts)
+      tbats[i + 1] <- as.numeric(forecast(fit, h = 1)$mean)
 
-    # STLF
-    fit <- stlf(train_ts)
-    stlf[i + 1] <- as.numeric(forecast(fit, h = 1)$mean)
+      # STLF
+      fit <- stlf(train_ts)
+      stlf[i + 1] <- as.numeric(forecast(fit, h = 1)$mean)
 
-    # ARIMAX
-    fit <- auto.arima(train_ts, xreg = month.m)
-    arimax[i + 1] <- as.numeric(forecast(fit, xreg = horizon.m, h = 1)$mean)
+      # ARIMAX
+      fit <- auto.arima(train_ts, xreg = month.m)
+      arimax[i + 1] <- as.numeric(forecast(fit, xreg = horizon.m, h = 1)$mean)
 
-    # DYNREG
-    fit1 <- tslm(train_ts ~ trend + season)
-    fcast1 <- forecast(fit1, h = 1)
+      # DYNREG
+      fit1 <- tslm(train_ts ~ trend + season)
+      fcast1 <- forecast(fit1, h = 1)
 
-    fit2 <- auto.arima(fit1$residuals)
-    fcast2 <- forecast(fit2, h = 1)
+      fit2 <- auto.arima(fit1$residuals)
+      fcast2 <- forecast(fit2, h = 1)
 
-    y <- as.numeric(fcast1$mean)
-    x <- as.numeric(fcast2$mean)
-    dynreg[i + 1] <- (x + y)
+      y <- as.numeric(fcast1$mean)
+      x <- as.numeric(fcast2$mean)
+      dynreg[i + 1] <- (x + y)
 
-    # NN
-    fit <- nnetar(train_ts)
-    nn[i + 1] <- as.numeric(forecast(fit, h = 1)$mean)
+      # NN
+      fit <- nnetar(train_ts)
+      nn[i + 1] <- as.numeric(forecast(fit, h = 1)$mean)
 
-    # ETS
-    fit <- ets(train_ts)
-    ets[i + 1] <- as.numeric(forecast(fit, h = 1)$mean)
+      # ETS
+      fit <- ets(train_ts)
+      ets[i + 1] <- as.numeric(forecast(fit, h = 1)$mean)
 
-    # STL
-    fit <- stl(train_ts, s.window = "periodic", t.window = 7)
-    stl[i + 1] <- as.numeric(forecast(fit, h = 1)$mean)
+      # STL
+      fit <- stl(train_ts, s.window = "periodic", t.window = 7)
+      stl[i + 1] <- as.numeric(forecast(fit, h = 1)$mean)
+
+      # MLP
+      fit <- mlp(train_ts, reps = 20)
+      mlp[i + 1] <- as.numeric(forecast(fit, h = 2)$mean[1]) # crashes conditionally if h = 1, so we set h = 2 and take the 1st element
+
+      # ELM
+      fit <- elm(train_ts, reps = 20)
+      elm[i + 1] <- as.numeric(forecast(fit, h = 2)$mean[1]) # crashes conditionally if h = 1, so we set h = 2 and take the 1st element
     }
 
     # Create a date vector for the forecasts
     fcast_dates <- seq.Date(from = weekly.sim$date[rw + 1], to = weekly.sim$date[nrow(weekly.sim)], by = "weeks")
     # Combine into a df
-    forecasts_wo_avg <- data.frame(date = fcast_dates, snaive = snaive, ma5 = ma5, ma7 = ma7,
-                                    ma9 = ma9, ma12 = ma12, ets = ets, stl = stl, tbats = tbats,
-                                    nn = nn, arimax = arimax, dynreg = dynreg, stlf = stlf)
+    forecasts_wo_avg <- data.frame(date = fcast_dates, SNAIVE = snaive, MA5 = ma5, MA7 = ma7,
+                                    MA9 = ma9, MA12 = ma12, ETS = ets, STL = stl, TBATS = tbats,
+                                    NNAR = nn, ARIMAX = arimax, DYNREG = dynreg, STLF = stlf, MLP = mlp, ELM = elm)
 
     # Create method average (AVG)
-    avg <- apply(forecasts_wo_avg[, -1], 1, mean)
+    AVG <- apply(forecasts_wo_avg[, -1], 1, mean)
     # Add it to
-    indv_forecasts_syn <- cbind(forecasts_wo_avg, avg)
+    indv_forecasts_syn <- cbind(forecasts_wo_avg, AVG)
 
     # Save
     write.csv(indv_forecasts_syn, paste0(SAVEPATH, "indv_method_forecasts_synthetic.csv"), row.names = FALSE)
@@ -172,13 +183,13 @@ if (RUNSYNAGAIN) {
 
 # Compute errors on synthetic data
 # Ensure time window parity
-out <- ensure.window.parity(synweekly, indv_forecasts_syn)
+out <- ensure.window.parity(weekly.sim, indv_forecasts_syn)
 synseries <- out$first
 fcast <- out$second
 
 # APE = 100 * |F - A| / A
 apes <- 100 * abs(fcast[, -1] - synseries[, -1]) / synseries[, -1]
-colnames(apes) <- c("SNAIVE", "MA-5", "MA-7", "MA-9", "MA-12", "ETS", "STL", "TBATS", "NNAR", "ARIMAX", "DYNREG", "STLF", "AVG")
+colnames(apes) <- c("SNAIVE", "MA5", "MA7", "MA9", "MA12", "ETS", "STL", "TBATS", "NNAR", "ARIMAX", "DYNREG", "STLF", "MLP", "ELM", "AVG")
 
 # Check overall errors
 indv_syn_errors <- colMeans(apes)
@@ -188,7 +199,7 @@ indv_syn_errors <- colMeans(apes)
 first <- colMeans(apes[1:(nrow(apes)/2), ])
 last <- colMeans(apes[(nrow(apes)/2 + 1):nrow(apes), ])
 methods <- c(names(first), names(last))
-subgroup <- c(rep("First half", 13), rep("Second half", 13))
+subgroup <- c(rep("First half", 15), rep("Second half", 15))
 values <- c(first, last)
 
 dat <- data.frame(methods, subgroup, values)
@@ -202,8 +213,8 @@ ggplot(dat, aes(fill = subgroup, y = values, x = methods)) +
   geom_bar(position = "dodge", stat = "identity") +
   theme_minimal() +
   labs(y = "MAPE (%)", fill = "Time window") +
-  scale_x_discrete(limits = c("ETS", "MA-12", "MA-5", "MA-7", "MA-9", "ARIMAX", "TBATS",
-                              "NNAR",  "AVG", "SNAIVE", "STL", "DYNREG", "STLF")) +
+  scale_x_discrete(limits = c("ETS", "MA12", "MA5", "MA7", "MA9", "ARIMAX", "ELM", "TBATS",
+                              "NNAR",  "MLP", "AVG", "SNAIVE", "STL", "DYNREG", "STLF")) +
   theme(axis.title.x = element_blank(), axis.text.x = element_text(angle = 90, hjust = 0.9),
         legend.key.size = unit(0.1, "cm"), legend.title = element_text(size = 10)) +
   scale_fill_manual(values = c("grey10", "grey40"))
@@ -212,6 +223,7 @@ dev.off()
 
 # Now simulate forecasts for AutoN methods, exponentially weighted avg
 # This is a bit laborious, but we run and save results for all desired val lengths
+RUNSYNAGAIN <- TRUE
 if (RUNSYNAGAIN) {
 
     val1 <- simulate_forecast(fcast, apes, 1)
@@ -242,18 +254,23 @@ if (RUNSYNAGAIN) {
 # Create W.AVG using apes
 alpha <- 0.5
 alphavec <- c()
-for (k in 1:13) {
+for (k in 1:15) {
   alphavec[k] <- 0.5**k
 }
 w.avg <- c()
 for (i in 1:(dim(fcast)[1] - 1)) {
-  w.avg[i] <- sum(alphavec * fcast[, 2:14][(i + 1), order(apes[i, 1:13])])
+  w.avg[i] <- sum(alphavec * fcast[, 2:16][(i + 1), order(apes[i, 1:15])])
 }
 wavg.errors <- 100 * abs(w.avg - synseries$pcs[-1]) / synseries$pcs[-1]
 
 # Check errors here with mean
 wavg.mape <- mean(wavg.errors)
 syn.val1mape <- mean(val1$error)
+syn.val3mape <- mean(val3$error)
+syn.val6mape <- mean(val6$error)
+syn.val12mape <- mean(val12$error)
+syn.val18mape <- mean(val18$error)
+syn.val24mape <- mean(val24$error)
 # Et cetera...
 
 ## Now we have checked
@@ -269,10 +286,10 @@ syn.val1mape <- mean(val1$error)
 ## affects the available backtesting space we have.
 
 # Backtest forecast histories on real data
-RUNREALAGAIN = FALSE # TRUE -> Generate results; FALSE -> Load results
+RUNREALAGAIN = TRUE # TRUE -> Generate results; FALSE -> Load results
 if (RUNREALAGAIN) {
-    # Set (rolling) training window size. 105 weeks is the minimum for these methods.
-    rw <- 105
+    # Set (rolling) training window size. 155 weeks is the minimum for these methods.
+    rw <- 155
 
     # Prepare any methods for saving
     snaive <- c()
@@ -287,6 +304,8 @@ if (RUNREALAGAIN) {
     arimax <- c()
     dynreg <- c()
     nn <- c()
+    mlp <- c()
+    elm <- c()
 
     for (i in 0:(nrow(weekly) - rw - 1)) {
     train_start <- weekly$date[1 + i]
@@ -316,13 +335,13 @@ if (RUNREALAGAIN) {
 
     month.m <- matrix(, nrow = nrow, ncol = 11)
     for (j in 1:nrow) {
-      month.m[j,] <- onehotyear[month(start_date + weeks(j - 1)), ]
+      month.m[j,] <- onehotyear[month(train_start + weeks(j - 1)), ]
     }
     horizon.m <- matrix(, nrow = 1, ncol = 11)
     k <- 0
     for (j in nrow:nrow) {
       k <- k + 1
-      horizon.m[k,] <- onehotyear[month(start_date + weeks(j)), ]
+      horizon.m[k,] <- onehotyear[month(train_start + weeks(j)), ]
     }
 
     # Seasonal naive
@@ -379,19 +398,27 @@ if (RUNREALAGAIN) {
     # STL
     fit <- stl(train_ts, s.window = "periodic", t.window = 7)
     stl[i + 1] <- as.numeric(forecast(fit, h = 1)$mean)
+
+    # MLP
+    fit <- mlp(train_ts, reps = 20)
+    mlp[i + 1] <- as.numeric(forecast(fit, h = 2)$mean[1]) # crashes conditionally if h = 1, so we set h = 2 and take the 1st element
+
+    # ELM
+    fit <- elm(train_ts, reps = 20)
+    elm[i + 1] <- as.numeric(forecast(fit, h = 2)$mean[1]) # crashes conditionally if h = 1, so we set h = 2 and take the 1st element
     }
 
     # Create a date vector for the forecasts
     fcast_dates <- seq.Date(from = weekly$date[rw + 1], to = weekly$date[nrow(weekly)], by = "weeks")
     # Combine into a df
-    forecasts_wo_avg <- data.frame(date = fcast_dates, snaive = snaive, ma5 = ma5, ma7 = ma7,
-                                    ma9 = ma9, ma12 = ma12, ets = ets, stl = stl, tbats = tbats,
-                                    nn = nn, arimax = arimax, dynreg = dynreg, stlf = stlf)
+    forecasts_wo_avg <- data.frame(date = fcast_dates, SNAIVE = snaive, MA5 = ma5, MA7 = ma7,
+                                    MA9 = ma9, MA12 = ma12, ETS = ets, STL = stl, TBATS = tbats,
+                                    NNAR = nn, ARIMAX = arimax, DYNREG = dynreg, STLF = stlf, MLP = mlp, ELM = elm)
 
     # Create method average (AVG)
-    avg <- apply(forecasts_wo_avg[, -1], 1, mean)
+    AVG <- apply(forecasts_wo_avg[, -1], 1, mean)
     # Add it to
-    indv_forecasts <- cbind(forecasts_wo_avg, avg)
+    indv_forecasts <- cbind(forecasts_wo_avg, AVG)
 
     # Save
     write.csv(indv_forecasts, paste0(SAVEPATH, "indv_method_forecasts_real.csv"), row.names = FALSE)
@@ -401,13 +428,14 @@ if (RUNREALAGAIN) {
 }
 
 # Compute method errors
-out <- ensure.window.parity(weekly[, -1], indv_forecasts)
+out <- ensure.window.parity(weekly, indv_forecasts)
 real <- out$first
 fcast <- out$second
 
 apes <- 100 * abs(fcast[, -1] - real$pcs) / real$pcs
 
 # Now simulate AutoN
+RUNREALAGAIN <- TRUE
 if (RUNREALAGAIN) {
 
     val1 <- simulate_forecast(fcast, apes, 1)
@@ -438,12 +466,12 @@ if (RUNREALAGAIN) {
 # Create W.AVG using apes
 alpha <- 0.5
 alphavec <- c()
-for (k in 1:13) {
+for (k in 1:15) {
   alphavec[k] <- 0.5**k
 }
 w.avg <- c()
 for (i in 1:(dim(fcast)[1] - 1)) {
-  w.avg[i] <- sum(alphavec * fcast[, 2:14][(i + 1), order(apes[i, 1:13])])
+  w.avg[i] <- sum(alphavec * fcast[, 2:16][(i + 1), order(apes[i, 1:15])])
 }
 wavg.errors <- 100 * abs(w.avg - real$pcs[-1]) / real$pcs[-1]
 
@@ -452,10 +480,10 @@ minimum <- c()
 min.errors <- c()
 optimal.scheme <- c()
 for (i in 1:dim(fcast)[1]) {
-    min.errors[i] <- min(apes[i, 1:13])
-    min.method <- which.min(apes[i, 1:13])
-    optimal.scheme[i] <- names(apes[, 1:13])[min.method]
-    minimum[i] <- fcast[, 2:14][i, min.method]
+    min.errors[i] <- min(apes[i, 1:15])
+    min.method <- which.min(apes[i, 1:15])
+    optimal.scheme[i] <- names(apes[, 1:15])[min.method]
+    minimum[i] <- fcast[, 2:16][i, min.method]
 }
 
 # Because the length of the validation period decreases the number

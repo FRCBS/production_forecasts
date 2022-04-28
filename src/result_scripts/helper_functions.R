@@ -21,7 +21,7 @@
 ##
 ## ---------------------------
 
-daily_to_weekly <- function(daily) {
+daily_to_weekly <- function(series) {
     # Aggregate FROM daily TO weekly
     pcslist <- c(); weeklist <- c(); datelist <- c()  # Create storage lists
     j <- 0; k <- 0  # j is for resetting week counter, k is for gathering dates
@@ -36,9 +36,8 @@ daily_to_weekly <- function(daily) {
     weekly <- data.frame(week = weeklist,
                         date = as.Date.numeric(datelist, origin = "1970-01-01"),
                         pcs = pcslist)
-
-    return(weekly)
     }
+    return(weekly)
 }
 
 ensure.window.parity <- function(x, y) {
@@ -59,8 +58,8 @@ simulate_forecast <- function(fcast, apes, val){
     date <- c()
     for (i in 1:(nrow(apes) - val)) {
         # Select method
-        meanerr <- colMeans(apes[i:(i + val - 1), 1:13]) # 1:(number of methods)
-        selected_method[i] <- names(apes[, 1:13])[which.min(meanerr)]
+        meanerr <- colMeans(apes[i:(i + val - 1), 1:15]) # 1:(number of methods) NOW WITH 2 MORE
+        selected_method[i] <- names(apes[, 1:15])[which.min(meanerr)]
         # Fetch forecast of selected method at i + val (- 1 + 1)
         forecast[i] <- fcast[i + val, selected_method[i]]
         error[i] <- apes[i + val, selected_method[i]]
@@ -90,4 +89,21 @@ val_errors_auto <- function(auto, val.self, val.levels) {
         res[i] <- mean(auto$error[-(1:N[i])])
     }
     return(c(rep(NA, nNA), res))
+}
+
+all_vs_all_ttest <- function(numeric_df) {
+    # From http://www.sthda.com/english/wiki/matrix-of-student-t-test
+    # Apparently this is one of the fastest ways??
+    mat <- as.matrix(numeric_df)
+    n <- ncol(mat)
+    p.mat <- matrix(NA, n, n)
+    diag(p.mat) <- 1
+    for (i in 1:(n - 1)) {
+        for (j in (i + 1):n) {
+            test <- t.test(mat[, i], mat[, j])
+            p.mat[i, j] <- p.mat[j, i] <- test$p.value
+        }
+    }
+    colnames(p.mat) <- rownames(p.mat) <- colnames(mat)
+    return(signif(p.mat, 4))
 }
