@@ -32,9 +32,9 @@ read_DW <- function(INPUT, PROD) {
 
   file_list <- list()
   for (i in 1:length(filenames)) {
-  filename <- filenames[i] # get filename
-  file_content <- fread(paste0(INPUT, filename), colClasses = c("Date", "numeric", "factor", "character", "character", "character")) # read file
-  file_list[[i]] <- file_content # add to list
+    filename <- filenames[i] # get filename
+    file_content <- fread(paste0(INPUT, filename), colClasses = c("Date", "numeric", "factor", "character", "character", "character")) # read file
+    file_list[[i]] <- file_content # add to list
   }
 
   complete_data <- as.data.frame(rbindlist(file_list, fill = TRUE)) # compile list into a data frame
@@ -152,167 +152,188 @@ read_DW <- function(INPUT, PROD) {
 }
 
 read_FACS <- function(INPUT, PROD) {
-    # Reads older FACS data from INPUT
+  # Reads older FACS data from INPUT
 
-    # argument validity is checked on upper level!
+  # argument validity is checked on upper level!
 
-    # ---
-    # data reading and compilation ----
-    # ---
-    filenames <- list.files(INPUT, pattern = "FAC0091_*")  # character vector of file names
+  # ---
+  # data reading and compilation ----
+  # ---
+  filenames <- list.files(INPUT, pattern = "FAC0091_*")  # character vector of file names
 
-    file_list <- list()
-    for (i in filenames) { # compile a dataframe by going over all files
-      file <- read.delim(file = paste0(INPUT, "/", i), header = FALSE, sep = ";", stringsAsFactors = FALSE, colClasses = 'character')
+  file_list <- list()
+  for (i in filenames) { # compile a dataframe by going over all files
+    file <- read.delim(file = paste0(INPUT, "/", i), header = FALSE, sep = ";", stringsAsFactors = FALSE, colClasses = 'character')
 
-      if (length(file) == 26) { # special case
-        file <- file[, !(names(file) %in% c("V10"))]  # the column numbers unfortunately vary between files, so we'll adjust
-        }
-
-      colnames(file) <- c("V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12", "V13",
-                          "V14", "V15", "V16", "V17", "V18", "V19", "V20", "V21", "V22", "V23", "V24", "V25")  # this is done so as to have easier column handling later
-
-      file_list[[i]] <- file
+    if (length(file) == 26) { # special case
+      file <- file[, !(names(file) %in% c("V10"))]  # the column numbers unfortunately vary between files, so we'll adjust
     }
 
-    complete_data <- as.data.frame(rbindlist(file_list, fill = TRUE)) # stack a data frame from the list of files
+    colnames(file) <- c("V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12", "V13",
+                        "V14", "V15", "V16", "V17", "V18", "V19", "V20", "V21", "V22", "V23", "V24", "V25")  # this is done so as to have easier column handling later
 
-    # ---
-    # data manipulation ----
-    # ---
+    file_list[[i]] <- file
+  }
 
-    # Drop internal customers
-    complete_data <- complete_data[-which(as.numeric(complete_data$V25) < 1000), ] # there are lots of NA values, but we don't touch those here
+  complete_data <- as.data.frame(rbindlist(file_list, fill = TRUE)) # stack a data frame from the list of files
+
+  # ---
+  # data manipulation ----
+  # ---
+
+  # Drop internal customers
+  complete_data <- complete_data[-which(as.numeric(complete_data$V25) < 1000), ] # there are lots of NA values, but we don't touch those here
 
 
-    complete_re <- complete_data %>% # recode for easier handling and less code redundancy
-      mutate(V20 = recode(V20, "O +" = "O+", "O -" = "O-", "A +" = "A+", "A -" = "A-", "B +" = "B+", "B -" = "B-"))
-    # NB! returns aren't coded by type in FACS data, so we don't need to account for the column shift here
+  complete_re <- complete_data %>% # recode for easier handling and less code redundancy
+    mutate(V20 = recode(V20, "O +" = "O+", "O -" = "O-", "A +" = "A+", "A -" = "A-", "B +" = "B+", "B -" = "B-"))
+  # NB! returns aren't coded by type in FACS data, so we don't need to account for the column shift here
 
 
-    if (PROD == "RBC") {
+  if (PROD == "RBC") {
 
-        filtr <- c("REMOVED", "FROM", "PUBLIC", "VERSION") # filter to RBC by these
+    filtr <- c("budTR001", "A0071V00", "A0074V00", "A0092VA0", "A0092VB0",
+               "E3844V00", "E3845V00", "E3846VA0", "E3846VB0", "E3846VC0",
+               "E3846V00", "E3847VA0", "E3847VB0", "E3847VC0", "E3847V00",
+               "E3936VA0", "E3936VB0", "E3939V00", "E3940V00", "E4683V00",
+               "E7668V00", "E7673V00", "E4999V00", "E5000V00") # filter to RBC by these
 
-        deliveries <- complete_re %>%
-          filter(V1 == "P") %>%
-          select(V12, V14, V18) %>% # we want date, product code, quantity
-          rename(date = V12, product = V14, deliveries = V18) %>% # rename columns
-          transmute(date = dmy(date), product = as.character(product), deliveries = as.numeric(deliveries)) %>% # ensure column class
-          filter(product %in% filtr) # filter by product
+    deliveries <- complete_re %>%
+      filter(V1 == "P") %>%
+      select(V12, V14, V18) %>% # we want date, product code, quantity
+      rename(date = V12, product = V14, deliveries = V18) %>% # rename columns
+      transmute(date = dmy(date), product = as.character(product), deliveries = as.numeric(deliveries)) %>% # ensure column class
+      filter(product %in% filtr) # filter by product
 
-        returns <- complete_re %>% # ATTENTION: the column order is slightly different with returns!
-          filter(V1 == "R") %>%
-          select(V4, V5, V7) %>% # we want date, product code, quantity
-          rename(date = V4, product = V5, returns = V7) %>% # rename columns
-          transmute(date = dmy(date), product = as.character(product), returns = as.numeric(returns)) %>% # ensure column class
-          filter(product %in% filtr) # filter by product
+    returns <- complete_re %>% # ATTENTION: the column order is slightly different with returns!
+      filter(V1 == "R") %>%
+      select(V4, V5, V7) %>% # we want date, product code, quantity
+      rename(date = V4, product = V5, returns = V7) %>% # rename columns
+      transmute(date = dmy(date), product = as.character(product), returns = as.numeric(returns)) %>% # ensure column class
+      filter(product %in% filtr) # filter by product
 
-        deliv_daily <- aggregate(deliveries$deliveries, by = list(deliveries$date), sum) %>% # create a daily series from both by aggregating
-          rename(date = Group.1, deliveries = x)
-        retur_daily <- aggregate(returns$returns, by = list(returns$date), sum) %>%
-          rename(date = Group.1, returns = x)
+    deliv_daily <- aggregate(deliveries$deliveries, by = list(deliveries$date), sum) %>% # create a daily series from both by aggregating
+      rename(date = Group.1, deliveries = x)
+    retur_daily <- aggregate(returns$returns, by = list(returns$date), sum) %>%
+      rename(date = Group.1, returns = x)
 
-        # Important! Check that the series are continuous (no missing dates). Impute with zeros if needed.
-        all_dates <- seq.Date(min(c(deliv_daily$date, retur_daily$date)), max(c(deliv_daily$date, retur_daily$date)), "day") # range of dates from start to end
+    # Important! Check that the series are continuous (no missing dates). Impute with zeros if needed.
+    all_dates <- seq.Date(min(c(deliv_daily$date, retur_daily$date)), max(c(deliv_daily$date, retur_daily$date)), "day") # range of dates from start to end
 
-        cont_deliv_with_nas <- merge(x = data.frame(date = all_dates), y = deliv_daily, all.x = TRUE) # continuous delivery series (missing date -> NA)
-        cont_deliv_with_nas[is.na(cont_deliv_with_nas)] <- 0 # impute with zeros
+    cont_deliv_with_nas <- merge(x = data.frame(date = all_dates), y = deliv_daily, all.x = TRUE) # continuous delivery series (missing date -> NA)
+    cont_deliv_with_nas[is.na(cont_deliv_with_nas)] <- 0 # impute with zeros
 
-        cont_retur_with_nas <- merge(x = data.frame(date = all_dates), y = retur_daily, all.x = TRUE) # continuous returns series (missing date -> NA)
-        cont_retur_with_nas[is.na(cont_retur_with_nas)] <- 0
+    cont_retur_with_nas <- merge(x = data.frame(date = all_dates), y = retur_daily, all.x = TRUE) # continuous returns series (missing date -> NA)
+    cont_retur_with_nas[is.na(cont_retur_with_nas)] <- 0
 
-        # Important! There was a significant demand level change before 2014 (demand decreased).
-        # Forecasts will improve when cutting to time after 2014, even though it limits the number of data points.
-        deliv <- cont_deliv_with_nas %>%
-          filter(date >= as.Date("2014-01-01"))
-        retur <- cont_retur_with_nas %>%
-          filter(date >= as.Date("2014-01-01"))
+    # Important! There was a significant demand level change before 2014 (demand decreased).
+    # Forecasts will improve when cutting to time after 2014, even though it limits the number of data points.
+    deliv <- cont_deliv_with_nas %>%
+      filter(date >= as.Date("2014-01-01"))
+    retur <- cont_retur_with_nas %>%
+      filter(date >= as.Date("2014-01-01"))
 
-        out <- cbind(deliv, returns = retur$returns) # combine for returning
+    out <- cbind(deliv, returns = retur$returns) # combine for returning
 
-        }
+  }
 
-    if (PROD == "PLAT") {
+  if (PROD == "PLAT") {
 
-        filtr <- c("REMOVED", "FROM", "PUBLIC", "VERSION") # filter to PLAT by these
+    filtr <- c("budTR002", "trEnnApu", "A0004V00", "A0005V00", "A0006V00", "A0007V00", "A0008V00",
+               "A0086VA0", "A0086VB0", "A0086V00", "A0088V00", "A0088VA0", "A0088VB0", "A0089V00",
+               "A0089VB0", "A0089VA0", "A0090V00", "A0090VA0", "A0090VB0", "A0018V00", "A0020V00",
+               "A0021V00", "A0021VA0", "A0021VB0", "A0047V00", "A0049V00", "A0051V00", "A0054V00",
+               "A0055V00", "A0056V00", "A0057V00", "A0059V00", "A0060V00", "A0067VA0", "A0067VB0",
+               "A0067V00", "A0068VA0", "A0068VB0", "A0068V00", "A0075V00", "A0101V00", "A0102V00",
+               "E3949V00", "E3953V00", "E3954V00", "E3955V00", "E3956V00", "E3957V00", "E3958V00",
+               "E3959V00", "E3960V00", "E3961V00", "E3962V00", "E3963V00", "E3964V00", "E3965V00",
+               "E3966V00", "E3968VA0", "E3968VB0", "E3968V00", "E3970V00", "E3971V00", "E3973V00",
+               "E3974V00", "E3976V00", "E3981V00", "E3995V00", "E3996V00", "E3997V00", "E3997VA0",
+               "E3997VB0", "E4002V00", "E4004V00", "E6782V00", "E6783V00", "E6953V00", "E6860V00",
+               "E6874VA0", "E6874V00", "E6874VB0", "E6875VB0", "E6875V00", "E7530V00", "E7530VA0",
+               "E7530VB0", "E7531V00", "E7531VA0", "E7531VB0", "E6875VA0") # filter to PLAT by these
 
-        deliveries <- complete_re %>%
-          filter(V1 == "P") %>%
-          select(V12, V14, V18) %>% # we want date, product code, quantity
-          rename(date = V12, product = V14, deliveries = V18) %>% # rename columns
-          transmute(date = dmy(date), product = as.character(product), deliveries = as.numeric(deliveries)) %>% # ensure column class
-          filter(product %in% filtr) # filter by product
+    deliveries <- complete_re %>%
+      filter(V1 == "P") %>%
+      select(V12, V14, V18) %>% # we want date, product code, quantity
+      rename(date = V12, product = V14, deliveries = V18) %>% # rename columns
+      transmute(date = dmy(date), product = as.character(product), deliveries = as.numeric(deliveries)) %>% # ensure column class
+      filter(product %in% filtr) # filter by product
 
-        returns <- complete_re %>% # ATTENTION: the column order is slightly different with returns!
-          filter(V1 == "R") %>%
-          select(V4, V5, V7) %>% # we want date, product code, quantity
-          rename(date = V4, product = V5, returns = V7) %>% # rename columns
-          transmute(date = dmy(date), product = as.character(product), returns = as.numeric(returns)) %>% # ensure column class
-          filter(product %in% filtr) # filter by product
+    returns <- complete_re %>% # ATTENTION: the column order is slightly different with returns!
+      filter(V1 == "R") %>%
+      select(V4, V5, V7) %>% # we want date, product code, quantity
+      rename(date = V4, product = V5, returns = V7) %>% # rename columns
+      transmute(date = dmy(date), product = as.character(product), returns = as.numeric(returns)) %>% # ensure column class
+      filter(product %in% filtr) # filter by product
 
-        deliv_daily <- aggregate(deliveries$deliveries, by = list(deliveries$date), sum) %>% # create a daily series from both by aggregating
-          rename(date = Group.1, deliveries = x)
-        retur_daily <- aggregate(returns$returns, by = list(returns$date), sum) %>%
-          rename(date = Group.1, returns = x)
+    deliv_daily <- aggregate(deliveries$deliveries, by = list(deliveries$date), sum) %>% # create a daily series from both by aggregating
+      rename(date = Group.1, deliveries = x)
+    retur_daily <- aggregate(returns$returns, by = list(returns$date), sum) %>%
+      rename(date = Group.1, returns = x)
 
-        # Important! Check that the series are continuous (no missing dates). Impute with zeros if needed.
-        all_dates <- seq.Date(min(c(deliv_daily$date, retur_daily$date)), max(c(deliv_daily$date, retur_daily$date)), "day") # range of dates from start to end
+    # Important! Check that the series are continuous (no missing dates). Impute with zeros if needed.
+    all_dates <- seq.Date(min(c(deliv_daily$date, retur_daily$date)), max(c(deliv_daily$date, retur_daily$date)), "day") # range of dates from start to end
 
-        cont_deliv_with_nas <- merge(x = data.frame(date = all_dates), y = deliv_daily, all.x = TRUE) # continuous delivery series (missing date -> NA)
-        cont_deliv_with_nas[is.na(cont_deliv_with_nas)] <- 0 # impute with zeros
+    cont_deliv_with_nas <- merge(x = data.frame(date = all_dates), y = deliv_daily, all.x = TRUE) # continuous delivery series (missing date -> NA)
+    cont_deliv_with_nas[is.na(cont_deliv_with_nas)] <- 0 # impute with zeros
 
-        cont_retur_with_nas <- merge(x = data.frame(date = all_dates), y = retur_daily, all.x = TRUE) # continuous returns series (missing date -> NA)
-        cont_retur_with_nas[is.na(cont_retur_with_nas)] <- 0
+    cont_retur_with_nas <- merge(x = data.frame(date = all_dates), y = retur_daily, all.x = TRUE) # continuous returns series (missing date -> NA)
+    cont_retur_with_nas[is.na(cont_retur_with_nas)] <- 0
 
-        # Important! There was a significant demand level change before 2014 (demand decreased).
-        # Forecasts will improve when cutting to time after 2014, even though it limits the number of data points.
-        deliv <- cont_deliv_with_nas %>%
-          filter(date >= as.Date("2014-01-01"))
-        retur <- cont_retur_with_nas %>%
-          filter(date >= as.Date("2014-01-01"))
+    # Important! There was a significant demand level change before 2014 (demand decreased).
+    # Forecasts will improve when cutting to time after 2014, even though it limits the number of data points.
+    deliv <- cont_deliv_with_nas %>%
+      filter(date >= as.Date("2014-01-01"))
+    retur <- cont_retur_with_nas %>%
+      filter(date >= as.Date("2014-01-01"))
 
-        out <- cbind(deliv, returns = retur$returns) # combine for returning
+    out <- cbind(deliv, returns = retur$returns) # combine for returning
 
-    }
+  }
 
-    if (PROD %in% c("O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-")) {
+  if (PROD %in% c("O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-")) {
 
-      filtr <- c("REMOVED", "FROM", "PUBLIC", "VERSION") # filter to RBC by these
+    filtr <- c("budTR001", "A0071V00", "A0074V00", "A0092VA0", "A0092VB0",
+               "E3844V00", "E3845V00", "E3846VA0", "E3846VB0", "E3846VC0",
+               "E3846V00", "E3847VA0", "E3847VB0", "E3847VC0", "E3847V00",
+               "E3936VA0", "E3936VB0", "E3939V00", "E3940V00", "E4683V00",
+               "E7668V00", "E7673V00", "E4999V00", "E5000V00") # filter to RBC by these
 
-        deliveries <- complete_re %>%
-          filter(V1 == "P" & V20 == PROD) %>%
-          select(V12, V14, V18) %>% # we want date, product code, quantity
-          rename(date = V12, product = V14, deliveries = V18) %>% # rename columns
-          transmute(date = dmy(date), product = as.character(product), deliveries = as.numeric(deliveries)) %>% # ensure column class
-          filter(product %in% filtr) # filter by product
+    deliveries <- complete_re %>%
+      filter(V1 == "P" & V20 == PROD) %>%
+      select(V12, V14, V18) %>% # we want date, product code, quantity
+      rename(date = V12, product = V14, deliveries = V18) %>% # rename columns
+      transmute(date = dmy(date), product = as.character(product), deliveries = as.numeric(deliveries)) %>% # ensure column class
+      filter(product %in% filtr) # filter by product
 
-        # ATTENTION: RETURNS ARE NOT LOGGED BY TYPE IN THE FACS DATA!
-        # SO UP UNTIL 2020, WE DON'T HAVE RETURNS DATA (SAVED AS ZEROS)
+    # ATTENTION: RETURNS ARE NOT LOGGED BY TYPE IN THE FACS DATA!
+    # SO UP UNTIL 2020, WE DON'T HAVE RETURNS DATA (SAVED AS ZEROS)
 
-        deliv_daily <- aggregate(deliveries$deliveries, by = list(deliveries$date), sum) %>% # create a daily series from both by aggregating
-          rename(date = Group.1, deliveries = x)
+    deliv_daily <- aggregate(deliveries$deliveries, by = list(deliveries$date), sum) %>% # create a daily series from both by aggregating
+      rename(date = Group.1, deliveries = x)
 
-        # Important! Check that the series are continuous (no missing dates). Impute with zeros if needed.
-        all_dates <- seq.Date(min(c(deliv_daily$date)), max(c(deliv_daily$date)), "day") # range of dates from start to end
+    # Important! Check that the series are continuous (no missing dates). Impute with zeros if needed.
+    all_dates <- seq.Date(min(c(deliv_daily$date)), max(c(deliv_daily$date)), "day") # range of dates from start to end
 
-        cont_deliv_with_nas <- merge(x = data.frame(date = all_dates), y = deliv_daily, all.x = TRUE) # continuous delivery series (missing date -> NA)
-        cont_deliv_with_nas[is.na(cont_deliv_with_nas)] <- 0 # impute with zeros
+    cont_deliv_with_nas <- merge(x = data.frame(date = all_dates), y = deliv_daily, all.x = TRUE) # continuous delivery series (missing date -> NA)
+    cont_deliv_with_nas[is.na(cont_deliv_with_nas)] <- 0 # impute with zeros
 
-        # Important! There was a significant demand level change before 2014 (demand decreased).
-        # Forecasts will improve when cutting to time after 2014, even though it limits the number of data points.
-        deliv <- cont_deliv_with_nas %>%
-          filter(date >= as.Date("2014-01-01"))
+    # Important! There was a significant demand level change before 2014 (demand decreased).
+    # Forecasts will improve when cutting to time after 2014, even though it limits the number of data points.
+    deliv <- cont_deliv_with_nas %>%
+      filter(date >= as.Date("2014-01-01"))
 
-        out <- cbind(deliv, returns = 0) # combine for returning
-    }
+    out <- cbind(deliv, returns = 0) # combine for returning
+  }
 
-    # ---
-    # return ----
-    # ---
-    out <- data.frame(date = out$date, sales = out$deliveries - out$returns, deliveries = out$deliveries, returns = out$returns) # conform with read_DW output
-    return(out)
-    }
+  # ---
+  # return ----
+  # ---
+  out <- data.frame(date = out$date, sales = out$deliveries - out$returns, deliveries = out$deliveries, returns = out$returns) # conform with read_DW output
+  return(out)
+}
+
 
 update_data <- function(INPUT, OUTPUT, PROD) {
 
@@ -333,106 +354,15 @@ update_data <- function(INPUT, OUTPUT, PROD) {
   # ---
   # read and update data ----
   # ---
-  if (PROD == "RBC") {
+  FACS_data <- read_FACS(INPUT, PROD)
+  DW_data <- read_DW(INPUT, PROD)
 
-    if (!file.exists(paste0(OUTPUT, PROD, "_daily.csv"))) { # if daily series data does not exist, create it
-      FACS_data <- read_FACS(INPUT, PROD)
-      DW_data <- read_DW(INPUT, PROD)
+  # ATTENTION: the old data and new data overlap briefly in May 2020.
+  # the newer data is presumably of better quality, so we'll use that one
+  cutoff_date <- DW_data$date[1]
+  data <- rbind(FACS_data[FACS_data$date < cutoff_date, ], DW_data)
 
-      # ATTENTION: the old data and new data overlap briefly in May 2020.
-      # the newer data is presumably of better quality, so we'll use that one
-      cutoff_date <- DW_data$date[1]
-      data <- rbind(FACS_data[FACS_data$date < cutoff_date, ], DW_data)
-
-      write.table(data, paste0(OUTPUT, PROD, "_daily.csv"), sep = ",", row.names = F, col.names = T)
-    } else { # if daily series file exists
-        file <- read.csv(paste0(OUTPUT, PROD, "_daily.csv"), colClasses = c("Date", "numeric", "numeric", "numeric")) # read it
-        DW_data <- read_DW(INPUT, PROD) # read new data
-
-        # check if we need to read FACS at all
-        # need to satisfy: first_date == 2014-01-01, last_date >= 2020-05-04, continuous == TRUE
-        first_date <- as.Date("2014-01-01") # should be
-        last_date <- file$date[nrow(file)]
-        if (file$date[1] == first_date & file$date[nrow(file)] >= last_date & is_continuous(file$date)) {
-          # skip loading FACS and append new data directly if needed
-          if (DW_data$date[nrow(DW_data)] > last_date) {
-            new_data <- DW_data %>%
-              filter(date > last_date)
-            write.table(new_data, file = paste0(OUTPUT, PROD, "_daily.csv"), sep = ",", append = T, col.names = F, row.names = F)
-
-            data <- rbind(file, new_data)
-          } else {data <- file}
-
-        }
-    }
-}
-
-  if (PROD == "PLAT") {
-
-    if (!file.exists(paste0(OUTPUT, PROD, "_daily.csv"))) { # if daily series data does not exist, create it
-      FACS_data <- read_FACS(INPUT, PROD)
-      DW_data <- read_DW(INPUT, PROD)
-
-      # ATTENTION: the old data and new data overlap briefly in May 2020.
-      # the newer data is presumably of better quality, so we'll use that one
-      cutoff_date <- DW_data$date[1]
-      data <- rbind(FACS_data[FACS_data$date < cutoff_date, ], DW_data)
-
-      write.table(data, paste0(OUTPUT, PROD, "_daily.csv"), sep = ",", row.names = F, col.names = T)
-    } else { # if daily series file exists
-        file <- read.csv(paste0(OUTPUT, PROD, "_daily.csv"), colClasses = c("Date", "numeric", "numeric", "numeric")) # read it
-        DW_data <- read_DW(INPUT, PROD) # read new data
-
-        # check if we need to read FACS at all
-        # need to satisfy: first_date == 2014-01-01, last_date >= 2020-05-04, continuous == TRUE
-        first_date <- as.Date("2014-01-01") # should be
-        last_date <- file$date[nrow(file)]
-        if (file$date[1] == first_date & file$date[nrow(file)] >= last_date & is_continuous(file$date)) {
-          # skip loading FACS and append new data directly if needed
-          if (DW_data$date[nrow(DW_data)] > last_date) {
-            new_data <- DW_data %>%
-              filter(date > last_date)
-            write.table(new_data, file = paste0(OUTPUT, PROD, "_daily.csv"), sep = ",", append = T, col.names = F, row.names = F)
-
-            data <- rbind(file, new_data)
-          } else {data <- file}
-
-        }
-    }
-  }
-
-  if (PROD %in% c("O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-")) {
-    if (!file.exists(paste0(OUTPUT, PROD, "_daily.csv"))) { # if daily series data does not exist, create it
-      FACS_data <- read_FACS(INPUT, PROD)
-      DW_data <- read_DW(INPUT, PROD)
-
-      # ATTENTION: the old data and new data overlap briefly in May 2020.
-      # the newer data is presumably of better quality, so we'll use that one
-      cutoff_date <- DW_data$date[1]
-      data <- rbind(FACS_data[FACS_data$date < cutoff_date, ], DW_data)
-
-      write.table(data, paste0(OUTPUT, PROD, "_daily.csv"), sep = ",", row.names = F, col.names = T)
-    } else { # if daily series file exists
-        file <- read.csv(paste0(OUTPUT, PROD, "_daily.csv"), colClasses = c("Date", "numeric", "numeric", "numeric")) # read it
-        DW_data <- read_DW(INPUT, PROD) # read new data
-
-        # check if we need to read FACS at all
-        # need to satisfy: first_date == 2014-01-01, last_date >= 2020-05-04, continuous == TRUE
-        first_date <- as.Date("2014-01-01") # should be
-        last_date <- file$date[nrow(file)]
-        if (file$date[1] == first_date & file$date[nrow(file)] >= last_date & is_continuous(file$date)) {
-          # skip loading FACS and append new data directly if needed
-          if (DW_data$date[nrow(DW_data)] > last_date) {
-            new_data <- DW_data %>%
-              filter(date > last_date)
-            write.table(new_data, file = paste0(OUTPUT, PROD, "_daily.csv"), sep = ",", append = T, col.names = F, row.names = F)
-
-            data <- rbind(file, new_data)
-          } else {data <- file}
-
-        }
-    }
-}
+  write.table(data, paste0(OUTPUT, PROD, "_daily.csv"), sep = ",", row.names = F, col.names = T)
 
   # ---
   # return for use ----
@@ -451,7 +381,7 @@ workday_adjustment <- function(df, reverse = FALSE) {
     adj_series <- data.frame(date = df[, 1], (df[, -1] * workdays))
   } else {
     adj_series <- data.frame(date = df[, 1], (df[, -1] / workdays))
-    }
+  }
 
   colnames(adj_series) <- colnam
 
@@ -722,8 +652,8 @@ wavg_selection <- function(history, alpha = 0.5, single = TRUE) {
     last <- history[nrow(history), c(1:12)]
     return(list(method = "wavg", coef = alphavec, order = order(last)))
   } else {
-      return(list(method = "wavg", coef = alphavec/sum(alphavec), order = t(apply(history[, c(1:12)], 1, order))))
-    }
+    return(list(method = "wavg", coef = alphavec/sum(alphavec), order = t(apply(history[, c(1:12)], 1, order))))
+  }
 
 }
 
@@ -780,20 +710,20 @@ simulate_selection_history <- function(data, S_R = "S", PROD, RES, ECON, TEST_LE
       out_suffix <- paste0(PROD, "_sales_ECON_forecasts.csv")
       out_alt_suffix <- paste0(PROD, "_sales_ECON_point_forecasts.csv")
     } else {
-        in_suffix <- paste0(PROD, "_returns_ECON_method_forecasts.csv")
-        in_alt_suffix <- paste0(PROD, "_returns_ECON_method_point_forecasts.csv")
-        out_suffix <- paste0(PROD, "_returns_ECON_forecasts.csv")
-        out_alt_suffix <- paste0(PROD, "_returns_ECON_point_forecasts.csv")
-      }
-  } else {
-      if (S_R == "S") {
-        in_suffix <- paste0(PROD, "_", RES, "_sales_OPER_method_forecasts.csv")
-        out_suffix <- paste0(PROD, "_", RES, "_sales_OPER_forecasts.csv")
-      } else {
-          in_suffix <- paste0(PROD, "_", RES, "_returns_OPER_method_forecasts.csv")
-          out_suffix <- paste0(PROD, "_", RES, "_returns_OPER_forecasts.csv")
-        }
+      in_suffix <- paste0(PROD, "_returns_ECON_method_forecasts.csv")
+      in_alt_suffix <- paste0(PROD, "_returns_ECON_method_point_forecasts.csv")
+      out_suffix <- paste0(PROD, "_returns_ECON_forecasts.csv")
+      out_alt_suffix <- paste0(PROD, "_returns_ECON_point_forecasts.csv")
     }
+  } else {
+    if (S_R == "S") {
+      in_suffix <- paste0(PROD, "_", RES, "_sales_OPER_method_forecasts.csv")
+      out_suffix <- paste0(PROD, "_", RES, "_sales_OPER_forecasts.csv")
+    } else {
+      in_suffix <- paste0(PROD, "_", RES, "_returns_OPER_method_forecasts.csv")
+      out_suffix <- paste0(PROD, "_", RES, "_returns_OPER_forecasts.csv")
+    }
+  }
 
   method_histories <- read.table(paste0(OUTPUT, in_suffix), header = TRUE, sep = ",")
   method_histories$date <- as.Date(method_histories$date)
@@ -819,18 +749,18 @@ simulate_selection_history <- function(data, S_R = "S", PROD, RES, ECON, TEST_LE
     write.table(simulated_p, paste0(OUTPUT, out_alt_suffix), sep = ",", row.names = FALSE, col.names = TRUE)
     write.table(simulated_r, paste0(OUTPUT, out_suffix), sep = ",", row.names = FALSE, col.names = TRUE)
   } else {
-      depth <- nrow(method_histories) - TEST_LEN
-      simulated <- data.frame(date = rep(as.Date("2000-01-01"), depth), method = rep("NaN", depth), forecast = rep(0, depth)) # prepare a df
-      simulated$method <- as.character(simulated$method)
-      for (i in 1:depth) {
-        method <- select_method(data[data$date <= method_histories$date[i + TEST_LEN - 1], ], PROD, S_R, OUTPUT, ECON, TEST_LEN)
-        forecast <- method_histories[(i + TEST_LEN), method]
-        date <- method_histories[(i + TEST_LEN), "date"]
-        simulated[i, 1] <- date; simulated[i, 2] <- method; simulated[i, 3] <- forecast
-      }
-
-      write.table(simulated, paste0(OUTPUT, out_suffix), sep = ",", row.names = FALSE, col.names = TRUE)
+    depth <- nrow(method_histories) - TEST_LEN
+    simulated <- data.frame(date = rep(as.Date("2000-01-01"), depth), method = rep("NaN", depth), forecast = rep(0, depth)) # prepare a df
+    simulated$method <- as.character(simulated$method)
+    for (i in 1:depth) {
+      method <- select_method(data[data$date <= method_histories$date[i + TEST_LEN - 1], ], PROD, S_R, OUTPUT, ECON, TEST_LEN)
+      forecast <- method_histories[(i + TEST_LEN), method]
+      date <- method_histories[(i + TEST_LEN), "date"]
+      simulated[i, 1] <- date; simulated[i, 2] <- method; simulated[i, 3] <- forecast
     }
+
+    write.table(simulated, paste0(OUTPUT, out_suffix), sep = ",", row.names = FALSE, col.names = TRUE)
+  }
 
 }
 
@@ -845,19 +775,19 @@ generate_method_history <- function(data, S_R, PROD, RES, ECON, TRAIN_LEN, HORIZ
       suffix <- paste0(PROD, "_sales_ECON_method_point_forecasts.csv")
       target <- data[, c(1, 2)]
     } else {
-        rsuffix <- paste0(PROD, "_returns_ECON_method_forecasts.csv")
-        suffix <- paste0(PROD, "_returns_ECON_method_point_forecasts.csv")
-        target <- data[, c(1, 4)]
-      }
+      rsuffix <- paste0(PROD, "_returns_ECON_method_forecasts.csv")
+      suffix <- paste0(PROD, "_returns_ECON_method_point_forecasts.csv")
+      target <- data[, c(1, 4)]
+    }
     HORIZON <- as.integer(24) # this is different than normal ECON functionality (where HORIZON=60), because our method selection benchmark is "sum of next 24 months"
   } else {
-      if (S_R == "S") {
-        suffix <- paste0(PROD, "_", RES, "_sales_OPER_method_forecasts.csv")
-        target <- data[, c(1, 2)]
-      } else {
-          suffix <- paste0(PROD, "_", RES, "_returns_OPER_method_forecasts.csv")
-          target <- data[, c(1, 4)]
-        }
+    if (S_R == "S") {
+      suffix <- paste0(PROD, "_", RES, "_sales_OPER_method_forecasts.csv")
+      target <- data[, c(1, 2)]
+    } else {
+      suffix <- paste0(PROD, "_", RES, "_returns_OPER_method_forecasts.csv")
+      target <- data[, c(1, 4)]
+    }
   }
 
   resolution <- find_resolution(data[, 1], format = "frequency")
@@ -884,27 +814,27 @@ generate_method_history <- function(data, S_R, PROD, RES, ECON, TRAIN_LEN, HORIZ
       forecast_dates <- seq.Date(from = first_fdate, length.out = fdepth, by = "year")
     }
   } else {
-      if (resolution == 365.25) {
-        first_fdate <- data[train_len, 1] + days(1) # when NOT ECON, our forecasts start after the end of first training period
-        fdepth <- nrow(data[data$date >= first_fdate, ])
-        forecast_dates <- seq.Date(from = first_fdate, length.out = fdepth, by = "day")
-      }
-      if (resolution == 52.17857) {
-        first_fdate <- data[train_len, 1] + weeks(1)
-        fdepth <- nrow(data[data$date >= first_fdate, ])
-        forecast_dates <- seq.Date(from = first_fdate, length.out = fdepth, by = "week")
-      }
-      if (resolution == 12) {
-        first_fdate <- data[train_len, 1] + months(1)
-        fdepth <- nrow(data[data$date >= first_fdate, ])
-        forecast_dates <- seq.Date(from = first_fdate, length.out = fdepth, by = "month")
-      }
-      if (resolution == 1) {
-        first_fdate <- data[train_len, 1] + years(1)
-        fdepth <- nrow(data[data$date >= first_fdate, ])
-        forecast_dates <- seq.Date(from = first_fdate, length.out = fdepth, by = "year")
-      }
+    if (resolution == 365.25) {
+      first_fdate <- data[train_len, 1] + days(1) # when NOT ECON, our forecasts start after the end of first training period
+      fdepth <- nrow(data[data$date >= first_fdate, ])
+      forecast_dates <- seq.Date(from = first_fdate, length.out = fdepth, by = "day")
     }
+    if (resolution == 52.17857) {
+      first_fdate <- data[train_len, 1] + weeks(1)
+      fdepth <- nrow(data[data$date >= first_fdate, ])
+      forecast_dates <- seq.Date(from = first_fdate, length.out = fdepth, by = "week")
+    }
+    if (resolution == 12) {
+      first_fdate <- data[train_len, 1] + months(1)
+      fdepth <- nrow(data[data$date >= first_fdate, ])
+      forecast_dates <- seq.Date(from = first_fdate, length.out = fdepth, by = "month")
+    }
+    if (resolution == 1) {
+      first_fdate <- data[train_len, 1] + years(1)
+      fdepth <- nrow(data[data$date >= first_fdate, ])
+      forecast_dates <- seq.Date(from = first_fdate, length.out = fdepth, by = "year")
+    }
+  }
   # ---
   # generate forecasts ----
   # ---
@@ -915,12 +845,12 @@ generate_method_history <- function(data, S_R, PROD, RES, ECON, TRAIN_LEN, HORIZ
     rforecasts <- c()
     forecasts <- c()
     for (i in 1:fdepth) { # and all available data
-        window <- i:(train_len + i - 1)
-        cdata <- data[window, ]
-        fcast <- get_forecast(cdata, S_R, method = methods[i_m], hilo = F, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON)
+      window <- i:(train_len + i - 1)
+      cdata <- data[window, ]
+      fcast <- get_forecast(cdata, S_R, method = methods[i_m], hilo = F, PROD, TRAIN_LEN, HORIZON, OUTPUT, ECON)
 
-        rforecasts[i] <- sum(fcast[, 2])
-        forecasts[i] <- fcast[1, 2]
+      rforecasts[i] <- sum(fcast[, 2])
+      forecasts[i] <- fcast[1, 2]
     }
     method_rfs[[i_m]] <- rforecasts
     method_fs[[i_m]] <- forecasts
@@ -956,7 +886,7 @@ generate_method_history <- function(data, S_R, PROD, RES, ECON, TRAIN_LEN, HORIZ
     wavg_obj <- wavg_selection(acc_history[, -1], alpha = 0.5, single = FALSE) # this gets us everything we need
     wavg_v <- c()
     fs <- master[, -1]
-    for (i in 1:(nrow(fs) - 1)) {
+    for (i in 1:(nrow(rfs) - 1)) {
       wavg <- sum(wavg_obj$coef * fs[(i + 1), wavg_obj$order[i, ]])
       wavg_v[i] <- wavg
     }
@@ -967,25 +897,26 @@ generate_method_history <- function(data, S_R, PROD, RES, ECON, TRAIN_LEN, HORIZ
     write.table(rsavethis, file = paste0(OUTPUT, rsuffix), sep = ",", row.names = F) # save
     write.table(savethis, file = paste0(OUTPUT, suffix), sep = ",", row.names = F) # save
   } else {
-      # we use those parts of the code that don't do rolling
+    # we use those parts of the code that don't do rolling
 
-      master_fs <- t(do.call(rbind, method_fs))
-      master <- data.frame(date = forecast_dates, master_fs); colnames(master) <- c("date", methods)
-      avg <- round(rowMeans(master_fs)) # create avg
+    master_fs <- t(do.call(rbind, method_fs))
+    master <- data.frame(date = forecast_dates, master_fs); colnames(master) <- c("date", methods)
+    avg <- round(rowMeans(master_fs)) # create avg
 
-      # create wavg for point fcasts
-      acc_history <- get_errors(target, master)
-      wavg_obj <- wavg_selection(acc_history[, -1], alpha = 0.5, single = FALSE) # this gets us everything we need
-      wavg_v <- c()
-      fs <- master[, -1]
-      for (i in 1:(nrow(fs) - 1)) {
-        wavg <- sum(wavg_obj$coef * fs[(i + 1), wavg_obj$order[i, ]])
-        wavg_v[i] <- wavg
-      }
-      savethis <- cbind(master[-1, ], avg = avg[-1], wavg = round(wavg_v)) # prepare for saving
-      write.table(savethis, file = paste0(OUTPUT, suffix), sep = ",", row.names = F) # save
+    # create wavg for point fcasts
+    acc_history <- get_errors(target, master)
+    wavg_obj <- wavg_selection(acc_history[, -1], alpha = 0.5, single = FALSE) # this gets us everything we need
+    wavg_v <- c()
+    fs <- master[, -1]
+    for (i in 1:(nrow(fs) - 1)) {
+      wavg <- sum(wavg_obj$coef * fs[(i + 1), wavg_obj$order[i, ]])
+      wavg_v[i] <- wavg
     }
+    savethis <- cbind(master[-1, ], avg = avg[-1], wavg = round(wavg_v)) # prepare for saving
+    write.table(savethis, file = paste0(OUTPUT, suffix), sep = ",", row.names = F) # save
+  }
 }
+
 
 select_method <- function(data, PROD, S_R = "S", OUTPUT, ECON, TEST_LEN) {
 
@@ -1003,18 +934,18 @@ select_method <- function(data, PROD, S_R = "S", OUTPUT, ECON, TEST_LEN) {
       suffix <- "_sales_ECON_method_forecasts.csv"
       target <- data[, c(1, 2)]
     } else {
-        suffix <- "_returns_ECON_method_forecasts.csv"
-        target <- data[, c(1, 4)]
-      }
+      suffix <- "_returns_ECON_method_forecasts.csv"
+      target <- data[, c(1, 4)]
+    }
   } else {
-      RES <- find_resolution(data[, 1], format = "label")
-      if (S_R == "S") {
-        suffix <- paste0("_", RES, "_sales_OPER_method_forecasts.csv")
-        target <- data[, c(1, 2)]
+    RES <- find_resolution(data[, 1], format = "label")
+    if (S_R == "S") {
+      suffix <- paste0("_", RES, "_sales_OPER_method_forecasts.csv")
+      target <- data[, c(1, 2)]
     } else {
-        suffix <- paste0("_", RES, "_returns_OPER_method_forecasts.csv")
-        target <- data[, c(1, 4)]
-      }
+      suffix <- paste0("_", RES, "_returns_OPER_method_forecasts.csv")
+      target <- data[, c(1, 4)]
+    }
   }
 
   # ---
@@ -1104,17 +1035,17 @@ get_forecast <- function(data, S_R = "S", method = "ets", hilo = TRUE, PROD, TRA
       suffix <- paste0(PROD, "_sales_ECON_method_forecasts.csv")
       target <- data[, c(1, 2)]
     } else {
-        suffix <- paste0(PROD, "_returns_ECON_method_forecasts.csv")
-        target <- data[, c(1, 4)]
-      }
+      suffix <- paste0(PROD, "_returns_ECON_method_forecasts.csv")
+      target <- data[, c(1, 4)]
+    }
   } else {
     if (S_R == "S") {
       suffix <- paste0(PROD, "_", res, "_sales_OPER_method_forecasts.csv")
       target <- data[, c(1, 2)]
     } else {
-        suffix <- paste0(PROD, "_", res, "_returns_OPER_method_forecasts.csv")
-        target <- data[, c(1, 4)]
-      }
+      suffix <- paste0(PROD, "_", res, "_returns_OPER_method_forecasts.csv")
+      target <- data[, c(1, 4)]
+    }
   }
   if (method == "wavg" | (method %in% c("dynreg", "nn", "avg") & hilo == TRUE)) {
     file <- read.table(paste0(OUTPUT, suffix), header = TRUE, sep = ",")
@@ -1158,8 +1089,8 @@ get_forecast <- function(data, S_R = "S", method = "ets", hilo = TRUE, PROD, TRA
                            0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-                       ncol = 11,
-                       byrow = TRUE)
+                         ncol = 11,
+                         byrow = TRUE)
 
     month.m <- matrix(, nrow = nrow, ncol = 11)
     for (j in 1:nrow) {
@@ -1270,11 +1201,11 @@ get_forecast <- function(data, S_R = "S", method = "ets", hilo = TRUE, PROD, TRA
       # build a df to return
       df <- data.frame(date = forecast_dates, forecast = fcast[, 1], Lo80 = hilo[, 1], Hi80 = hilo[, 2], Lo95 = hilo[, 3], Hi95 = hilo[, 4])
     } else {
-        df <- data.frame(date = forecast_dates, forecast = fcast[, 1], Lo80 = fcast[, 2], Hi80 = fcast[, 3], Lo95 = fcast[, 4], Hi95 = fcast[, 5])
-      }
-  } else {
-      df <- data.frame(date = forecast_dates, forecast = fcast[, 1])
+      df <- data.frame(date = forecast_dates, forecast = fcast[, 1], Lo80 = fcast[, 2], Hi80 = fcast[, 3], Lo95 = fcast[, 4], Hi95 = fcast[, 5])
     }
+  } else {
+    df <- data.frame(date = forecast_dates, forecast = fcast[, 1])
+  }
 
   # ---
   # transforms (if needed) ----
@@ -1283,8 +1214,8 @@ get_forecast <- function(data, S_R = "S", method = "ets", hilo = TRUE, PROD, TRA
     if (method %in% c("nn", "dynreg")) {
       df[, c(1, 2)] <- workday_adjustment(df[, c(1, 2)], reverse = TRUE)
     } else {
-        df <- workday_adjustment(df, reverse = TRUE)
-      }
+      df <- workday_adjustment(df, reverse = TRUE)
+    }
     df[, -1] <- round(df[, -1])
     # force out subzeroes
     # NB! this will ruin the probability mass distribution in the intervals if they have subzeroes
@@ -1293,7 +1224,7 @@ get_forecast <- function(data, S_R = "S", method = "ets", hilo = TRUE, PROD, TRA
   } else {
     df[, -1] <- round(df[, -1])
     df[df < 0] <- 0
-    }
+  }
 
   # this scales and justifies the bootstrapped hilo
   if (method %in% c("wavg", "avg", "nn", "dynreg") & dim(df)[2] == 6) {
@@ -1328,41 +1259,41 @@ get_forecast <- function(data, S_R = "S", method = "ets", hilo = TRUE, PROD, TRA
           write.table(tobesaved, file = savepath, append = T, sep = ",", col.names = F, row.names = F)
         }
       } else {
-          savepath <- paste0(OUTPUT, PROD, "_returns_ECON_forecasts.csv")
-          file <- read.table(savepath, header = T, sep = ","); file[, 1] <- as.Date(file[, 1])
-          if (file[nrow(file), 1] < df[1, 1]) {
-            datasum <- sum(tail(data[, 4], 23))
-            rollfcast <- datasum + df[1, 2]
-            tobesaved <- data.frame(date = fdate, method = method, forecast = rollfcast)
-            write.table(tobesaved, file = savepath, append = T, sep = ",", col.names = F, row.names = F)
-          }
-          savepath <- paste0(OUTPUT, PROD, "_returns_ECON_point_forecasts.csv")
-          file <- read.table(savepath, header = T, sep = ","); file[, 1] <- as.Date(file[, 1])
-          if (file[nrow(file), 1] < df[1, 1]) {
-            fcast <- df[1, 2]
-            tobesaved <- data.frame(date = fdate, method = method, forecast = fcast)
-            write.table(tobesaved, file = savepath, append = T, sep = ",", col.names = F, row.names = F)
-          }
+        savepath <- paste0(OUTPUT, PROD, "_returns_ECON_forecasts.csv")
+        file <- read.table(savepath, header = T, sep = ","); file[, 1] <- as.Date(file[, 1])
+        if (file[nrow(file), 1] < df[1, 1]) {
+          datasum <- sum(tail(data[, 4], 23))
+          rollfcast <- datasum + df[1, 2]
+          tobesaved <- data.frame(date = fdate, method = method, forecast = rollfcast)
+          write.table(tobesaved, file = savepath, append = T, sep = ",", col.names = F, row.names = F)
         }
-    } else {
-        if (S_R == "S") {
-          savepath <- paste0(OUTPUT, PROD, "_", res, "_sales_OPER_forecasts.csv")
-          file <- read.table(savepath, header = T, sep = ","); file[, 1] <- as.Date(file[, 1])
-          if (file[nrow(file), 1] < df[1, 1]) {
-            fcast <- df[1, 2]
-            tobesaved <- data.frame(date = fdate, method = method, forecast = fcast)
-            write.table(tobesaved, file = savepath, append = T, sep = ",", col.names = F, row.names = F)
-          }
-        } else {
-            savepath <- paste0(OUTPUT, PROD, "_", res, "_returns_OPER_forecasts.csv")
-            file <- read.table(savepath, header = T, sep = ","); file[, 1] <- as.Date(file[, 1])
-            if (file[nrow(file), 1] < df[1, 1]) {
-              fcast <- df[1, 2]
-              tobesaved <- data.frame(date = fdate, method = method, forecast = fcast)
-              write.table(tobesaved, file = savepath, append = T, sep = ",", col.names = F, row.names = F)
-            }
-          }
+        savepath <- paste0(OUTPUT, PROD, "_returns_ECON_point_forecasts.csv")
+        file <- read.table(savepath, header = T, sep = ","); file[, 1] <- as.Date(file[, 1])
+        if (file[nrow(file), 1] < df[1, 1]) {
+          fcast <- df[1, 2]
+          tobesaved <- data.frame(date = fdate, method = method, forecast = fcast)
+          write.table(tobesaved, file = savepath, append = T, sep = ",", col.names = F, row.names = F)
+        }
       }
+    } else {
+      if (S_R == "S") {
+        savepath <- paste0(OUTPUT, PROD, "_", res, "_sales_OPER_forecasts.csv")
+        file <- read.table(savepath, header = T, sep = ","); file[, 1] <- as.Date(file[, 1])
+        if (file[nrow(file), 1] < df[1, 1]) {
+          fcast <- df[1, 2]
+          tobesaved <- data.frame(date = fdate, method = method, forecast = fcast)
+          write.table(tobesaved, file = savepath, append = T, sep = ",", col.names = F, row.names = F)
+        }
+      } else {
+        savepath <- paste0(OUTPUT, PROD, "_", res, "_returns_OPER_forecasts.csv")
+        file <- read.table(savepath, header = T, sep = ","); file[, 1] <- as.Date(file[, 1])
+        if (file[nrow(file), 1] < df[1, 1]) {
+          fcast <- df[1, 2]
+          tobesaved <- data.frame(date = fdate, method = method, forecast = fcast)
+          write.table(tobesaved, file = savepath, append = T, sep = ",", col.names = F, row.names = F)
+        }
+      }
+    }
   }
 
   # ---
@@ -1384,16 +1315,16 @@ draw_forecast <- function(forecast, data, ECON, OUTPUT, selected_method, RES, PR
     pmh_suffix <- paste0(PROD, "_sales_ECON_method_point_forecasts.csv") # this for error calc
     forecast <- head(forecast, -12) # there is 12 months too much for plotting purposes in ECON
   } else {
-      fh_suffix <- paste0(PROD, "_", RES, "_sales_OPER_forecasts.csv")
-      mh_suffix <- paste0(PROD, "_", RES, "_sales_OPER_method_forecasts.csv")
-    }
+    fh_suffix <- paste0(PROD, "_", RES, "_sales_OPER_forecasts.csv")
+    mh_suffix <- paste0(PROD, "_", RES, "_sales_OPER_method_forecasts.csv")
+  }
   if (ECON) {
     forecast_history <- read.table(paste0(OUTPUT, pfh_suffix), header = TRUE, sep = ",", colClasses = c("Date", "character", NA))[, c(1, 3)] # we use type detection for the numerics (=NA), because, for some reason, it doesn't understand it if we put it in explicitly??
     forecast_history[, 1] <- as.Date(forecast_history[, 1])
   } else {
-      forecast_history <- read.table(paste0(OUTPUT, fh_suffix), header = TRUE, sep = ",", colClasses = c("Date", "character", NA))[, c(1, 3)] # we use type detection for the numerics (=NA), because, for some reason, it doesn't understand it if we put it in explicitly??
-      forecast_history[, 1] <- as.Date(forecast_history[, 1])
-    }
+    forecast_history <- read.table(paste0(OUTPUT, fh_suffix), header = TRUE, sep = ",", colClasses = c("Date", "character", NA))[, c(1, 3)] # we use type detection for the numerics (=NA), because, for some reason, it doesn't understand it if we put it in explicitly??
+    forecast_history[, 1] <- as.Date(forecast_history[, 1])
+  }
 
   if (PROD == "RBC") {titlefix <- "Punasolut"}
   if (PROD == "PLAT") {titlefix <- "Trombosyytit"}
@@ -1416,8 +1347,8 @@ draw_forecast <- function(forecast, data, ECON, OUTPUT, selected_method, RES, PR
   if (ECON) {
     method_history <- read.table(paste0(OUTPUT, pmh_suffix), header = TRUE, sep = ",")[, c(1, coln)]; method_history[, 1] <- as.Date(method_history[, 1])
   } else {
-      method_history <- read.table(paste0(OUTPUT, mh_suffix), header = TRUE, sep = ",")[, c(1, coln)]; method_history[, 1] <- as.Date(method_history[, 1])
-    }
+    method_history <- read.table(paste0(OUTPUT, mh_suffix), header = TRUE, sep = ",")[, c(1, coln)]; method_history[, 1] <- as.Date(method_history[, 1])
+  }
   if (RES == "daily") {
     past_length <- 365
     h <- tail(data[, 1], past_length)
@@ -1492,12 +1423,12 @@ draw_forecast <- function(forecast, data, ECON, OUTPUT, selected_method, RES, PR
          color = "Väri") +
     scale_x_date(date_labels = "%m/%Y") +
     theme(text = element_text(size = 20),
-      panel.background = element_rect(fill = "transparent"), # bg of the panel
-      plot.background = element_rect(fill = "transparent", color = NA), # bg of the plot
-      panel.grid.major = element_blank(), # get rid of major grid
-      panel.grid.minor = element_blank(), # get rid of minor grid
-      legend.background = element_blank(),
-      legend.box.background = element_rect(colour = "transparent")
+          panel.background = element_rect(fill = "transparent"), # bg of the panel
+          plot.background = element_rect(fill = "transparent", color = NA), # bg of the plot
+          panel.grid.major = element_blank(), # get rid of major grid
+          panel.grid.minor = element_blank(), # get rid of minor grid
+          legend.background = element_blank(),
+          legend.box.background = element_rect(colour = "transparent")
     )
 }
 
@@ -1528,20 +1459,20 @@ table_previous_year <- function(data, PROD) {
   table <- cbind(m, c(datasum, fcastsum, rawdiffsum, pdiffavg)); colnames(table) <- c(data_part[, 1], "Yhteensä/k.a.")
 
   datatable(table, rownames = TRUE, filter = "none", extensions = 'Buttons', options = list(pageLength = 5,
-                                                                                                      scrollX = T,
-                                                                                                      dom = 'tB',
-                                                                                                      buttons = list("copy",
-                                                                                                                     list(extend = "excel",
-                                                                                                                          filename = paste0(prefix, "_TE_", last_year_in_data),
-                                                                                                                          title = paste0(prefix, " | Toteuma ja ennuste | ", last_year_in_data)),
-                                                                                                                     list(extend = "csv",
-                                                                                                                          filename = paste0(prefix, "_TE_", last_year_in_data)),
-                                                                                                                     list(extend = "pdf",
-                                                                                                                          filename = paste0(prefix, "_TE_", last_year_in_data),
-                                                                                                                          title = paste0(prefix, " | Toteuma ja ennuste | ", last_year_in_data),
-                                                                                                                          pageSize = "LEGAL",
-                                                                                                                          orientation = "landscape")),
-                                                                                                      fixedColumns = list(leftColumns = 1)))
+                                                                                            scrollX = T,
+                                                                                            dom = 'tB',
+                                                                                            buttons = list("copy",
+                                                                                                           list(extend = "excel",
+                                                                                                                filename = paste0(prefix, "_TE_", last_year_in_data),
+                                                                                                                title = paste0(prefix, " | Toteuma ja ennuste | ", last_year_in_data)),
+                                                                                                           list(extend = "csv",
+                                                                                                                filename = paste0(prefix, "_TE_", last_year_in_data)),
+                                                                                                           list(extend = "pdf",
+                                                                                                                filename = paste0(prefix, "_TE_", last_year_in_data),
+                                                                                                                title = paste0(prefix, " | Toteuma ja ennuste | ", last_year_in_data),
+                                                                                                                pageSize = "LEGAL",
+                                                                                                                orientation = "landscape")),
+                                                                                            fixedColumns = list(leftColumns = 1)))
 }
 
 
@@ -1568,23 +1499,22 @@ table_current_year <- function(data, comb_forecast, PROD) {
       this_year_df <- cbind(rotated_data, rotated_fcast)
       sums <- c(sum(this_year_df[1, ]), sum(this_year_df[2, ]), sum(this_year_df[3, ]))
       this_year_table <- cbind(this_year_df, Yhteensä = sums)
-  } else {
+    } else {
       this_year_df <- rotated_data
       sums <- c(sum(this_year_df[1, ]), sum(this_year_df[2, ]), sum(this_year_df[3, ]))
       this_year_table <- cbind(this_year_df, Yhteensä = sums)
     }
   } else {
-      fcast_part <- comb_forecast[, c(1, 2, 7, 8)] %>% filter(year(date) == (last_year_in_data + 1)) %>% mutate(date = paste0("Ennuste\n", month(date), "/", year(date)))
-      colnames(fcast_part) <- c("date", "sales", "deliveries", "returns")
-      rotated_fcast <- fcast_part %>%
-        gather(sales, deliveries, -date) %>%
-        spread(date, deliveries) %>%
-        select(fcast_part$date); rownames(rotated_fcast) <- c("Toimitukset", "Palautukset", "Myynti")
-      this_year_df <- rotated_fcast
-      sums <- c(sum(this_year_df[1, ]), sum(this_year_df[2, ]), sum(this_year_df[3, ]))
-      this_year_table <- cbind(this_year_df, Yhteensä = sums)
-    }
-
+    fcast_part <- comb_forecast[, c(1, 2, 7, 8)] %>% filter(year(date) == (last_year_in_data + 1)) %>% mutate(date = paste0("Ennuste\n", month(date), "/", year(date)))
+    colnames(fcast_part) <- c("date", "sales", "deliveries", "returns")
+    rotated_fcast <- fcast_part %>%
+      gather(sales, deliveries, -date) %>%
+      spread(date, deliveries) %>%
+      select(fcast_part$date); rownames(rotated_fcast) <- c("Toimitukset", "Palautukset", "Myynti")
+    this_year_df <- rotated_fcast
+    sums <- c(sum(this_year_df[1, ]), sum(this_year_df[2, ]), sum(this_year_df[3, ]))
+    this_year_table <- cbind(this_year_df, Yhteensä = sums)
+  }
   datatable(this_year_table, rownames = TRUE, filter = "none", extensions = 'Buttons', options = list(pageLength = 5,
                                                                                                       scrollX = T,
                                                                                                       dom = 'tB',
@@ -1674,18 +1604,18 @@ table_generic <- function(comb_forecast, PROD) {
   df <- rbind(sales, ret, deliv); rownames(df) <- c("Myynti", "Palautukset", "Toimitukset"); colnames(df) <- cnames
 
   datatable(df, rownames = TRUE, filter = "none", extensions = 'Buttons', options = list(pageLength = 5,
-                                                                                                      scrollX = T,
-                                                                                                      dom = 'tB',
-                                                                                                      buttons = list("copy",
-                                                                                                                     list(extend = "excel",
-                                                                                                                          filename = paste0(prefix, "_E_", today()),
-                                                                                                                          title = paste0(prefix, " | Ennutsennuste | ", today())),
-                                                                                                                     list(extend = "csv",
-                                                                                                                          filename = paste0(prefix, "_E_", today())),
-                                                                                                                     list(extend = "pdf",
-                                                                                                                          filename = paste0(prefix, "_E_", today()),
-                                                                                                                          title = paste0(prefix, " | Ennuste | ", today()),
-                                                                                                                          pageSize = "LEGAL",
-                                                                                                                          orientation = "landscape")),
-                                                                                                      fixedColumns = list(leftColumns = 1)))
+                                                                                         scrollX = T,
+                                                                                         dom = 'tB',
+                                                                                         buttons = list("copy",
+                                                                                                        list(extend = "excel",
+                                                                                                             filename = paste0(prefix, "_E_", today()),
+                                                                                                             title = paste0(prefix, " | Ennutsennuste | ", today())),
+                                                                                                        list(extend = "csv",
+                                                                                                             filename = paste0(prefix, "_E_", today())),
+                                                                                                        list(extend = "pdf",
+                                                                                                             filename = paste0(prefix, "_E_", today()),
+                                                                                                             title = paste0(prefix, " | Ennuste | ", today()),
+                                                                                                             pageSize = "LEGAL",
+                                                                                                             orientation = "landscape")),
+                                                                                         fixedColumns = list(leftColumns = 1)))
 }

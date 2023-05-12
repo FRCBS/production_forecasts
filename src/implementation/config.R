@@ -3,7 +3,7 @@
 
 # Where does your raw data come from? Currently, raw data looks like this: DWSALES_YYYY-MM-DDT######.dat
 # Missä ennustimen raakadata sijaitsee? Raakadata näyttää toistaiseksi tältä: DWSALES_YYYY-MM-DDT######.dat
-INPUT <- "~/prodfore_internal/data/rawdata/"
+INPUT <- "~/prodfore_internal/data/2022/"
 
 # Where do you want to save the aggregate data it needs?
 # Minne ennustimen halutaan tallentavan sen tarvitsemia aggregaattitietoja?

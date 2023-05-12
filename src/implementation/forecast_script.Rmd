@@ -1,5 +1,5 @@
 ---
-title: "<center>Myyntiennusteraportti</center>"
+title: "Myyntiennusteraportti"
 pagetitle: Myyntiennusteraportti
 output: 
   html_document: 
@@ -20,7 +20,7 @@ knitr::opts_chunk$set(dev.args = list(bg = "transparent")) # this enables transp
 options(OutDec = ",") # this changes the number separator from a period to a comma
 #.libPaths("packrat/lib/x86_64-pc-linux-gnu/3.6.1/")
 
-source("~/prodfore_internal/src/report_functions_internal.R") # source our own helper functions
+source("~/forecaster-investigations/src/report_functions_internal.R") # source our own helper functions
 library(tidyverse) # on our serverside it seems tidyverse needs to be loaded first
 library(data.table)
 library(dplyr)
@@ -340,6 +340,7 @@ Ennusteet
 table_generic(comb_forecast, PROD)
 ```
 
+
 ```{r PLAT_tab_title, echo = F, results = 'asis', eval = PLAT & !(ECON)}
 cat("### Trombosyyttituotteet")
 ```
@@ -404,6 +405,7 @@ Ennusteet
 table_generic(comb_forecast, PROD)
 ```
 
+
 ```{r O+_tab_title, echo = F, results = 'asis', eval = OPLUS}
 cat("### O+")
 ```
@@ -467,6 +469,7 @@ Ennusteet
 ```{r O+_generic_table, R.options = list(width = 100), echo = FALSE, eval = OPLUS & !(ECON), message = FALSE, warning = FALSE}
 table_generic(comb_forecast, PROD)
 ```
+
 
 ```{r O-_tab_title, echo = F, results = 'asis', eval = OMINUS}
 cat("### O-")
@@ -921,7 +924,6 @@ Ennusteet
 ```{r AB-_generic_table, R.options = list(width = 100), echo = FALSE, eval = ABMINUS & !(ECON), message = FALSE, warning = FALSE}
 table_generic(comb_forecast, PROD)
 ```
-
 
 ### Selite
 
